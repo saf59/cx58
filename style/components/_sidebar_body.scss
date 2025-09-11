@@ -1,0 +1,28 @@
+.sb-sidebar-body {
+  a {
+    display: flex;
+    height: 65px;
+    width: 100%;
+    color: var(--h-textcolor);
+    line-height: 65px;
+    box-sizing: border-box;
+    transition: all .5s ease;
+  }
+
+  a.active, a:hover {
+    color: var(--accent-color);
+    background: linear-gradient(to left, var(--accent-color), var(--gradient-color));
+  }
+
+  a i {
+    font-size: 23px;
+    margin-left: 16px;
+    margin-right: 16px;
+    align-content: center;
+  }
+
+  a span {
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+}
