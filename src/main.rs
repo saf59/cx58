@@ -1,13 +1,14 @@
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() {
-    use axum::Router;
+    use axum::{routing::get, Router};
     use leptos::logging::log;
     use leptos::prelude::*;
     use leptos_axum::{generate_route_list, LeptosRoutes};
-    use cx58::auth::{auth_callback, logout_handler, AppState, AuthTokenLayer};
+    use cx58::auth::{auth_callback, logout_handler, AppState, AuthTokenLayer };
     use cx58::app::*;
     use cx58::config::AppConfig;
+    use cx58::rbac::{ensure_role, Authenticated, Role};
     // 1. Создаем ПОЛНУЮ конфигурацию один раз
     let app_config = AppConfig::from_env().expect("Failed to load config");
     let app_config_clone = app_config.clone();
@@ -23,6 +24,15 @@ async fn main() {
         config: app_config_clone,
     };
     // 4. Собираем Router
+    async fn me(Authenticated(claims): Authenticated) -> String {
+        format!("hello {}", claims.name.unwrap_or(claims.sub))
+    }
+
+    async fn admin_stats(Authenticated(claims): Authenticated) -> Result<&'static str, (axum::http::StatusCode, &'static str)> {
+        ensure_role(&claims, Role::Admin)?;
+        Ok("Top secret stats")
+    }
+
     let app = Router::new()
         .leptos_routes(&app_state, routes, {
             let leptos_options = app_state.leptos_options.clone();
@@ -30,6 +40,8 @@ async fn main() {
         })
         .route("/api/auth/callback", axum::routing::get(auth_callback))
         .route("/api/auth/logout", axum::routing::post(logout_handler))
+        .route("/api/me", get(me))
+        .route("/api/admin/stats", get(admin_stats))
         .fallback(leptos_axum::file_and_error_handler::<AppState, _>(shell))
         .layer(axum::Extension(app_config.clone()))
         .layer(AuthTokenLayer::new(app_config))

@@ -1,4 +1,4 @@
-﻿#![allow(unused_imports)]
+#![allow(unused_imports)]
 use leptos::prelude::LeptosOptions;
 use std::collections::HashMap;
 use std::future::Future;
@@ -37,6 +37,7 @@ pub struct Claims {
     pub sub: String,
     pub email: Option<String>,
     pub name: Option<String>,
+    pub roles: Option<Vec<String>>,
     pub exp: usize,
 }
 #[cfg(feature = "ssr")]

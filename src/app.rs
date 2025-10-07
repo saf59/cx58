@@ -74,25 +74,6 @@ pub fn App() -> impl IntoView {
     }
 }
 
-/*fn provide_all(resource: Resource<Result<PublicConfig, ServerFnError>>) {
-    // Provides context that manages stylesheets, titles, meta tags, etc.
-    //let profile = Resource::new(|| (), |_| async { get_profile_claims().await });
-    let public_config: PublicConfig = resource.get().expect("111").unwrap();
-
-    let auth_parameters = AuthParameters {
-        issuer: public_config.oidc_issuer_url.clone(),
-        client_id: public_config.oidc_client_id.clone(),
-        redirect_uri: public_config.redirect_uri.clone(),
-        post_logout_redirect_uri: format!("{}/logout", public_config.redirect_uri.clone()),
-        challenge: Challenge::S256,
-        scope: Some("openid email profile".to_string()),
-        audience: None,
-    };
-    provide_context(public_config);
-
-    let _auth = Auth::init(auth_parameters);
-}
-*/
 // Server function to get public config
 #[server]
 pub async fn get_public_config() -> Result<PublicConfig, ServerFnError> {

@@ -51,7 +51,7 @@ pub fn HomePage() -> impl IntoView {
 
         // A more complex example with optional fallbacks for the loading and unauthenticated state
         <Authenticated
-            unauthenticated=move || view! { "this will only be rendered if the user is unauthenticated" }
+            unauthenticated=move || view! { "This will only be rendered if the user is unauthenticated" }
             //loading=move || view! { "this will only be rendered if the library is still loading" }
             >
                 "This will only be rendered if the user is authenticated"

@@ -3,6 +3,7 @@ pub mod components;
 pub mod auth;
 pub mod config;
 pub mod error;
+pub mod rbac;
 
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]
