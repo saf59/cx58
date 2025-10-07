@@ -1,0 +1,83 @@
+﻿use serde::{Deserialize, Serialize};
+use std::env;
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SameSiteConfig {
+    Strict,
+    Lax,
+    None
+}
+
+impl From<SameSiteConfig> for cookie::SameSite {
+    fn from(config: SameSiteConfig) -> Self {
+        match config {
+            SameSiteConfig::Strict => cookie::SameSite::Strict,
+            SameSiteConfig::Lax => cookie::SameSite::Lax,
+            SameSiteConfig::None => cookie::SameSite::None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CookieConfig {
+    pub secure: bool,
+    pub http_only: bool,
+    pub same_site: SameSiteConfig,
+    pub max_age_secs: i64,
+    pub path: String,
+}
+
+impl Default for CookieConfig {
+    fn default() -> Self {
+        Self {
+            secure: true,
+            http_only: true,
+            same_site: SameSiteConfig::Lax,
+            max_age_secs: 3600, // 1 hour
+            path: "/".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AppConfig {
+    pub oidc_issuer_url: String,
+    pub oidc_client_id: String,
+    #[serde(skip_serializing)] // Never send to client
+    pub oidc_client_secret: String,
+    pub oidc_redirect_uri: String,
+    pub oidc_scopes: String,
+    pub cookie_config: CookieConfig
+}
+
+impl AppConfig {
+    pub fn from_env() -> Result<Self, env::VarError> {
+        Ok(Self {
+            oidc_issuer_url: env::var("OIDC_ISSUER_URL").expect("OIDC_ISSUER_URL must be set"),
+            oidc_client_id: env::var("OIDC_CLIENT_ID").expect("OIDC_CLIENT_ID must be set"),
+            oidc_client_secret: env::var("OIDC_CLIENT_SECRET").expect("OIDC_CLIENT_SECRET must be set"), // Server-only
+            oidc_redirect_uri: env::var("OIDC_REDIRECT_URI").expect("OIDC_REDIRECT_URI must be set"),
+            oidc_scopes: env::var("OIDC_SCOPES")
+                .unwrap_or_else(|_| "openid profile email".to_string()),
+            cookie_config: CookieConfig::default(),
+        })
+    }
+
+    // Public config for client (without secret)
+    pub fn public_config(&self) -> PublicConfig {
+        PublicConfig {
+            oidc_issuer_url: self.oidc_issuer_url.clone(),
+            oidc_client_id: self.oidc_client_id.clone(),
+            redirect_uri: self.oidc_redirect_uri.clone(),
+            scopes: self.oidc_scopes.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PublicConfig {
+    pub oidc_issuer_url: String,
+    pub oidc_client_id: String,
+    pub redirect_uri: String,
+    pub scopes: String,
+}
