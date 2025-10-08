@@ -1,7 +1,10 @@
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() {
-    use axum::{routing::get, Router};
+    use axum::{routing::get, Router, middleware};
+    use axum::http::{HeaderName, HeaderValue};
+    use axum::extract::Request;
+    use axum::middleware::Next;
     use leptos::logging::log;
     use leptos::prelude::*;
     use leptos_axum::{generate_route_list, LeptosRoutes};
@@ -33,6 +36,33 @@ async fn main() {
         Ok("Top secret stats")
     }
 
+    async fn security_headers(req: Request, next: Next) -> axum::response::Response {
+        let mut res = next.run(req).await;
+        let headers = res.headers_mut();
+        // X-Frame-Options
+        let _ = headers.insert(
+            HeaderName::from_static("x-frame-options"),
+            HeaderValue::from_static("DENY"),
+        );
+        // X-Content-Type-Options
+        let _ = headers.insert(
+            HeaderName::from_static("x-content-type-options"),
+            HeaderValue::from_static("nosniff"),
+        );
+        // X-XSS-Protection (legacy; some scanners still require it)
+        let _ = headers.insert(
+            HeaderName::from_static("x-xss-protection"),
+            HeaderValue::from_static("1; mode=block"),
+        );
+        // Content-Security-Policy (adjust as needed for your app)
+        // Note: this CSP is relaxed for DEV to avoid breaking hot-reload and external fonts.
+        let csp = "default-src 'self'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://use.fontawesome.com; img-src 'self' data: blob:; font-src 'self' data: https://use.fontawesome.com; connect-src 'self' ws: wss:";
+        if let Ok(val) = HeaderValue::from_str(csp) {
+            let _ = headers.insert(HeaderName::from_static("content-security-policy"), val);
+        }
+        res
+    }
+
     let app = Router::new()
         .leptos_routes(&app_state, routes, {
             let leptos_options = app_state.leptos_options.clone();
@@ -43,6 +73,7 @@ async fn main() {
         .route("/api/me", get(me))
         .route("/api/admin/stats", get(admin_stats))
         .fallback(leptos_axum::file_and_error_handler::<AppState, _>(shell))
+        .layer(middleware::from_fn(security_headers))
         .layer(axum::Extension(app_config.clone()))
         .layer(AuthTokenLayer::new(app_config))
         .with_state(app_state);
