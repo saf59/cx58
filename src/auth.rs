@@ -68,8 +68,8 @@ mod tests {
         assert!(v.contains("Path=/"));
     }
 
-    #[test]
-    fn test_validate_token_expired_maps_tokenexpired() {
+    #[tokio::test]
+    async fn test_validate_token_expired_maps_tokenexpired() {
         // Create token that expired 10 seconds ago
         let now = (chrono::Utc::now().timestamp() - 10) as usize;
         let claims = Claims { sub: "u".into(), email: None, name: None, roles: None, exp: now };
@@ -82,7 +82,7 @@ mod tests {
             oidc_scopes: "openid".into(),
             cookie_config: CookieConfig::default(),
         };
-        let res = validate_token(&token, &cfg);
+        let res = validate_token(&token, &cfg).await;
         match res {
             Err(AuthError::TokenExpired) => {},
             other => panic!("expected TokenExpired, got {:?}", other),
@@ -235,31 +235,82 @@ pub async fn logout_handler(State(state): State<AppState>) -> Response {
 }
 
 #[cfg(feature = "ssr")]
-fn validate_token(token: &str, _config: &AppConfig) -> Result<Claims, AuthError> {
-    // Simplified validation - in production, verify signature with JWKS
-    let header = decode_header(token)?;
+async fn validate_token(token: &str, config: &AppConfig) -> Result<Claims, AuthError> {
+    // PROD: verify against JWKS
+    let is_prod = std::env::var("LEPTOS_ENV").ok()
+        .or_else(|| std::env::var("APP_ENV").ok())
+        .map(|v| matches!(v.as_str(), "PROD" | "prod" | "Production" | "production"))
+        .unwrap_or(false);
 
-    // Decode without validating exp to inspect claims
-    let mut validation = Validation::new(header.alg);
+    let header = decode_header(token)?;
+    let alg = header.alg;
+
+    if is_prod {
+        let decoding_key = get_decoding_key_from_jwks(&config.oidc_issuer_url, header.kid.as_deref()).await?;
+        let mut validation = Validation::new(alg);
+        validation.validate_exp = true;
+        let token_data = decode::<Claims>(token, &decoding_key, &validation)?;
+        return Ok(token_data.claims);
+    }
+
+    // DEV: insecure path, manual exp check
+    let mut validation = Validation::new(alg);
     validation.insecure_disable_signature_validation();
     validation.validate_exp = false;
-
-    let token_data = decode::<Claims>(
-        token,
-        &DecodingKey::from_secret(&[]), // Dummy key for insecure validation
-        &validation,
-    )?;
-
+    let token_data = decode::<Claims>(token, &DecodingKey::from_secret(&[]), &validation)?;
     let claims = token_data.claims;
-    // Manual exp check
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs() as usize;
-    if claims.exp <= now {
-        return Err(AuthError::TokenExpired);
-    }
+    if claims.exp <= now { return Err(AuthError::TokenExpired); }
     Ok(claims)
+}
+
+#[cfg(feature = "ssr")]
+async fn get_decoding_key_from_jwks(issuer: &str, kid: Option<&str>) -> Result<DecodingKey, AuthError> {
+    use once_cell::sync::OnceCell;
+    use std::collections::HashMap;
+    use std::sync::RwLock;
+
+    static JWKS_CACHE: OnceCell<RwLock<HashMap<String, DecodingKey>>> = OnceCell::new();
+    let cache = JWKS_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
+
+    if let Some(kid) = kid {
+        if let Ok(map) = cache.read() {
+            if let Some(key) = map.get(kid) {
+                return Ok(key.clone());
+            }
+        }
+    }
+
+    // Fetch OIDC config
+    let conf_url = format!("{}/.well-known/openid-configuration", issuer.trim_end_matches('/'));
+    let oidc_conf: serde_json::Value = reqwest::get(conf_url).await?.json().await?;
+    let jwks_uri = oidc_conf["jwks_uri"].as_str().ok_or(AuthError::InvalidToken)?.to_string();
+    let jwks: serde_json::Value = reqwest::get(jwks_uri).await?.json().await?;
+    let keys = jwks["keys"].as_array().ok_or(AuthError::InvalidToken)?;
+
+    // Prefer matching kid; otherwise take first RSA key
+    let choose = |k: &serde_json::Value| {
+        k["kty"].as_str() == Some("RSA") && k["n"].is_string() && k["e"].is_string()
+    };
+    let selected = if let Some(kid) = kid {
+        keys.iter().find(|k| choose(k) && k["kid"].as_str() == Some(kid))
+            .or_else(|| keys.iter().find(|k| choose(k)))
+    } else {
+        keys.iter().find(|k| choose(k))
+    }.ok_or(AuthError::InvalidToken)?;
+
+    let n_b64 = selected["n"].as_str().ok_or(AuthError::InvalidToken)?;
+    let e_b64 = selected["e"].as_str().ok_or(AuthError::InvalidToken)?;
+    // jsonwebtoken accepts base64url (no padding) components directly
+    let key = DecodingKey::from_rsa_components(n_b64, e_b64).map_err(|_| AuthError::InvalidToken)?;
+
+    if let Some(kid) = selected["kid"].as_str() {
+        if let Ok(mut map) = cache.write() { map.insert(kid.to_string(), key.clone()); }
+    }
+    Ok(key)
 }
 
 // Middleware for token validation and refresh
@@ -434,7 +485,7 @@ where
                 let mut new_tokens = None;
 
                 if let Some(id_cookie) = cookies.iter().find(|c| c.name() == COOKIE_ID_TOKEN) {
-                    match validate_token(id_cookie.value(), &config) {
+                    match validate_token(id_cookie.value(), &config).await {
                         Ok(claims) => {
                             req.extensions_mut().insert(claims);
                         }

@@ -32,6 +32,7 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
             <head>
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <CspNonceHead />
                 <AutoReload options=options.clone() />
                 <HydrationScripts options />
                 <MetaTags />
@@ -42,6 +43,49 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
         </html>
     }
 }
+
+// Server function to read CSP nonce from response headers inserted by middleware
+#[server]
+pub async fn get_csp_nonce() -> Result<Option<String>, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use axum::http::HeaderMap;
+        use leptos_axum::extract;
+
+        let headers: HeaderMap = extract().await?;
+        let nonce = headers
+            .get("x-csp-nonce")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+        Ok(nonce)
+    }
+    #[cfg(not(feature = "ssr"))]
+    {
+        Ok(None)
+    }
+}
+
+#[component]
+fn CspNonceHead() -> impl IntoView {
+    // Fetch nonce via server fn once per render
+    let res = Resource::new(|| (), |_| async move { get_csp_nonce().await.ok().flatten() });
+    view! {
+        <Suspense fallback=|| view!{ <></> }>
+            <Show when=move || res.get().is_some() fallback=|| view!{ <></> }>
+                {move || {
+                    let nonce = res.get().unwrap();
+                    view! {
+                        <meta name="csp-nonce" content=nonce.clone() />
+                        <script nonce=nonce>
+                            {"/* CSP nonce wired */"}
+                        </script>
+                    }
+                }}
+            </Show>
+        </Suspense>
+    }
+}
+
 
 #[component]
 pub fn App() -> impl IntoView {
