@@ -107,7 +107,7 @@ async fn main() {
             )
         } else {
             format!(
-                "default-src 'self'; frame-ancestors 'none'; script-src 'self' 'nonce-{}' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://use.fontawesome.com 'nonce-{}'; img-src 'self' data: blob:; font-src 'self' data: https://use.fontawesome.com; connect-src 'self'",
+                "default-src 'self'; frame-ancestors 'none'; script-src 'self' 'nonce-{}' 'wasm-unsafe-eval'; style-src 'self' https://use.fontawesome.com 'nonce-{}'; img-src 'self' data: blob:; font-src 'self' data: https://use.fontawesome.com; connect-src 'self'",
                 nonce, nonce
             )
         };
