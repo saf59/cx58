@@ -1,11 +1,12 @@
-﻿use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::env;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SameSiteConfig {
     Strict,
     Lax,
-    None
+    None,
 }
 
 impl From<SameSiteConfig> for cookie::SameSite {
@@ -47,11 +48,44 @@ pub struct AppConfig {
     pub oidc_client_secret: String,
     pub oidc_redirect_uri: String,
     pub oidc_scopes: String,
-    pub cookie_config: CookieConfig
+    pub cookie_config: CookieConfig,
 }
 
 impl AppConfig {
     pub fn from_env() -> Result<Self, env::VarError> {
+        // Determine environment (DEV/PROD)
+        let app_env = env::var("LEPTOS_ENV").ok()
+            .or_else(|| env::var("APP_ENV").ok())
+            .unwrap_or_else(|| "DEV".to_string());
+        let is_prod = matches!(app_env.as_str(), "PROD" | "prod" | "Production" | "production");
+
+        // Base cookie config by env
+        let mut cookie = CookieConfig::default();
+        if !is_prod {
+            // In DEV, allow non-secure cookies for http://127.0.0.1
+            cookie.secure = false;
+            cookie.same_site = SameSiteConfig::Lax;
+        }
+
+        // Overrides via env
+        if let Ok(v) = env::var("COOKIE_SECURE") {
+            cookie.secure = v.eq_ignore_ascii_case("true");
+        }
+        if let Ok(v) = env::var("COOKIE_HTTP_ONLY") {
+            cookie.http_only = v.eq_ignore_ascii_case("true");
+        }
+        if let Ok(v) = env::var("COOKIE_SAMESITE") {
+            cookie.same_site = match v.as_str() {
+                "strict" | "Strict" => SameSiteConfig::Strict,
+                "none" | "None" => SameSiteConfig::None,
+                _ => SameSiteConfig::Lax,
+            }
+        }
+        if let Ok(v) = env::var("COOKIE_MAX_AGE_SECS") {
+            if let Ok(parsed) = v.parse::<i64>() { cookie.max_age_secs = parsed; }
+        }
+        if let Ok(v) = env::var("COOKIE_PATH") { cookie.path = v; }
+
         Ok(Self {
             oidc_issuer_url: env::var("OIDC_ISSUER_URL").expect("OIDC_ISSUER_URL must be set"),
             oidc_client_id: env::var("OIDC_CLIENT_ID").expect("OIDC_CLIENT_ID must be set"),
@@ -59,7 +93,7 @@ impl AppConfig {
             oidc_redirect_uri: env::var("OIDC_REDIRECT_URI").expect("OIDC_REDIRECT_URI must be set"),
             oidc_scopes: env::var("OIDC_SCOPES")
                 .unwrap_or_else(|_| "openid profile email".to_string()),
-            cookie_config: CookieConfig::default(),
+            cookie_config: cookie,
         })
     }
 

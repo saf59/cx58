@@ -26,6 +26,8 @@ tower = "0.5.2"
 thiserror = "2.0.17"
 tracing = "0.1.41"
 async-trait = "0.1.89"
+base64 = "0.22.1"
+getrandom = "0.2.15"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

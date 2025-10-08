@@ -40,6 +40,55 @@ pub struct Claims {
     pub roles: Option<Vec<String>>,
     pub exp: usize,
 }
+
+#[cfg(all(test, feature = "ssr"))]
+mod tests {
+    use super::*;
+    use axum::http::HeaderMap;
+    use jsonwebtoken::{EncodingKey, Header as JwtHeader};
+
+    #[test]
+    fn test_set_auth_cookie_attributes() {
+        let mut headers = HeaderMap::new();
+        let cfg = CookieConfig {
+            secure: true,
+            http_only: true,
+            same_site: SameSiteConfig::Lax,
+            max_age_secs: 120,
+            path: "/".into(),
+        };
+        set_auth_cookie(&mut headers, "id_token", "abc", &cfg);
+        let set_cookie = headers.get(axum::http::header::SET_COOKIE).unwrap();
+        let v = set_cookie.to_str().unwrap();
+        assert!(v.contains("id_token=abc"));
+        assert!(v.contains("HttpOnly"));
+        assert!(v.contains("Secure"));
+        assert!(v.contains("SameSite=Lax"));
+        assert!(v.contains("Max-Age=120"));
+        assert!(v.contains("Path=/"));
+    }
+
+    #[test]
+    fn test_validate_token_expired_maps_tokenexpired() {
+        // Create token that expired 10 seconds ago
+        let now = (chrono::Utc::now().timestamp() - 10) as usize;
+        let claims = Claims { sub: "u".into(), email: None, name: None, roles: None, exp: now };
+        let token = jsonwebtoken::encode(&JwtHeader::default(), &claims, &EncodingKey::from_secret(&[])).unwrap();
+        let cfg = AppConfig {
+            oidc_issuer_url: "http://example".into(),
+            oidc_client_id: "id".into(),
+            oidc_client_secret: "sec".into(),
+            oidc_redirect_uri: "http://example/cb".into(),
+            oidc_scopes: "openid".into(),
+            cookie_config: CookieConfig::default(),
+        };
+        let res = validate_token(&token, &cfg);
+        match res {
+            Err(AuthError::TokenExpired) => {},
+            other => panic!("expected TokenExpired, got {:?}", other),
+        }
+    }
+}
 #[cfg(feature = "ssr")]
 #[derive(Debug, Deserialize)]
 pub struct CallbackQuery {
@@ -173,24 +222,27 @@ fn validate_token(token: &str, _config: &AppConfig) -> Result<Claims, AuthError>
     // Simplified validation - in production, verify signature with JWKS
     let header = decode_header(token)?;
 
+    // Decode without validating exp to inspect claims
     let mut validation = Validation::new(header.alg);
     validation.insecure_disable_signature_validation();
-    validation.validate_exp = true;
+    validation.validate_exp = false;
 
-    match decode::<Claims>(
+    let token_data = decode::<Claims>(
         token,
         &DecodingKey::from_secret(&[]), // Dummy key for insecure validation
         &validation,
-    ) {
-        Ok(token_data) => Ok(token_data.claims),
-        Err(e) => {
-            use jsonwebtoken::errors::ErrorKind;
-            if matches!(e.kind(), ErrorKind::ExpiredSignature) {
-                return Err(AuthError::TokenExpired);
-            }
-            Err(AuthError::from(e))
-        }
+    )?;
+
+    let claims = token_data.claims;
+    // Manual exp check
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as usize;
+    if claims.exp <= now {
+        return Err(AuthError::TokenExpired);
     }
+    Ok(claims)
 }
 
 // Middleware for token validation and refresh

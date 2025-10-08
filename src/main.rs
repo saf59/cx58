@@ -8,6 +8,7 @@ async fn main() {
     use leptos::logging::log;
     use leptos::prelude::*;
     use leptos_axum::{generate_route_list, LeptosRoutes};
+    use base64::Engine;
     use cx58::auth::{auth_callback, logout_handler, AppState, AuthTokenLayer };
     use cx58::app::*;
     use cx58::config::AppConfig;
@@ -36,28 +37,82 @@ async fn main() {
         Ok("Top secret stats")
     }
 
-    async fn security_headers(req: Request, next: Next) -> axum::response::Response {
+    async fn security_headers(mut req: Request, next: Next) -> axum::response::Response {
+        // Detect environment early
+        let app_env = std::env::var("LEPTOS_ENV").ok()
+            .or_else(|| std::env::var("APP_ENV").ok())
+            .unwrap_or_else(|| "DEV".to_string());
+        let is_prod = matches!(app_env.as_str(), "PROD" | "prod" | "Production" | "production");
+
+        // Generate per-request CSP nonce and place into request extensions for SSR usage
+        let mut nonce_bytes = [0u8; 16];
+        let _ = getrandom::getrandom(&mut nonce_bytes);
+        let nonce = base64::engine::general_purpose::STANDARD_NO_PAD.encode(nonce_bytes);
+        req.extensions_mut().insert(nonce.clone());
+
+        // Continue the pipeline
         let mut res = next.run(req).await;
         let headers = res.headers_mut();
-        // X-Frame-Options
+
+        // Core security headers
         let _ = headers.insert(
             HeaderName::from_static("x-frame-options"),
             HeaderValue::from_static("DENY"),
         );
-        // X-Content-Type-Options
         let _ = headers.insert(
             HeaderName::from_static("x-content-type-options"),
             HeaderValue::from_static("nosniff"),
         );
-        // X-XSS-Protection (legacy; some scanners still require it)
         let _ = headers.insert(
             HeaderName::from_static("x-xss-protection"),
             HeaderValue::from_static("1; mode=block"),
         );
-        // Content-Security-Policy (adjust as needed for your app)
-        // Note: this CSP is relaxed for DEV to avoid breaking hot-reload and external fonts.
-        let csp = "default-src 'self'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://use.fontawesome.com; img-src 'self' data: blob:; font-src 'self' data: https://use.fontawesome.com; connect-src 'self' ws: wss:";
-        if let Ok(val) = HeaderValue::from_str(csp) {
+        let _ = headers.insert(
+            HeaderName::from_static("referrer-policy"),
+            HeaderValue::from_static("no-referrer"),
+        );
+        let _ = headers.insert(
+            HeaderName::from_static("permissions-policy"),
+            HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
+        );
+        let _ = headers.insert(
+            HeaderName::from_static("cross-origin-opener-policy"),
+            HeaderValue::from_static("same-origin"),
+        );
+        let _ = headers.insert(
+            HeaderName::from_static("cross-origin-resource-policy"),
+            HeaderValue::from_static("same-origin"),
+        );
+
+        // HSTS only in PROD (assumes HTTPS termination in front)
+        if is_prod {
+            let _ = headers.insert(
+                HeaderName::from_static("strict-transport-security"),
+                HeaderValue::from_static("max-age=31536000; includeSubDomains; preload"),
+            );
+        }
+
+        // Expose nonce for potential client-side usage (optional)
+        if let Ok(val) = HeaderValue::from_str(&nonce) {
+            let _ = headers.insert(HeaderName::from_static("x-csp-nonce"), val);
+        }
+
+        // Content-Security-Policy
+        // DEV: relaxed to support HMR/hydration; include nonce as we prepare to remove 'unsafe-inline' later
+        // PROD: no ws/wss and no 'unsafe-eval'; keep 'unsafe-inline' for styles, include nonce for scripts/styles
+        let csp = if !is_prod {
+            format!(
+                "default-src 'self'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' 'nonce-{}'; style-src 'self' 'unsafe-inline' https://use.fontawesome.com 'nonce-{}'; img-src 'self' data: blob:; font-src 'self' data: https://use.fontawesome.com; connect-src 'self' ws: wss:",
+                nonce, nonce
+            )
+        } else {
+            format!(
+                "default-src 'self'; frame-ancestors 'none'; script-src 'self' 'nonce-{}' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://use.fontawesome.com 'nonce-{}'; img-src 'self' data: blob:; font-src 'self' data: https://use.fontawesome.com; connect-src 'self'",
+                nonce, nonce
+            )
+        };
+
+        if let Ok(val) = HeaderValue::from_str(&csp) {
             let _ = headers.insert(HeaderName::from_static("content-security-policy"), val);
         }
         res
