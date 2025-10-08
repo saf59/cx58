@@ -177,13 +177,20 @@ fn validate_token(token: &str, _config: &AppConfig) -> Result<Claims, AuthError>
     validation.insecure_disable_signature_validation();
     validation.validate_exp = true;
 
-    let token_data = decode::<Claims>(
+    match decode::<Claims>(
         token,
         &DecodingKey::from_secret(&[]), // Dummy key for insecure validation
         &validation,
-    )?;
-
-    Ok(token_data.claims)
+    ) {
+        Ok(token_data) => Ok(token_data.claims),
+        Err(e) => {
+            use jsonwebtoken::errors::ErrorKind;
+            if matches!(e.kind(), ErrorKind::ExpiredSignature) {
+                return Err(AuthError::TokenExpired);
+            }
+            Err(AuthError::from(e))
+        }
+    }
 }
 
 // Middleware for token validation and refresh
@@ -271,9 +278,9 @@ pub struct AuthTokenMiddleware<S> {
 // Server function to get profile claims
 #[cfg(feature = "ssr")]
 use leptos::prelude::*;
-#[cfg(feature = "ssr")]
-use leptos::server_fn::http_export::Request;
 //use leptos::server;
+#[cfg(feature = "ssr")]
+use axum::http::Request;
 
 #[cfg(feature = "ssr")]
 #[server]
