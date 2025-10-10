@@ -54,10 +54,12 @@ pub struct AppConfig {
 impl AppConfig {
     pub fn from_env() -> Result<Self, env::VarError> {
         // Determine environment (DEV/PROD)
-        let app_env = env::var("LEPTOS_ENV").ok()
-            .or_else(|| env::var("APP_ENV").ok())
-            .unwrap_or_else(|| "DEV".to_string());
-        let is_prod = matches!(app_env.as_str(), "PROD" | "prod" | "Production" | "production");
+        let app_env = env::var("APP_ENV").ok()
+            .unwrap_or_else(|| "PROD".to_string());
+        let is_prod = matches!(
+            app_env.as_str(),
+            "PROD" | "prod" | "Production" | "production"
+        );
 
         // Base cookie config by env
         let mut cookie = CookieConfig::default();
@@ -82,15 +84,21 @@ impl AppConfig {
             }
         }
         if let Ok(v) = env::var("COOKIE_MAX_AGE_SECS") {
-            if let Ok(parsed) = v.parse::<i64>() { cookie.max_age_secs = parsed; }
+            if let Ok(parsed) = v.parse::<i64>() {
+                cookie.max_age_secs = parsed;
+            }
         }
-        if let Ok(v) = env::var("COOKIE_PATH") { cookie.path = v; }
+        if let Ok(v) = env::var("COOKIE_PATH") {
+            cookie.path = v;
+        }
 
         Ok(Self {
             oidc_issuer_url: env::var("OIDC_ISSUER_URL").expect("OIDC_ISSUER_URL must be set"),
             oidc_client_id: env::var("OIDC_CLIENT_ID").expect("OIDC_CLIENT_ID must be set"),
-            oidc_client_secret: env::var("OIDC_CLIENT_SECRET").expect("OIDC_CLIENT_SECRET must be set"), // Server-only
-            oidc_redirect_uri: env::var("OIDC_REDIRECT_URI").expect("OIDC_REDIRECT_URI must be set"),
+            oidc_client_secret: env::var("OIDC_CLIENT_SECRET")
+                .expect("OIDC_CLIENT_SECRET must be set"), // Server-only
+            oidc_redirect_uri: env::var("OIDC_REDIRECT_URI")
+                .expect("OIDC_REDIRECT_URI must be set"),
             oidc_scopes: env::var("OIDC_SCOPES")
                 .unwrap_or_else(|_| "openid profile email".to_string()),
             cookie_config: cookie,

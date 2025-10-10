@@ -37,16 +37,17 @@ async fn main() {
         Ok("Top secret stats")
     }
 
+    #[cfg(feature = "ssr")]
     async fn security_headers(mut req: Request, next: Next) -> axum::response::Response {
         // Detect environment early
-        let app_env = std::env::var("LEPTOS_ENV").ok()
-            .or_else(|| std::env::var("APP_ENV").ok())
-            .unwrap_or_else(|| "DEV".to_string());
+        let app_env = std::env::var("APP_ENV").ok()
+            .unwrap_or_else(|| "PROD".to_string());
         let is_prod = matches!(app_env.as_str(), "PROD" | "prod" | "Production" | "production");
 
         // Generate per-request CSP nonce and place into request extensions for SSR usage
         let mut nonce_bytes = [0u8; 16];
-        let _ = getrandom::getrandom(&mut nonce_bytes);
+        //let _ = getrandom::getrandom(&mut nonce_bytes); // 0.2.16
+        let _ = getrandom::fill(&mut nonce_bytes);        // 0.3.3
         let nonce = base64::engine::general_purpose::STANDARD_NO_PAD.encode(nonce_bytes);
         req.extensions_mut().insert(nonce.clone());
 

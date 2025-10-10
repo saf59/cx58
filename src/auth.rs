@@ -15,6 +15,7 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
 };
 use cookie::Cookie;
+#[cfg(feature = "ssr")]
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
 use serde::{Deserialize, Serialize};
 //use std::time::{SystemTime, UNIX_EPOCH};
@@ -237,34 +238,39 @@ pub async fn logout_handler(State(state): State<AppState>) -> Response {
 #[cfg(feature = "ssr")]
 async fn validate_token(token: &str, config: &AppConfig) -> Result<Claims, AuthError> {
     // PROD: verify against JWKS
-    let is_prod = std::env::var("LEPTOS_ENV").ok()
-        .or_else(|| std::env::var("APP_ENV").ok())
+    let mut is_prod = std::env::var("APP_ENV").ok()
         .map(|v| matches!(v.as_str(), "PROD" | "prod" | "Production" | "production"))
         .unwrap_or(false);
+    // In tests, always treat as non-PROD to avoid external JWKS dependency
+    if cfg!(test) { is_prod = false; }
 
     let header = decode_header(token)?;
     let alg = header.alg;
 
-    if is_prod {
-        let decoding_key = get_decoding_key_from_jwks(&config.oidc_issuer_url, header.kid.as_deref()).await?;
-        let mut validation = Validation::new(alg);
-        validation.validate_exp = true;
-        let token_data = decode::<Claims>(token, &decoding_key, &validation)?;
-        return Ok(token_data.claims);
-    }
-
-    // DEV: insecure path, manual exp check
-    let mut validation = Validation::new(alg);
-    validation.insecure_disable_signature_validation();
-    validation.validate_exp = false;
-    let token_data = decode::<Claims>(token, &DecodingKey::from_secret(&[]), &validation)?;
-    let claims = token_data.claims;
+    // First: decode without signature to check expiration early
+    let mut no_sig_validation = Validation::new(alg);
+    no_sig_validation.insecure_disable_signature_validation();
+    no_sig_validation.validate_exp = false;
+    let prelim = decode::<Claims>(token, &DecodingKey::from_secret(b"dev"), &no_sig_validation)?;
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs() as usize;
-    if claims.exp <= now { return Err(AuthError::TokenExpired); }
-    Ok(claims)
+    if prelim.claims.exp <= now {
+        return Err(AuthError::TokenExpired);
+    }
+
+    if is_prod {
+        // Verify signature in PROD
+        let decoding_key = get_decoding_key_from_jwks(&config.oidc_issuer_url, header.kid.as_deref()).await?;
+        let mut validation = Validation::new(alg);
+        validation.validate_exp = true;
+        let token_data = decode::<Claims>(token, &decoding_key, &validation)?;
+        Ok(token_data.claims)
+    } else {
+        // DEV: return prelim claims (signature not verified)
+        Ok(prelim.claims)
+    }
 }
 
 #[cfg(feature = "ssr")]
@@ -473,10 +479,15 @@ where
                 .get(header::COOKIE)
                 .and_then(|v| v.to_str().ok())
                 .map(|cookie_str| {
-                    cookie_str
-                        .split(';')
-                        .filter_map(|s| Cookie::parse(s.trim()).ok())
-                        .collect::<Vec<Cookie>>()
+                    let mut map = HashMap::new();
+                    for part in cookie_str.split(';') {
+                        let p = part.trim();
+                        if p.is_empty() { continue; }
+                        if let Some((k, v)) = p.split_once('=') {
+                            map.insert(k.trim().to_string(), v.trim().to_string());
+                        }
+                    }
+                    map
                 });
 
             let mut response = None;
@@ -484,14 +495,13 @@ where
             if let Some(cookies) = cookies {
                 let mut new_tokens = None;
 
-                if let Some(id_cookie) = cookies.iter().find(|c| c.name() == COOKIE_ID_TOKEN) {
-                    match validate_token(id_cookie.value(), &config).await {
+                if let Some(id_val) = cookies.get(COOKIE_ID_TOKEN) {
+                    match validate_token(id_val, &config).await {
                         Ok(claims) => {
                             req.extensions_mut().insert(claims);
                         }
                         Err(AuthError::TokenExpired) => {
-                            if let Some(refresh_cookie) = cookies.iter().find(|c| c.name() == COOKIE_REFRESH_TOKEN) {
-                                let refresh_token = refresh_cookie.value();
+                            if let Some(refresh_token) = cookies.get(COOKIE_REFRESH_TOKEN) {
 
                                 // Apply rate limiting
                                 if rate_limiter.is_rate_limited(refresh_token).await {

@@ -76,9 +76,7 @@ fn CspNonceHead() -> impl IntoView {
                     let nonce = res.get().unwrap();
                     view! {
                         <meta name="csp-nonce" content=nonce.clone() />
-                        <script nonce=nonce>
-                            {"/* CSP nonce wired */"}
-                        </script>
+                        //<script nonce=nonce>{"/* CSP nonce wired */"}</script>
                     }
                 }}
             </Show>
@@ -95,7 +93,7 @@ pub fn App() -> impl IntoView {
     view! {
         // injects a stylesheet into the document <head>
         // id=leptos means cargo-leptos will hot-reload this stylesheet
-        <Stylesheet id="leptos" href="/pkg/cx58.css" />
+        <Stylesheet id="leptos" href="/pkg/cx58-client.css" />
         <Stylesheet href="https://use.fontawesome.com/releases/v5.6.1/css/all.css" />
         <Title text="CX58 AI agent" />
         //<Link rel="icon" href="/favicon.ico" />

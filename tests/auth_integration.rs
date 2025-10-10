@@ -41,8 +41,10 @@ async fn me(Authenticated(claims): Authenticated) -> String {
     format!("hello {}", claims.name.unwrap_or(claims.sub))
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn auth_middleware_allows_valid_token() {
+    // Ensure DEV behavior for validator
+    std::env::set_var("APP_ENV", "DEV");
     // Build a router with the auth layer and a protected route
     let app = Router::new()
         .route("/api/me", get(me))
@@ -57,16 +59,22 @@ async fn auth_middleware_allows_valid_token() {
         roles: Some(vec!["user".into()]),
         exp: now,
     };
-    let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(&[])).unwrap();
+    let mut hdr = Header::default();
+    hdr.alg = jsonwebtoken::Algorithm::HS256;
+    let token = encode(&hdr, &claims, &EncodingKey::from_secret(b"dev")).unwrap();
 
     let req = axum::http::Request::builder()
         .uri("/api/me")
-        .header(axum::http::header::COOKIE, format!("id_token={}; path=/", token))
+        .header(axum::http::header::COOKIE, format!("id_token={}", token))
         .body(axum::body::Body::empty())
         .unwrap();
 
     let resp = app.clone().oneshot(req).await.unwrap();
-    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    if resp.status() != axum::http::StatusCode::OK {
+        let (parts, body) = resp.into_parts();
+        let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap_or_default();
+        panic!("unexpected status: {:?}, body: {}", parts.status, String::from_utf8_lossy(&bytes));
+    }
 
     let body_bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
