@@ -15,10 +15,10 @@ use leptos_oidc::{
 pub fn HomePage() -> impl IntoView {
     // let config_resource = Resource::new(|| (), |_| async { get_config().await });
     // Creates a reactive value to update the button
-    //let cfg = use_context::<AppConfig>().expect("AppConfig context missing");
-    //log!("{:?}", cfg);
-    //let auth = Auth::init(cfg.auth_parameters());
-    //provide_context(auth);
+    // let cfg = use_context::<AppConfig>().expect("AppConfig context missing");
+    // log!("{:?}", cfg);
+    let auth = Auth::signal();  //init(cfg.auth_parameters());
+    provide_context(auth);
     let count = RwSignal::new(0);
     let on_click = move |_| *count.write() += 1;
     view! {
@@ -27,7 +27,7 @@ pub fn HomePage() -> impl IntoView {
         //<a href={login_url} class="btn">"Login with Rauthy"</a>
         <button on:click=on_click>"Click Me: " {count}</button>
         <br/>
-        // <SomeAuth />
+        <SomeAuth />
     }
 }
 
@@ -43,6 +43,7 @@ pub fn SomeAuth() -> impl IntoView {
         <AuthLoading>"This will be rendered only when the auth library is still loading"</AuthLoading>
         <Authenticated>"This will only be rendered if the user is authenticated"</Authenticated>
         <AuthErrorContext>"This will only be rendered if there was an error during authentication"</AuthErrorContext>
+        <br/>
         // A more complex example with optional fallbacks for the loading and unauthenticated state
         <Authenticated  unauthenticated=move ||
             view! { "This will only be rendered if the user is unauthenticated" }
