@@ -17,3 +17,4 @@ Dockerfile
 *.pdb
 /.env
 /docker-compose.yaml
+/.continue/

@@ -1,4 +1,4 @@
-use leptos::prelude::{signal, ClassAttribute, ElementChild, Get, OnAttribute, Set, StyleAttribute};
+use leptos::prelude::{signal, ClassAttribute, ElementChild, Get, OnAttribute, Set};
 use leptos::{component, view, IntoView};
 
 #[component]
@@ -24,7 +24,7 @@ where
                 }
             >
                 <header class="sb-sideHeader">
-                    <button style="padding:0" class="tooltip sb-pin" on:click=move |_| set_is_pinned.set(true)>
+                    <button class="tooltip sb-pin" on:click=move |_| set_is_pinned.set(true)>
                         <span class="tooltiptext">Pin sidebar</span></button>
                     <div class="sb-side-top">{top.into_view()}</div>
                     <button class="tooltip sb-unpin"

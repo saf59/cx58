@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::env;
+use leptos_oidc::{AuthParameters, Challenge};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -105,21 +106,27 @@ impl AppConfig {
         })
     }
 
-    // Public config for client (without secret)
-    pub fn public_config(&self) -> PublicConfig {
-        PublicConfig {
-            oidc_issuer_url: self.oidc_issuer_url.clone(),
-            oidc_client_id: self.oidc_client_id.clone(),
-            redirect_uri: self.oidc_redirect_uri.clone(),
-            scopes: self.oidc_scopes.clone(),
+    pub fn auth_parameters(&self) -> AuthParameters {
+        AuthParameters {
+            issuer: "http://localhost:8080/auth/v1".to_string(),
+            client_id: "localdev".to_string(),
+            redirect_uri: "http://localhost:3080".to_string(),
+            post_logout_redirect_uri: "http://localhost:3080".to_string(),
+            challenge: Challenge::S256,
+            scope: None,
+            audience: None,
         }
     }
 }
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PublicConfig {
-    pub oidc_issuer_url: String,
-    pub oidc_client_id: String,
-    pub redirect_uri: String,
-    pub scopes: String,
+/*
+impl FromRef<AppConfig> for AuthParameters {
+    fn from_ref(state: &AppConfig) -> Self {
+        state.auth_parameters()
+    }
 }
+impl FromRef<AppState> for AuthParameters {
+    fn from_ref(state: &AppState) -> Self {
+        state.config.auth_parameters()
+    }
+}
+*/

@@ -1,0 +1,8 @@
+﻿
+[target.wasm32-unknown-unknown]
+# These flags are ONLY applied when compiling for the wasm32-unknown-unknown target.
+rustflags = [
+    # The `--cfg` flag and its value must be separate items in the array.
+    "--cfg",
+    "getrandom_backend=\"wasm_js\""
+]

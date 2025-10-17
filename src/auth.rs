@@ -119,6 +119,12 @@ impl FromRef<AppState> for LeptosOptions {
         state.leptos_options.clone()
     }
 }
+#[cfg(feature = "ssr")]
+impl FromRef<AppState> for AppConfig {
+    fn from_ref(state: &AppState) -> Self {
+        state.config.clone()
+    }
+}
 
 // Callback handler
 #[cfg(feature = "ssr")]
