@@ -11,7 +11,7 @@ use leptos::{
     attr::{crossorigin, Scope},
     html::Link,
     prelude::*,
-}
+};
 use leptos_meta::{provide_meta_context, MetaTags, Stylesheet, Title};
 use leptos_oidc::{Auth, AuthParameters, AuthSignal, Challenge};
 use leptos_router::{
@@ -23,15 +23,15 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "ssr")]
 use crate::auth::get_profile_claims;
 #[cfg(feature = "ssr")]
+use axum::{
+    extract::{FromRef, Request, State},
+    http::HeaderValue,
+    response::{Html, IntoResponse, Response},
+};
+#[cfg(feature = "ssr")]
 use leptos::server_fn::middleware::{Layer, Service};
 #[cfg(feature = "ssr")]
 use leptos_axum::{render_app_to_stream, ResponseOptions};
-#[cfg(feature = "ssr")]
-use axum:: {
-    extract::{FromRef, Request, State},
-    http::HeaderValue,
-    response::{Html, IntoResponse, Response}
-};
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();
