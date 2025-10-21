@@ -1,5 +1,6 @@
 #![allow(unused_imports)]
 
+use leptos_oidc::{Auth, AuthParameters};
 
 #[cfg(feature = "ssr")]
 #[tokio::main]
@@ -18,6 +19,7 @@ async fn main() {
     use leptos::*;
     use leptos_axum::{
         generate_route_list, render_app_to_stream_with_context, file_and_error_handler,
+        handle_server_fns_with_context,
         LeptosRoutes, ResponseOptions,
     };
     //use axum::http::{HeaderName, HeaderValue};
@@ -104,15 +106,18 @@ async fn main() {
         let nonce = req.extensions().get::<Nonce>().cloned().unwrap_or_else(Nonce::new);
         let leptos_options = app_state.leptos_options.clone();
         let leptos_options_clone = leptos_options.clone();
+        let auth_parameters:AuthParameters = app_state.config.auth_parameters();
         let handler = leptos_axum::render_app_to_stream_with_context(
             move || {
-                provide_context(app_state.clone());
-                provide_context(app_state.config.clone());
-                provide_context(app_state.config.auth_parameters());
+                println!("provide_context auth_parameters, leptos_options ");
+                provide_context(Auth::signal());
+                Auth::init(auth_parameters.clone());
                 provide_context(leptos_options.clone());
                 provide_context(nonce.clone());
+                println!("after provide_context in leptos_handler");
             },
             move||  { shell(leptos_options_clone.clone()) },
+            //move||  { App }, // Do not do this - no meta, no header, no nonce in scripts
         );
         handler(req).await.into_response()
     }

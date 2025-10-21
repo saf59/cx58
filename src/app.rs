@@ -1,25 +1,17 @@
 #![allow(unused_imports)]
+#[cfg(feature = "ssr")]
+use crate::auth::AppState;
 pub use crate::components::home_page::HomePage;
 use crate::components::side_body::SideBody;
 use crate::components::side_top::SideTop;
 use crate::components::sidebar::SideBar;
-use crate::config::{AppConfig};
-#[cfg(feature = "ssr")]
-use crate::auth::AppState;
-#[cfg(feature = "ssr")]
-use axum::extract::{FromRef, Request, State};
-#[cfg(feature = "ssr")]
-use axum::http::HeaderValue;
-#[cfg(feature = "ssr")]
-use axum::response::{Html, IntoResponse, Response};
+use crate::config::AppConfig;
 use base64::Engine;
-use leptos::attr::{crossorigin, Scope};
-use leptos::html::Link;
-use leptos::prelude::*;
-#[cfg(feature = "ssr")]
-use leptos::server_fn::middleware::{Layer, Service};
-#[cfg(feature = "ssr")]
-use leptos_axum::{render_app_to_stream,ResponseOptions};
+use leptos::{
+    attr::{crossorigin, Scope},
+    html::Link,
+    prelude::*,
+}
 use leptos_meta::{provide_meta_context, MetaTags, Stylesheet, Title};
 use leptos_oidc::{Auth, AuthParameters, AuthSignal, Challenge};
 use leptos_router::{
@@ -30,6 +22,16 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "ssr")]
 use crate::auth::get_profile_claims;
+#[cfg(feature = "ssr")]
+use leptos::server_fn::middleware::{Layer, Service};
+#[cfg(feature = "ssr")]
+use leptos_axum::{render_app_to_stream, ResponseOptions};
+#[cfg(feature = "ssr")]
+use axum:: {
+    extract::{FromRef, Request, State},
+    http::HeaderValue,
+    response::{Html, IntoResponse, Response}
+};
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();
@@ -109,7 +111,6 @@ fn CspNonceHead() -> impl IntoView {
     }
 }
 
-
 #[component]
 fn CspNonceHead3() -> impl IntoView {
     // Try to extract nonce from request context (inserted in middleware)
@@ -151,6 +152,13 @@ pub fn App3() -> impl IntoView {
 }
 #[component]
 pub fn App() -> impl IntoView {
+    //let auth = use_context::<AuthSignal>().expect("AuthSignal not present in LoginLink");
+    //println!("{:?}",auth);
+    //let auth_parameters_resource = Resource::new(|| (), |_| async { get_auth_parameters().await });
+    //println!("{:?}", auth_parameters_resource);
+    //let auth_parameters = use_context::<AuthParameters>().expect("AuthParameters context missing");
+    //println!("{:?}", auth_parameters);
+    println!("Render App");
     view! {
         <Router>
             <main>

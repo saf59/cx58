@@ -13,12 +13,11 @@ use leptos_oidc::{
 /// Renders the home page of your application.
 #[component]
 pub fn HomePage() -> impl IntoView {
-    // let config_resource = Resource::new(|| (), |_| async { get_config().await });
     // Creates a reactive value to update the button
     // let cfg = use_context::<AppConfig>().expect("AppConfig context missing");
     // log!("{:?}", cfg);
-    let auth = Auth::signal();  //init(cfg.auth_parameters());
-    provide_context(auth);
+    //let auth = Auth::signal();  //init(cfg.auth_parameters());
+    //provide_context(auth);
     let count = RwSignal::new(0);
     let on_click = move |_| *count.write() += 1;
     view! {
