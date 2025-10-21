@@ -90,7 +90,7 @@ pub async fn get_csp_nonce() -> Result<Option<String>, ServerFnError> {
             .get("x-csp-nonce")
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string());
-        println!("Прочитал x-csp-nonce:{:?}", nonce.clone());
+        println!("Read x-csp-nonce:{:?}", nonce.clone());
         Ok(nonce)
     }
     #[cfg(not(feature = "ssr"))]
@@ -102,7 +102,7 @@ pub async fn get_csp_nonce() -> Result<Option<String>, ServerFnError> {
 fn CspNonceHead() -> impl IntoView {
     // Try to extract nonce from request context (inserted in middleware)
     let nonce = use_context::<String>().unwrap_or_default();
-    println!("CNH Прочитал x-csp-nonce:{:?}", nonce.clone());
+    println!("CNH Read x-csp-nonce:{:?}", nonce.clone());
     view! {
         <meta name="csp-nonce" content=nonce.clone() />
         <link nonce=nonce.clone() id="leptos" rel="stylesheet" href="/pkg/cx58-client.css" />

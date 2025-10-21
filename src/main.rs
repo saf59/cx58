@@ -32,14 +32,11 @@ async fn main() {
     use cx58::app::*;
     use cx58::config::AppConfig;
     use cx58::rbac::{ensure_role, Authenticated, Role};
-    // 1. Создаем ПОЛНУЮ конфигурацию один раз
     let app_config = AppConfig::from_env().expect("Failed to load config");
     let app_config_clone = app_config.clone();
-    // 2. Получаем стандартную конфигурацию Leptos
     let conf = get_configuration(None).unwrap();
     let addr = conf.leptos_options.site_addr;
     let leptos_options = conf.leptos_options;
-    // 3. Создаем единое состояние приложения
     let app_state = AppState {
         leptos_options: leptos_options.clone(),
         config: app_config_clone,
@@ -102,7 +99,6 @@ async fn main() {
         State(app_state): State<AppState>,
         req: Request<Body>,
     ) -> impl IntoResponse {
-        // Получаем nonce из extensions (установлено в middleware)
         let nonce = req.extensions().get::<Nonce>().cloned().unwrap_or_else(Nonce::new);
         let leptos_options = app_state.leptos_options.clone();
         let leptos_options_clone = leptos_options.clone();
@@ -175,8 +171,8 @@ async fn main() {
         ensure_role(&claims, Role::Admin)?;
         Ok("Top secret stats")
     }
-    /// Middleware, добавляющее CSP 3 и другие security headers.
-    /// Также вставляет nonce в Request Extensions, чтобы Leptos мог использовать его.
+    /// Middleware, with CSP 3 && security headers
+    /// && nonce in Request Extensions, for Leptos
     pub async fn security_headers(
         State(_app_state): State<AppState>,
         mut req: Request<Body>,
@@ -187,17 +183,10 @@ async fn main() {
             .unwrap_or_else(|| "PROD".to_string());
         let is_prod = matches!(app_env.as_str(), "PROD" | "prod" | "Production" | "production");
 
-        // 1️⃣ Генерируем nonce
         let nonce = Nonce::new();
-
-        // 2️⃣ Добавляем nonce в Request Extensions (доступно Leptos-контексту)
         req.extensions_mut().insert(nonce.clone());
-
-        // 3️⃣ Передаём запрос дальше по цепочке
         let mut res = next.run(req).await;
         let nonce = nonce.to_string();
-        // 4️⃣ Создаём CSP с nonce
-        // CSP Level 3: защищает от XSS, inline-скриптов, стилей и фреймов
         const CF:&str = "https://cdnjs.cloudflare.com";
 
         // Content-Security-Policy
@@ -229,7 +218,6 @@ async fn main() {
             )
         };
 
-        // 5️⃣ Добавляем security headers
         let headers = res.headers_mut();
         headers.insert("Content-Security-Policy", HeaderValue::from_str(&csp).unwrap());
         headers.insert("X-Content-Type-Options", HeaderValue::from_static("nosniff"));
