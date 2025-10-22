@@ -5,11 +5,7 @@ edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
-path = "src/lib.rs"
 
-[[bin]]
-name = "server"       # the server executable name
-path = "src/main.rs"
 
 [dependencies]
 leptos = { version = "0.8.10" , features = ["nonce"] }

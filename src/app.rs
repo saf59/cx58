@@ -35,7 +35,7 @@ use leptos_axum::{render_app_to_stream, ResponseOptions};
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();
-    println!("Build html with nonce");
+    println!("Shell");
     view! {
         <!DOCTYPE html>
         <html lang="en">
@@ -77,19 +77,6 @@ pub async fn get_csp_nonce() -> Result<Option<String>, ServerFnError> {
         Ok(None)
     }
 }
-#[component]
-fn CspNonceHead() -> impl IntoView {
-    // Try to extract nonce from request context (inserted in middleware)
-    let nonce = use_context::<String>().unwrap_or_default();
-    println!("CNH Read x-csp-nonce:{:?}", nonce.clone());
-    view! {
-        <meta name="csp-nonce" content=nonce.clone() />
-        <link nonce=nonce.clone() id="leptos" rel="stylesheet" href="/pkg/cx58-client.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous"/>
-        //<script nonce=nonce>{"/* CSP nonce wired */"}</script>
-    }
-}
-
 #[component]
 fn CspNonceHead3() -> impl IntoView {
     // Try to extract nonce from request context (inserted in middleware)
