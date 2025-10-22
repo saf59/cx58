@@ -122,9 +122,13 @@ pub fn App() -> impl IntoView {
     //let auth = use_context::<AuthSignal>().expect("AuthSignal not present in LoginLink");
     //println!("{:?}",auth);
     //let auth_parameters_resource = Resource::new(|| (), |_| async { get_auth_parameters().await });
-    //println!("{:?}", auth_parameters_resource);
+    //println!("param :{:?}", auth_parameters_resource);
     //let auth_parameters = use_context::<AuthParameters>().expect("AuthParameters context missing");
     //println!("{:?}", auth_parameters);
+    //let auth_signal = use_context::<AuthSignal>().expect("AuthParameters context missing");
+    //println!("signal:{:?}", auth_signal);
+    let auth_signal = Auth::signal();
+    provide_context(auth_signal);
     println!("Render App");
     view! {
         <Router>

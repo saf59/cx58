@@ -12,10 +12,11 @@ async fn main() {
         extract::State,
         http::{HeaderMap, Request,HeaderName, HeaderValue,header::CONTENT_SECURITY_POLICY},
         middleware::{self, Next},
-        response::IntoResponse,
+        response::{IntoResponse,Json},
         routing::get,
         Router,
     };
+    use axum_extra::routing::RouterExt;
     use leptos::*;
     use leptos_axum::{
         generate_route_list, render_app_to_stream_with_context, file_and_error_handler,
@@ -54,6 +55,8 @@ async fn main() {
             .route("/api/me", get(me))
             .route("/api/admin/stats", get(admin_stats))
             .route("/api/health", get(|| async { "OK" }))
+            //.route("/api/get_auth_parameters/*", get(Json(app_config.auth_parameters())))
+            .route_with_tsr("/api/get_auth_parameters{_rand}", get(Json(app_config.auth_parameters())))
 /*            .handle_server_fns_with_context(app_config.clone(), move |cx| {
                 provide_context(app_state.clone());
             })
