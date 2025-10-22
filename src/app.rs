@@ -56,27 +56,6 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
     }
 }
 
-pub fn shell2(options: LeptosOptions) -> impl IntoView {
-    provide_meta_context();
-    println!("shell()");
-    view! {
-        <!DOCTYPE html>
-        <html lang="en">
-            <head>
-                <meta charset="utf-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                //<CspNonceHead />
-                <AutoReload options=options.clone() />
-                <HydrationScripts options />
-                <MetaTags />
-            </head>
-            <body>
-                <App3 />
-            </body>
-        </html>
-    }
-}
-
 // Server function to read CSP nonce from response headers inserted by middleware
 #[server]
 pub async fn get_csp_nonce() -> Result<Option<String>, ServerFnError> {
@@ -136,18 +115,6 @@ fn CspNonceHead3() -> impl IntoView {
                 }}
             </Show>
         </Suspense>
-    }
-}
-
-#[component]
-pub fn App3() -> impl IntoView {
-    // **Important**: this component must NOT render <head>, <html> or DOCTYPE.
-    // it should produce only body content.
-    view! {
-        <main>
-            <h1>"Hello Leptos"</h1>
-            <p>"This minimal App will not trigger the leptos_meta panic."</p>
-        </main>
     }
 }
 #[component]
