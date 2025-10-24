@@ -132,7 +132,6 @@ async fn main() {
     ) -> impl IntoResponse {
         println!(">>> security_headers called for {}", req.uri());
         let uri = req.uri().path().to_string();
-
         // ❌ We do not add CSP for static or API
         if uri.starts_with("/pkg")
             || uri.starts_with("/assets")
@@ -182,7 +181,7 @@ async fn main() {
                 nonce, nonce
             )
         };
-        println!("{csp}");
+        //println!("{csp}");
         let headers = res.headers_mut();
         headers.insert(
             "Content-Security-Policy",

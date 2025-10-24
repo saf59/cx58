@@ -39,7 +39,6 @@ use web_sys::RequestInit;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();
-    println!("Shell");
     view! {
         <!DOCTYPE html>
         <html lang="en">
@@ -82,69 +81,10 @@ pub async fn get_csp_nonce() -> Result<Option<String>, ServerFnError> {
     }
 }
 #[component]
-fn CspNonceHead3() -> impl IntoView {
-    // Try to extract nonce from request context (inserted in middleware)
-    // let nonce = use_context::<String>().unwrap_or_default();
-
-    // Fetch nonce via server fn once per render
-    let res = Resource::new(
-        || (),
-        |_| async move { get_csp_nonce().await.ok().flatten() },
-    );
-    view! {
-        <Suspense fallback=|| view!{ <></> }>
-            <Show when=move || res.get().is_some() fallback=|| view!{ <></> }>
-                {move || {
-                    let nonce = res.get().unwrap();
-                    leptos::logging::log!("nonce:{}",nonce.clone().unwrap_or("none".to_string()));
-                    view! {
-                        <meta name="csp-nonce" content=nonce.clone() />
-                        <link crossorigin=nonce.clone() id="leptos" rel="stylesheet" href="/pkg/cx58-client.css" />
-                        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous"/>
-                        //<script nonce=nonce>{"/* CSP nonce wired */"}</script>
-                    }
-                }}
-            </Show>
-        </Suspense>
-    }
-}
-#[component]
-pub fn App33() -> impl IntoView {
-    // Create AuthSignal
-    //let auth_signal = Auth::signal();
-    //provide_context(auth_signal.clone());
-
-    // Fetch auth parameters async
-    let auth_parameters = Resource::new(|| (), |_| async { get_auth_parameters().await });
-    view! {
-        <Suspense fallback=|| view!{ <></> }>
-            <Show when=move || auth_parameters.get().is_some() fallback=|| view!{ <p>auth_parameters not found!</p> }>
-                {move || {
-                    match auth_parameters.get().unwrap() {
-                        Ok(param) => {
-                            leptos::logging::log!("param:{:?}",param.clone());
-                            // init it
-                            Auth::init(param);
-                            view! {
-                                <LoginLink class="optional-class-attributes">Sign in</LoginLink>
-                                <br/>
-                                <LogoutLink class="optional-class-attributes">Sign Out</LogoutLink>
-                            }.into_any()
-                        },
-                        _ => view!{ <p>auth_parameters not found!</p> }.into_any()
-                    }
-                }}
-            </Show>
-        </Suspense>
-    }
-}
-
-#[component]
 pub fn App() -> impl IntoView {
     use leptos::prelude::*;
     use leptos_oidc::{Auth, AuthParameters};
 
-    // Create auth signal and provide it to context FIRST
     // Create auth signal and provide it to context FIRST
     let auth_signal = Auth::signal();
     provide_context(auth_signal.clone());
