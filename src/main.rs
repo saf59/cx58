@@ -133,7 +133,7 @@ async fn main() {
         println!(">>> security_headers called for {}", req.uri());
         let uri = req.uri().path().to_string();
 
-        // ❌ Не добавляем CSP для статики или API
+        // ❌ We do not add CSP for static or API
         if uri.starts_with("/pkg")
             || uri.starts_with("/assets")
             || uri.starts_with("/api")
