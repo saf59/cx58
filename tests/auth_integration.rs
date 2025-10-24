@@ -34,6 +34,9 @@ fn test_config(issuer: &str) -> AppConfig {
             max_age_secs: 3600,
             path: "/".to_string(),
         },
+        trust_data_list:"".into(),
+        trust_connect_list:"".into(),
+        is_prod:false
     }
 }
 

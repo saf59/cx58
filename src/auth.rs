@@ -82,6 +82,9 @@ mod tests {
             oidc_redirect_uri: "http://example/cb".into(),
             oidc_scopes: "openid".into(),
             cookie_config: CookieConfig::default(),
+            trust_data_list:"".into(),
+            trust_connect_list:"".into(),
+            is_prod:false
         };
         let res = validate_token(&token, &cfg).await;
         match res {

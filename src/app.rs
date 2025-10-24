@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+
 #[cfg(feature = "ssr")]
 use crate::auth::AppState;
 pub use crate::components::home_page::HomePage;
@@ -13,7 +14,7 @@ use leptos::{
     prelude::*,
 };
 use leptos_meta::{provide_meta_context, MetaTags, Stylesheet, Title};
-use leptos_oidc::{Auth, AuthParameters, AuthSignal, Challenge};
+use leptos_oidc::{Auth, AuthParameters, AuthSignal, Challenge, LoginLink, LogoutLink};
 use leptos_router::{
     components::{Route, Router, Routes},
     StaticSegment,
@@ -28,10 +29,13 @@ use axum::{
     http::HeaderValue,
     response::{Html, IntoResponse, Response},
 };
+use leptos::__reexports::wasm_bindgen_futures::JsFuture;
+use leptos::reactive::spawn_local;
 #[cfg(feature = "ssr")]
 use leptos::server_fn::middleware::{Layer, Service};
 #[cfg(feature = "ssr")]
 use leptos_axum::{render_app_to_stream, ResponseOptions};
+use web_sys::RequestInit;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();
@@ -105,17 +109,99 @@ fn CspNonceHead3() -> impl IntoView {
     }
 }
 #[component]
+pub fn App33() -> impl IntoView {
+    // Create AuthSignal
+    //let auth_signal = Auth::signal();
+    //provide_context(auth_signal.clone());
+
+    // Fetch auth parameters async
+    let auth_parameters = Resource::new(|| (), |_| async { get_auth_parameters().await });
+    view! {
+        <Suspense fallback=|| view!{ <></> }>
+            <Show when=move || auth_parameters.get().is_some() fallback=|| view!{ <p>auth_parameters not found!</p> }>
+                {move || {
+                    match auth_parameters.get().unwrap() {
+                        Ok(param) => {
+                            leptos::logging::log!("param:{:?}",param.clone());
+                            // init it
+                            Auth::init(param);
+                            view! {
+                                <LoginLink class="optional-class-attributes">Sign in</LoginLink>
+                                <br/>
+                                <LogoutLink class="optional-class-attributes">Sign Out</LogoutLink>
+                            }.into_any()
+                        },
+                        _ => view!{ <p>auth_parameters not found!</p> }.into_any()
+                    }
+                }}
+            </Show>
+        </Suspense>
+    }
+}
+
+#[component]
 pub fn App() -> impl IntoView {
-    //let auth = use_context::<AuthSignal>().expect("AuthSignal not present in LoginLink");
-    //println!("{:?}",auth);
-    //let auth_parameters_resource = Resource::new(|| (), |_| async { get_auth_parameters().await });
-    //println!("param :{:?}", auth_parameters_resource);
-    //let auth_parameters = use_context::<AuthParameters>().expect("AuthParameters context missing");
-    //println!("{:?}", auth_parameters);
-    //let auth_signal = use_context::<AuthSignal>().expect("AuthParameters context missing");
-    //println!("signal:{:?}", auth_signal);
+    use leptos::prelude::*;
+    use leptos_oidc::{Auth, AuthParameters};
+
+    // Create auth signal and provide it to context FIRST
+    // Create auth signal and provide it to context FIRST
     let auth_signal = Auth::signal();
-    provide_context(auth_signal);
+    provide_context(auth_signal.clone());
+
+    // Fetch and initialize
+    let auth_initialized: LocalResource<Result<(), String>> = LocalResource::new(move || async move {
+        leptos::logging::log!("Fetching auth parameters...");
+
+        // Use gloo-net for simple fetch
+        let params: AuthParameters = gloo_net::http::Request::get("/api/get_auth_parameters")
+            .send()
+            .await
+            .map_err(|e| {
+                leptos::logging::error!("Fetch failed: {:?}", e);
+                format!("Fetch failed: {:?}", e)
+            })?
+            .json()
+            .await
+            .map_err(|e| {
+                leptos::logging::error!("Failed to parse JSON: {:?}", e);
+                format!("Parse failed: {:?}", e)
+            })?;
+
+        leptos::logging::log!("Auth parameters received, initializing...");
+
+        // Initialize auth
+        Auth::init(params);
+
+        leptos::logging::log!("Auth initialized successfully!");
+        Ok(())
+    });
+
+
+    view! {
+        <Suspense fallback=|| view! { <div>"Initializing authentication..."</div> }>
+            {move || {
+                auth_initialized.get().map(|result: Result<(), String>| {
+                    match result {
+                        Ok(_) => view! {
+                                <LoginLink class="optional-class-attributes">Sign in</LoginLink>
+                                <br/>
+                                <LogoutLink class="optional-class-attributes">Sign Out</LogoutLink>
+                        }.into_any(),
+                        Err(_) => view! {
+                            <div>"Failed to initialize authentication. Check console for details."</div>
+                        }.into_any()
+                    }
+                })
+            }}
+        </Suspense>
+    }
+}
+
+#[component]
+pub fn _App2() -> impl IntoView {
+    //let auth_signal = Auth::signal();
+    //provide_context(auth_signal);
     println!("Render App");
     view! {
         <Router>
@@ -142,8 +228,9 @@ pub async fn get_auth_parameters() -> Result<AuthParameters, ServerFnError> {
     {
         use axum::Extension;
         use leptos_axum::extract;
+        use std::sync::Arc;
 
-        let Extension(config): Extension<AppConfig> = extract().await?;
+        let Extension(config): Extension<Arc<AppConfig>> = extract().await?;
         Ok(config.auth_parameters())
     }
 
@@ -160,9 +247,10 @@ pub async fn get_config() -> Result<AppConfig, ServerFnError> {
     {
         use axum::Extension;
         use leptos_axum::extract;
+        use std::sync::Arc;
 
-        let Extension(config): Extension<AppConfig> = extract().await?;
-        Ok(config)
+        let Extension(config): Extension<Arc<AppConfig>> = extract().await?;
+        Ok(config.as_ref().clone())
     }
 
     #[cfg(not(feature = "ssr"))]

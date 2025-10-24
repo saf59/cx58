@@ -1,9 +1,10 @@
 #![allow(unused_imports)]
 
-use axum::extract;
+/*use axum::extract;
+use axum::extract::FromRequest;
 use axum::http::Uri;
 use leptos_oidc::{Auth, AuthParameters};
-
+*/
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() {
@@ -23,6 +24,7 @@ async fn main() {
         file_and_error_handler, generate_route_list, handle_server_fns_with_context,
         render_app_to_stream_with_context, LeptosRoutes, ResponseOptions,
     };
+    use leptos_oidc::{Auth, AuthParameters};
     use std::sync::Arc;
     //use axum::http::{HeaderName, HeaderValue};
     use axum::Extension;
@@ -47,7 +49,7 @@ async fn main() {
     pub fn create_router(app_config: AppConfig, app_state: AppState) -> Router {
         let app = App;
         let routes = generate_route_list(app);
-
+        let arc_app_config = Arc::new(app_config.clone());
         // ---- API router (no CSP needed)
         let api_router = Router::new()
             .route("/api/auth/callback", get(auth_callback))
@@ -55,9 +57,14 @@ async fn main() {
             .route("/api/me", get(me))
             .route("/api/admin/stats", get(admin_stats))
             .route("/api/health", get(|| async { "OK" }))
-            .route("/api/get_auth_parameters{_}", get(Json(app_config.auth_parameters())))
-            .layer(Extension(app_config.clone()))
-            .layer(AuthTokenLayer::new(app_config));
+            .route(
+                "/api/get_auth_parameters",
+                get(Json(app_config.auth_parameters())),
+            )
+            .route(
+                "/api/get_auth_parameters{_}",
+                get(Json(app_config.auth_parameters())),
+            );
 
         // ---- Leptos router (CSP applied)
         let leptos_router = Router::new()
@@ -74,12 +81,14 @@ async fn main() {
         Router::new()
             .merge(api_router)
             .merge(leptos_router)
+            .layer(Extension(arc_app_config))
+            .layer(AuthTokenLayer::new(app_config))
             .with_state(app_state)
     }
     // ---------- Leptos SSR handler ----------
     async fn leptos_handler(
         State(app_state): State<AppState>,
-        req: Request<Body>,
+        req: axum_core::extract::Request<axum::body::Body>,
     ) -> impl IntoResponse {
         let nonce = req
             .extensions()
@@ -88,18 +97,18 @@ async fn main() {
             .unwrap_or_else(Nonce::new);
         let leptos_options = app_state.leptos_options.clone();
         let leptos_options_clone = leptos_options.clone();
-        let auth_parameters: AuthParameters = app_state.config.auth_parameters();
+        let auth_parameters = app_state.config.auth_parameters();
+
         let handler = leptos_axum::render_app_to_stream_with_context(
             move || {
-                println!("provide_context auth_parameters, leptos_options ");
-                provide_context(Auth::signal());
-                Auth::init(auth_parameters.clone());
+                let auth_signal: AuthSignal = Auth::signal();
+                provide_context(auth_signal);
+                let _ = Auth::init(auth_parameters.clone());
+                provide_context(app_state.config.clone());
                 provide_context(leptos_options.clone());
                 provide_context(nonce.clone());
-                println!("after provide_context in leptos_handler");
             },
             move || shell(leptos_options_clone.clone()),
-            //move||  { App }, // Do not do this - no meta, no header, no nonce in scripts
         );
         handler(req).await.into_response()
     }
@@ -117,24 +126,33 @@ async fn main() {
     /// Middleware, with CSP 3 && security headers
     /// && nonce in Request Extensions, for Leptos
     pub async fn security_headers(
-        State(_app_state): State<AppState>,
+        State(app_state): State<AppState>,
         mut req: Request<Body>,
         next: Next,
     ) -> impl IntoResponse {
-        // TODO move to AppState
-        let app_env = std::env::var("APP_ENV")
-            .ok()
-            .unwrap_or_else(|| "PROD".to_string());
-        let is_prod = matches!(
-            app_env.as_str(),
-            "PROD" | "prod" | "Production" | "production"
-        );
+        println!(">>> security_headers called for {}", req.uri());
+        let uri = req.uri().path().to_string();
 
+        // ❌ Не добавляем CSP для статики или API
+        if uri.starts_with("/pkg")
+            || uri.starts_with("/assets")
+            || uri.starts_with("/api")
+            || uri.ends_with(".js")
+            || uri.ends_with(".css")
+            || uri.ends_with(".wasm")
+            || uri.ends_with(".map")
+            || uri.ends_with(".ico")
+        {
+            return next.run(req).await;
+        }
+
+        let is_prod = app_state.config.is_prod;
+        let trust_data_list = app_state.config.trust_data_list;
+        let trust_connect_list = app_state.config.trust_connect_list;
         let nonce = Nonce::new();
         req.extensions_mut().insert(nonce.clone());
         let mut res = next.run(req).await;
         let nonce = nonce.to_string();
-        const CF: &str = "https://cdnjs.cloudflare.com";
 
         // Content-Security-Policy
         let csp = if !is_prod {
@@ -144,10 +162,10 @@ async fn main() {
                 "default-src 'self'; \
                 frame-ancestors 'none'; \
                 script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' 'nonce-{}'; \
-                style-src 'self' 'unsafe-inline' {CF} 'nonce-{}'; \
+                style-src 'self' 'unsafe-inline' {trust_data_list} 'nonce-{}'; \
                 img-src 'self' data: blob:; \
-                font-src 'self' data: {CF}; \
-                connect-src 'self' ws: wss:",
+                font-src 'self' data: {trust_data_list}; \
+                connect-src 'self' ws: wss: {trust_connect_list}",
                 nonce, nonce
             )
         } else {
@@ -157,14 +175,14 @@ async fn main() {
                 "default-src 'self';\
                  frame-ancestors 'none'; \
                  script-src 'self' 'nonce-{}' 'wasm-unsafe-eval'; \
-                 style-src 'self' {CF} 'nonce-{}'; \
+                 style-src 'self' {trust_data_list} 'nonce-{}'; \
                  img-src 'self' data: blob:; \
-                 font-src 'self' data: {CF}; \
-                 connect-src 'self'",
+                 font-src 'self' data: {trust_data_list}; \
+                 connect-src 'self' {trust_connect_list}",
                 nonce, nonce
             )
         };
-
+        println!("{csp}");
         let headers = res.headers_mut();
         headers.insert(
             "Content-Security-Policy",

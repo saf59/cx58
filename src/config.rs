@@ -50,6 +50,9 @@ pub struct AppConfig {
     pub oidc_redirect_uri: String,
     pub oidc_scopes: String,
     pub cookie_config: CookieConfig,
+    pub trust_data_list:String,
+    pub trust_connect_list:String,
+    pub is_prod:bool
 }
 
 impl AppConfig {
@@ -103,17 +106,20 @@ impl AppConfig {
             oidc_scopes: env::var("OIDC_SCOPES")
                 .unwrap_or_else(|_| "openid profile email".to_string()),
             cookie_config: cookie,
+            trust_data_list:env::var("TRUST_DATA_LIST").unwrap_or_else(|_| "".to_string()),
+            trust_connect_list:env::var("TRUST_CONNECT_LIST").unwrap_or_else(|_| "".to_string()),
+            is_prod:is_prod
         })
     }
 
     pub fn auth_parameters(&self) -> AuthParameters {
         AuthParameters {
-            issuer: "http://localhost:8080/auth/v1".to_string(),
-            client_id: "localdev".to_string(),
-            redirect_uri: "http://localhost:3080".to_string(),
-            post_logout_redirect_uri: "http://localhost:3080".to_string(),
+            issuer: self.oidc_issuer_url.clone(),
+            client_id: self.oidc_client_id.clone(),
+            redirect_uri: self.oidc_redirect_uri.clone(),
+            post_logout_redirect_uri: self.oidc_redirect_uri.clone(),
             challenge: Challenge::S256,
-            scope: None,
+            scope: Some(self.oidc_scopes.clone()),
             audience: None,
         }
     }

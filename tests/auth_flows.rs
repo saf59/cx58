@@ -22,6 +22,9 @@ fn test_config(issuer: &str) -> AppConfig {
             max_age_secs: 3600,
             path: "/".to_string(),
         },
+        trust_data_list:"".into(),
+        trust_connect_list:"".into(),
+        is_prod:false
     }
 }
 
@@ -50,7 +53,7 @@ async fn callback_sets_cookies() {
 
     // Build minimal router with callback endpoints
     let conf = get_configuration(None).unwrap();
-    let app_state = AppState { leptos_options: conf.leptos_options, config: test_config(&server.uri()) };
+    let app_state = AppState { leptos_options: conf.leptos_options, config: test_config(&server.uri())};
     let app = Router::new()
         .route("/api/auth/callback", get(auth_callback))
         .route("/api/auth/logout", post(logout_handler))
