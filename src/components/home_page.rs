@@ -26,7 +26,7 @@ pub fn HomePage() -> impl IntoView {
         //<a href={login_url} class="btn">"Login with Rauthy"</a>
         <button on:click=on_click>"Click Me: " {count}</button>
         <br/>
-        <SomeAuth />
+        <LogoutLink>Sign Out</LogoutLink>
     }
 }
 

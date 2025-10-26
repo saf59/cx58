@@ -14,7 +14,9 @@ use leptos::{
     prelude::*,
 };
 use leptos_meta::{provide_meta_context, MetaTags, Stylesheet, Title};
-use leptos_oidc::{Auth, AuthParameters, AuthSignal, Challenge, LoginLink, LogoutLink};
+use leptos_oidc::{
+    Auth, AuthLoaded, AuthParameters, AuthSignal, Authenticated, Challenge, LoginLink, LogoutLink,
+};
 use leptos_router::{
     components::{Route, Router, Routes},
     StaticSegment,
@@ -59,84 +61,76 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
     }
 }
 
-// Server function to read CSP nonce from response headers inserted by middleware
-#[server]
-pub async fn get_csp_nonce() -> Result<Option<String>, ServerFnError> {
-    #[cfg(feature = "ssr")]
-    {
-        use axum::http::HeaderMap;
-        use leptos_axum::extract;
-
-        let headers: HeaderMap = extract().await?;
-        let nonce = headers
-            .get("x-csp-nonce")
-            .and_then(|v| v.to_str().ok())
-            .map(|s| s.to_string());
-        println!("Read x-csp-nonce:{:?}", nonce.clone());
-        Ok(nonce)
-    }
-    #[cfg(not(feature = "ssr"))]
-    {
-        Ok(None)
-    }
-}
 #[component]
 pub fn App() -> impl IntoView {
     use leptos::prelude::*;
     use leptos_oidc::{Auth, AuthParameters};
 
-    // Create auth signal and provide it to context FIRST
     let auth_signal = Auth::signal();
     provide_context(auth_signal.clone());
 
+    // Move everything into a child component that lives *inside* Router
+    view! {
+        <Router>
+            <AuthInitializer/>
+        </Router>
+    }
+}
+
+#[component]
+fn AuthInitializer() -> impl IntoView {
+    use leptos_oidc::{Auth, AuthParameters};
+
     // Fetch and initialize
-    let auth_initialized: LocalResource<Result<(), String>> = LocalResource::new(move || async move {
-        leptos::logging::log!("Fetching auth parameters...");
+    let auth_initialized: LocalResource<Result<(), String>> =
+        LocalResource::new(move || async move {
+            leptos::logging::log!("Fetching auth parameters...");
+            let params: AuthParameters = gloo_net::http::Request::get("/api/get_auth_parameters")
+                .send()
+                .await
+                .map_err(|e| format!("Fetch failed: {:?}", e))?
+                .json()
+                .await
+                .map_err(|e| format!("Parse failed: {:?}", e))?;
 
-        // Use gloo-net for simple fetch
-        let params: AuthParameters = gloo_net::http::Request::get("/api/get_auth_parameters")
-            .send()
-            .await
-            .map_err(|e| {
-                leptos::logging::error!("Fetch failed: {:?}", e);
-                format!("Fetch failed: {:?}", e)
-            })?
-            .json()
-            .await
-            .map_err(|e| {
-                leptos::logging::error!("Failed to parse JSON: {:?}", e);
-                format!("Parse failed: {:?}", e)
-            })?;
-
-        leptos::logging::log!("Auth parameters received, initializing...");
-
-        // Initialize auth
-        Auth::init(params);
-
-        leptos::logging::log!("Auth initialized successfully!");
-        Ok(())
-    });
-
+            leptos::logging::log!("Initializing Auth...");
+            Auth::init(params);
+            Ok::<(), String>(())
+        });
 
     view! {
         <Suspense fallback=|| view! { <div>"Initializing authentication..."</div> }>
             {move || {
-                auth_initialized.get().map(|result: Result<(), String>| {
-                    match result {
-                        Ok(_) => view! {
-                                <LoginLink class="optional-class-attributes">Sign in</LoginLink>
-                                <br/>
-                                <LogoutLink class="optional-class-attributes">Sign Out</LogoutLink>
-                        }.into_any(),
-                        Err(_) => view! {
-                            <div>"Failed to initialize authentication. Check console for details."</div>
-                        }.into_any()
-                    }
+                auth_initialized.get().map(|result| {
+                    view! {
+                            <AuthLoaded>
+                                <Authenticated unauthenticated=Unauthenticated>
+                                    <SideBar top=SideTop() side_body=SideBody() content=HomePage() />
+                                </Authenticated>
+                            </AuthLoaded>
+                        }
                 })
             }}
         </Suspense>
     }
 }
+
+#[component]
+pub fn Unauthenticated() -> impl IntoView {
+    view! {
+        <Title text="Unauthenticated"/>
+        <div class="sb-content">
+            <h2>"Welcome  to CX58 AI agent!"</h2>
+            <h3>You are unauthenticated!</h3>
+            <h3>Please
+            <LoginLink class="login_logout_button">Sign in</LoginLink>
+            via SSO.</h3>
+        </div>
+        // Your Unauthenticated Page
+    }
+}
+
+// Server function to read CSP nonce from response headers inserted by middleware
 
 #[component]
 pub fn _App2() -> impl IntoView {
@@ -160,7 +154,26 @@ pub fn _App2() -> impl IntoView {
         </Router>
     }
 }
+#[server]
+pub async fn get_csp_nonce() -> Result<Option<String>, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use axum::http::HeaderMap;
+        use leptos_axum::extract;
 
+        let headers: HeaderMap = extract().await?;
+        let nonce = headers
+            .get("x-csp-nonce")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+        println!("Read x-csp-nonce:{:?}", nonce.clone());
+        Ok(nonce)
+    }
+    #[cfg(not(feature = "ssr"))]
+    {
+        Ok(None)
+    }
+}
 // Server function to get auth parameters
 #[server]
 pub async fn get_auth_parameters() -> Result<AuthParameters, ServerFnError> {

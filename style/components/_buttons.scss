@@ -1,0 +1,11 @@
+
+.login_logout_button {
+  margin: 0 10px;
+  background: var(--wrapper-bcolor);
+  color: var(--h-textcolor);
+  padding: 5px;
+  border-radius: 5px;
+}
+.login_logout_button:hover {
+  background: var(--border-bcolor);
+}
