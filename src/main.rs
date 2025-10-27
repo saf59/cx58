@@ -1,10 +1,6 @@
 #![allow(unused_imports)]
 
-/*use axum::extract;
-use axum::extract::FromRequest;
-use axum::http::Uri;
-use leptos_oidc::{Auth, AuthParameters};
-*/
+
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() {
@@ -12,19 +8,17 @@ async fn main() {
     use axum::{
         body::Body,
         extract::State,
-        http::{header::CONTENT_SECURITY_POLICY, HeaderMap, HeaderName, HeaderValue, Request},
+        http::{HeaderValue, Request},
         middleware::{self, Next},
         response::{IntoResponse, Json},
         routing::get,
         Router,
     };
-    use axum_extra::routing::RouterExt;
-    use leptos::*;
     use leptos_axum::{
-        file_and_error_handler, generate_route_list, handle_server_fns_with_context,
-        render_app_to_stream_with_context, LeptosRoutes, ResponseOptions,
+        file_and_error_handler, generate_route_list
+        , LeptosRoutes,
     };
-    use leptos_oidc::{Auth, AuthParameters};
+    use leptos_oidc::Auth;
     use std::sync::Arc;
     //use axum::http::{HeaderName, HeaderValue};
     use axum::Extension;

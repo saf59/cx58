@@ -99,9 +99,9 @@ fn AuthInitializer() -> impl IntoView {
         });
 
     view! {
-        <Suspense fallback=|| view! { <div>"Initializing authentication..."</div> }>
+        <Suspense fallback=|| view! { <div class="sb-content">"Initializing authentication..."</div> }>
             {move || {
-                auth_initialized.get().map(|result| {
+                auth_initialized.get().map(|_| {
                     view! {
                             <AuthLoaded>
                                 <Authenticated unauthenticated=Unauthenticated>
@@ -130,30 +130,6 @@ pub fn Unauthenticated() -> impl IntoView {
     }
 }
 
-// Server function to read CSP nonce from response headers inserted by middleware
-
-#[component]
-pub fn _App2() -> impl IntoView {
-    //let auth_signal = Auth::signal();
-    //provide_context(auth_signal);
-    println!("Render App");
-    view! {
-        <Router>
-            <main>
-                <Routes fallback=|| "Page not found.".into_view()>
-                    <Route
-                        path=StaticSegment("")
-                        view=|| {
-                            view! {
-                                <SideBar top=SideTop() side_body=SideBody() content=HomePage() />
-                            }
-                        }
-                    />
-                </Routes>
-            </main>
-        </Router>
-    }
-}
 #[server]
 pub async fn get_csp_nonce() -> Result<Option<String>, ServerFnError> {
     #[cfg(feature = "ssr")]
