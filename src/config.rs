@@ -48,6 +48,7 @@ pub struct AppConfig {
     #[serde(skip_serializing)] // Never send to client
     pub oidc_client_secret: String,
     pub oidc_redirect_uri: String,
+    pub oidc_post_logout_redirect_uri:String,
     pub oidc_scopes: String,
     pub cookie_config: CookieConfig,
     pub trust_data_list:String,
@@ -103,6 +104,8 @@ impl AppConfig {
                 .expect("OIDC_CLIENT_SECRET must be set"), // Server-only
             oidc_redirect_uri: env::var("OIDC_REDIRECT_URI")
                 .expect("OIDC_REDIRECT_URI must be set"),
+            oidc_post_logout_redirect_uri: env::var("OIDC_POST_LOGOUT_REDIRECT_URI")
+                .expect("OIDC_POST_LOGOUT_REDIRECT_URI must be set"),
             oidc_scopes: env::var("OIDC_SCOPES")
                 .unwrap_or_else(|_| "openid profile email".to_string()),
             cookie_config: cookie,
@@ -117,7 +120,7 @@ impl AppConfig {
             issuer: self.oidc_issuer_url.clone(),
             client_id: self.oidc_client_id.clone(),
             redirect_uri: self.oidc_redirect_uri.clone(),
-            post_logout_redirect_uri: self.oidc_redirect_uri.clone(),
+            post_logout_redirect_uri: self.oidc_post_logout_redirect_uri.clone(),
             challenge: Challenge::S256,
             scope: Some(self.oidc_scopes.clone()),
             audience: None,

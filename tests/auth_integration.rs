@@ -26,6 +26,7 @@ fn test_config(issuer: &str) -> AppConfig {
         oidc_client_id: "client_id".into(),
         oidc_client_secret: "client_secret".into(),
         oidc_redirect_uri: "http://localhost/callback".into(),
+        oidc_post_logout_redirect_uri: "http://localhost/".into(),
         oidc_scopes: "openid profile email".into(),
         cookie_config: CookieConfig {
             secure: false,

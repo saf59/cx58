@@ -80,6 +80,7 @@ mod tests {
             oidc_client_id: "id".into(),
             oidc_client_secret: "sec".into(),
             oidc_redirect_uri: "http://example/cb".into(),
+            oidc_post_logout_redirect_uri: "http://example/cb".into(),
             oidc_scopes: "openid".into(),
             cookie_config: CookieConfig::default(),
             trust_data_list:"".into(),
@@ -135,6 +136,7 @@ pub async fn auth_callback(
     Query(query): Query<CallbackQuery>,
     State(state): State<AppState>,
 ) -> Result<Response, StatusCode> {
+    println!("{:?}",&query);
     let token_response = match exchange_code_for_tokens(&state.config, &query.code).await {
         Ok(tr) => tr,
         Err(_) => {
@@ -156,7 +158,7 @@ pub async fn auth_callback(
         }
     };
 
-    let mut response = Redirect::to("/profile").into_response();
+    let mut response = Redirect::to("/").into_response();
     set_token_cookies(&mut response, &token_response, &state.config.cookie_config);
     Ok(response)
 }
@@ -174,12 +176,13 @@ async fn exchange_code_for_tokens(
         ("client_id", &config.oidc_client_id),
         ("client_secret", &config.oidc_client_secret),
     ];
-
+    println!("{:?}",&params);
     let response = client
         .post(format!("{}/oidc/token", config.oidc_issuer_url))
         .form(&params)
         .send()
         .await?;
+    println!("{:?}",&response);
 
     let token_response: TokenResponse = response.json().await?;
     Ok(token_response)

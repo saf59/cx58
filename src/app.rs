@@ -94,6 +94,7 @@ fn AuthInitializer() -> impl IntoView {
                 .map_err(|e| format!("Parse failed: {:?}", e))?;
 
             leptos::logging::log!("Initializing Auth...");
+            leptos::logging::log!("{:?}", &params);
             Auth::init(params);
             Ok::<(), String>(())
         });
@@ -103,11 +104,14 @@ fn AuthInitializer() -> impl IntoView {
             {move || {
                 auth_initialized.get().map(|_| {
                     view! {
+                        <Transition  >
                             <AuthLoaded>
                                 <Authenticated unauthenticated=Unauthenticated>
                                     <SideBar top=SideTop() side_body=SideBody() content=HomePage() />
                                 </Authenticated>
                             </AuthLoaded>
+
+                    </Transition>
                         }
                 })
             }}
@@ -117,8 +121,8 @@ fn AuthInitializer() -> impl IntoView {
 
 #[component]
 pub fn Unauthenticated() -> impl IntoView {
+    // <Title text="Unauthenticated"/>
     view! {
-        <Title text="Unauthenticated"/>
         <div class="sb-content">
             <h2>"Welcome  to CX58 AI agent!"</h2>
             <h3>You are unauthenticated!</h3>
