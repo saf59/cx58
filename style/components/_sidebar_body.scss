@@ -3,15 +3,15 @@
     display: flex;
     height: 65px;
     width: 100%;
-    color: var(--h-textcolor);
+    color: var(--4-color);
     line-height: 65px;
     box-sizing: border-box;
     transition: all .5s ease;
   }
 
   a.active, a:hover {
-    color: var(--accent-color);
-    background: linear-gradient(to left, var(--accent-color), var(--gradient-color));
+    color: var(--d-color);
+    background: var(--6-color);;
   }
 
   a i {

@@ -124,11 +124,11 @@ pub fn Unauthenticated() -> impl IntoView {
     // <Title text="Unauthenticated"/>
     view! {
         <div class="sb-content">
-            <h2>"Welcome  to CX58 AI agent!"</h2>
+            <h3>"Welcome  to CX58!"</h3>
             <h3>You are unauthenticated!</h3>
-            <h3>Please
-            <LoginLink class="login_logout_button">Sign in</LoginLink>
-            via SSO.</h3>
+            <span>Please
+            <LoginLink class="sign-in"><i class="fa fa-sign-in"></i><span>Sign in</span></LoginLink>
+            via SSO.</span>
         </div>
         // Your Unauthenticated Page
     }

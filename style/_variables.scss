@@ -1,6 +1,22 @@
 :root {
-  --accent-color: #ffffff;
-  --gradient-color: #cccccc;
+  --1-color: #111111;
+  --2-color: #222222;
+  --3-color: #333333;
+  --4-color: #444444;
+  --5-color: #555555;
+  --6-color: #666666;
+  --7-color: #777777;
+  --8-color: #888888;
+  --9-color: #999999;
+  --a-color: #aaaaaa;
+  --b-color: #bbbbbb;
+  --c-color: #cccccc;
+  --d-color: #dddddd;
+  --e-color: #eeeeee;
+  --f-color: #ffffff;
+
+  --accent-color: --f-color;
+  --gradient-color: --c-color;
   --sidebar-width: 18lvw;
   --content-width: 82lvw;
   --sidebar-bcolor: #f4f4f4;
@@ -8,5 +24,7 @@
   --border-color: #cccccc;
   --tooltip-bgcolor: #888888;
   --h-textcolor: #454545;
+
+
 }
 
