@@ -6,15 +6,16 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-
 [dependencies]
-leptos = { version = "0.8.10" , features = ["nonce"] }
-leptos_router = { version = "0.8.8" }
+leptos = { version = "0.8.12" , features = ["nonce"] }
+leptos_router = { version = "0.8.9" }
 leptos_oidc = "0.9.0"
-axum = { version = "0.8.6", optional = true }
-console_error_panic_hook = { version = "0.1.7", optional = true }
 leptos_axum = { version = "0.8.6", optional = true }
 leptos_meta = { version = "0.8.5" }
+axum = { version = "0.8.6", optional = true, features = ["macros"] }
+axum-core = "0.5.5"
+axum-extra ={ version= "0.10.3", features = ["cookie"] }
+console_error_panic_hook = { version = "0.1.7", optional = true }
 tokio = { version = "1.48.0", features = ["rt-multi-thread"], optional = true }
 wasm-bindgen = { version = "=0.2.104", optional = true }
 serde = { version = "1.0.228", features = ["derive"] }
@@ -27,16 +28,14 @@ thiserror = "2.0.17"
 tracing = "0.1.41"
 base64 = "0.22.1"
 once_cell = "1.21.3"
-axum-extra = "0.10.3"
-axum-core = "0.5.5"
-gloo-net = { version = "0.6", features = ["http"] }
-web-sys = "0.3.81"
+gloo-net = { version = "0.6.0", features = ["http"] }
+web-sys = "0.3"
 wasm-bindgen-futures = "=0.4.54"
-# getrandom =  "0.3.4"
-# uuid = "1.18.1"
-# futures = "0.3.31"
-# fallback = "0.1.3"
-# getrandom = "0.2.16"
+async-session = { version = "3.0.0", optional =true }
+async-redis-session-v2 = { version = "0.2.3", optional =true }
+#redis = { version = "0.25", optional =true }
+rand = "0.9.2"
+oauth2 = { version = "5.0", default-features = false, features = ["pkce-plain"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # getrandom = { version = "0.2.16", features = ["wasm-bindgen"] }
@@ -59,14 +58,13 @@ hydrate = [
 ssr = [
     "dep:axum",
     "dep:tokio",
+    "dep:async-session",
+    "dep:async-redis-session-v2",
     "dep:leptos_axum",
     "leptos/ssr",
     "leptos_meta/ssr",
     "leptos_router/ssr",
 ]
-
-# [target.wasm32-unknown-unknown]
-# rustflags = ['--cfg', 'getrandom_backend="wasm_js"']
 
 # Defines a size-optimized profile for the WASM bundle in release mode
 [profile.wasm-release]

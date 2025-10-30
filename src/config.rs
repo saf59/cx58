@@ -111,7 +111,7 @@ impl AppConfig {
             cookie_config: cookie,
             trust_data_list:env::var("TRUST_DATA_LIST").unwrap_or_else(|_| "".to_string()),
             trust_connect_list:env::var("TRUST_CONNECT_LIST").unwrap_or_else(|_| "".to_string()),
-            is_prod:is_prod
+            is_prod
         })
     }
 

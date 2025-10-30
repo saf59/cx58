@@ -1,4 +1,5 @@
-﻿use thiserror::Error;
+﻿use reqwest::StatusCode;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum AuthError {
@@ -14,4 +15,10 @@ pub enum AuthError {
     HttpError(#[from] reqwest::Error),
     #[error("JWT error: {0}")]
     JwtError(#[from] jsonwebtoken::errors::Error),
+    #[error("Network error: {0}")]
+    Network(String),
+    #[error("Token exchange failed with status: {0}")]
+    ExchangeFailed(StatusCode),
+    #[error("Failed to parse token response: {0}")]
+    Parse(String),
 }

@@ -1,5 +1,5 @@
 #![allow(unused_imports)]
-use crate::app::{get_auth_parameters, get_config};
+use crate::app::{get_auth_parameters, get_config, LogoutButton};
 use crate::config::AppConfig;
 use leptos::ev::{click, on};
 use leptos::html::{br, button};
@@ -18,5 +18,6 @@ pub fn HomePage() -> impl IntoView {
         <h3>"Welcome  to CX58 AI agent!"</h3>
         <button on:click=on_click>"Click Me: " {count}</button>
         <LogoutLink class="sign_out"><i class="fa fa-sign-out"></i><span>Sign out</span></LogoutLink>
+        <LogoutButton/>
     }
 }

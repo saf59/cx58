@@ -14,7 +14,7 @@ use axum::{
     http::{header, HeaderMap, StatusCode}, // Remove comma after StatusCode
     response::{IntoResponse, Redirect, Response},
 };
-use cookie::Cookie;
+use cookie::{Cookie}; // , CookieJar};
 #[cfg(feature = "ssr")]
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
 use serde::{Deserialize, Serialize};
@@ -23,6 +23,16 @@ use serde::{Deserialize, Serialize};
 use tower::{Layer, Service};
 #[cfg(feature = "ssr")]
 use cookie::time::Duration;
+#[cfg(feature = "ssr")]
+use axum_extra::extract::CookieJar;
+#[cfg(feature = "ssr")]
+use async_redis_session_v2::RedisSessionStore;
+#[cfg(feature = "ssr")]
+use rand::Rng;
+#[cfg(feature = "ssr")]
+use async_session::{Session,SessionStore};
+#[cfg(feature = "ssr")]
+use oauth2::{PkceCodeChallenge, PkceCodeVerifier};
 
 use crate::config::{AppConfig, CookieConfig, SameSiteConfig};
 use crate::error::AuthError;
@@ -115,6 +125,7 @@ pub struct TokenResponse {
 pub struct AppState {
     pub leptos_options: leptos::prelude::LeptosOptions,
     pub config: AppConfig,
+    pub session_store: Arc<RedisSessionStore>,
 }
 
 #[cfg(feature = "ssr")]
@@ -129,10 +140,133 @@ impl FromRef<AppState> for AppConfig {
         state.config.clone()
     }
 }
+#[cfg(feature = "ssr")]
+pub async fn start_login(State(state): State<AppState>) -> impl IntoResponse {
+    let (challenge,code_verifier) = PkceCodeChallenge::new_random_sha256();
+    let code_verifier_str = code_verifier.secret().to_owned();
+    let mut session = Session::new();
+    //session.expire_in(std::time::Duration::from_secs(600)); // 10 minutes else 1 hour
+    session.insert("code_verifier", &code_verifier_str).unwrap();
+
+    let cookie_value = match state.session_store.store_session(session).await {
+        Ok(Some(cookie_value)) => cookie_value,
+        _ => return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Failed to store session").into_response(),
+    };
+    println!("session_id==cookie_value:{:?}",&challenge);
+
+    let auth_url = format!(
+        "{issuer}/oidc/authorize?response_type=code&client_id={client_id}&redirect_uri={redirect}&scope=openid%20profile%20email&code_challenge={challenge}&code_challenge_method=S256",
+        issuer = state.config.oidc_issuer_url,
+        client_id = state.config.oidc_client_id,
+        redirect = state.config.oidc_redirect_uri,
+        challenge = challenge.as_str(),
+    );
+
+    let cookie_header = format!(
+        "session_id={}; Path=/; HttpOnly; Secure; SameSite=Lax",
+        cookie_value
+    );
+
+    let mut response = Redirect::to(&auth_url).into_response();
+    response.headers_mut().append("Set-Cookie", cookie_header.parse().unwrap());
+    response
+}
+
+#[cfg(feature = "ssr")]
+pub async fn auth_callback(
+    Query(query): Query<CallbackQuery>,
+    State(state): State<AppState>,
+    jar: CookieJar,
+) -> impl IntoResponse {
+
+    let session_id = match jar.get("session_id") {
+        Some(c) => c.value().to_string(),
+        None => return StatusCode::BAD_REQUEST.into_response(),
+    };
+
+    let session = match state.session_store.load_session(session_id.clone()).await {
+        Ok(Some(s)) => s,
+        Ok(None) | Err(_) => {
+            eprintln!("Session not found");
+            return StatusCode::BAD_REQUEST.into_response();
+        }
+    };
+
+    let code_verifier: String = match session.get("code_verifier") {
+        Some(v) => v,
+        None => return StatusCode::BAD_REQUEST.into_response(),
+    };
+
+    let token_response = match exchange_code_for_tokens_with_pkce(
+        &state.config,
+        &query.code,
+        &code_verifier,
+    )
+        .await
+    {
+        Ok(tr) => tr,
+        Err(e) => {
+            eprintln!("Token exchange failed: {e:?}");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    let _ = state.session_store.destroy_session(session).await;
+
+    let mut response = Redirect::to("/").into_response();
+    set_token_cookies(&mut response, &token_response, &state.config.cookie_config);
+    response.headers_mut().append(
+        "Set-Cookie",
+        "session_id=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax".parse().unwrap(),
+    );
+
+    response
+}
+
+#[cfg(feature = "ssr")]
+pub async fn auth_callback2(
+    Query(query): Query<CallbackQuery>,
+    State(state): State<AppState>,
+    jar: CookieJar,
+) -> impl IntoResponse {
+    // Extract the pkce verifier from cookie; return 400 if missing
+    let code_verifier = if let Some(cookie) = jar.get("pkce_code_verifier") {
+        cookie.value().to_string()
+    } else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+
+    println!("Callback query: {:?}", query);
+
+    let token_response = match exchange_code_for_tokens_with_pkce(
+        &state.config,
+        &query.code,
+        &code_verifier,
+    )
+        .await
+    {
+        Ok(tr) => tr,
+        Err(e) => {
+            eprintln!("Token exchange failed: {e:?}");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    // Build redirect response and set token cookies
+    let mut response = Redirect::to("/").into_response();
+    set_token_cookies(&mut response, &token_response, &state.config.cookie_config);
+
+    // Remove temporary pkce cookie
+    response
+        .headers_mut()
+        .append("Set-Cookie", "pkce_code_verifier=; Max-Age=0; Path=/; HttpOnly".parse().unwrap());
+
+    response
+}
 
 // Callback handler
 #[cfg(feature = "ssr")]
-pub async fn auth_callback(
+pub async fn auth_callback_(
     Query(query): Query<CallbackQuery>,
     State(state): State<AppState>,
 ) -> Result<Response, StatusCode> {
@@ -161,6 +295,47 @@ pub async fn auth_callback(
     let mut response = Redirect::to("/").into_response();
     set_token_cookies(&mut response, &token_response, &state.config.cookie_config);
     Ok(response)
+}
+#[cfg(feature = "ssr")]
+async fn exchange_code_for_tokens_with_pkce(
+    config: &AppConfig,
+    code: &str,
+    code_verifier: &str,
+) -> Result<TokenResponse, AuthError> {
+    use reqwest::Client;
+
+    let client = Client::new();
+
+    let params = [
+        ("grant_type", "authorization_code"),
+        ("code", code),
+        ("redirect_uri", &config.oidc_redirect_uri),
+        ("client_id", &config.oidc_client_id),
+        ("client_secret", &config.oidc_client_secret),
+        ("code_verifier", code_verifier),
+    ];
+
+    println!("Exchanging d (confidential client + PKCE): {:?}", &params);
+
+    let response = client
+        .post(format!("{}/oidc/token", config.oidc_issuer_url))
+        .form(&params)
+        .send()
+        .await
+        .map_err(|e| AuthError::Network(e.to_string()))?;
+    let status =response.status();
+    if !status.is_success() {
+        let text = response.text().await.unwrap_or_default();
+        eprintln!("Token exchange failed: {} -> {}", &status, text);
+        return Err(AuthError::ExchangeFailed(status));
+    }
+
+    let token_response: TokenResponse = response
+        .json()
+        .await
+        .map_err(|e| AuthError::Parse(e.to_string()))?;
+
+    Ok(token_response)
 }
 
 #[cfg(feature = "ssr")]
@@ -225,7 +400,68 @@ fn set_auth_cookie(headers: &mut HeaderMap, name: &str, value: &str, config: &Co
         headers.append(header::SET_COOKIE, cookie_str);
     }
 }
+#[cfg(feature = "ssr")]
+pub async fn logout(
+    State(state): State<AppState>,
+    jar: CookieJar,
+) -> impl IntoResponse {
+    use axum::response::Response;
+    use crate::config::CookieConfig;
+    //use axum_extra::extract::cookie::Expiration::Session;
+    use async_session::Session;
+    use std::fmt::Write as _;
 
+    // Try to destroy any existing PKCE/session_id cookie if still present
+    if let Some(session_cookie) = jar.get("session_id") {
+        let session_id = session_cookie.value().to_string();
+
+        // Ask the store (e.g., RedisSessionStore) to load the session
+        if let Ok(Some(session)) = state.session_store.load_session(session_id.clone()).await {
+            println!("✅ Restored session: {:?}", session);
+
+            if let Err(e) = state.session_store.destroy_session(session.clone()).await {
+                eprintln!("Failed to destroy session {:?}: {:?}", session, e);
+            }
+        } else {
+            println!("⚠️ Session not found or expired");
+        }
+    }
+
+    // Build a redirect and remove all leptos_oidc cookies
+    let mut response = Redirect::to("/").into_response();
+    fn clear_oidc_cookies(response: &mut Response) {
+        let mut cookie_headers = String::new();
+
+        for name in [
+            &COOKIE_ACCESS_TOKEN,
+            &COOKIE_ID_TOKEN,
+            &COOKIE_REFRESH_TOKEN
+        ] {
+            let _ = write!(
+                cookie_headers,
+                "{name}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure, "
+            );
+        }
+
+        if !cookie_headers.is_empty() {
+            // Remove trailing comma + space
+            let header_value = cookie_headers.trim_end_matches(", ");
+            response
+                .headers_mut()
+                .append("Set-Cookie", header_value.parse().unwrap());
+        }
+    }
+    // Remove OIDC token cookies that leptos_oidc uses internally
+    clear_oidc_cookies(&mut response);
+
+    // Explicitly remove session cookie as well
+    response.headers_mut().append(
+        "Set-Cookie",
+        "session_id=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax".parse().unwrap(),
+    );
+
+    response
+}
 #[cfg(feature = "ssr")]
 pub async fn logout_handler(State(state): State<AppState>) -> Response {
     let mut response = Redirect::to("/").into_response();

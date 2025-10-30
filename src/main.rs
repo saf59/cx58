@@ -1,6 +1,5 @@
 #![allow(unused_imports)]
 
-
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() {
@@ -11,9 +10,9 @@ async fn main() {
         http::{HeaderValue, Request},
         middleware::{self, Next},
         response::{IntoResponse, Json},
-        routing::get,
         Router,
     };
+    use axum_extra::extract::CookieJar;
     use leptos_axum::{
         file_and_error_handler, generate_route_list
         , LeptosRoutes,
@@ -24,13 +23,15 @@ async fn main() {
     use axum::Extension;
     use base64::Engine;
     use cx58::app::*;
-    use cx58::auth::{auth_callback, logout_handler, AppState, AuthTokenLayer};
+    use cx58::auth::{start_login, auth_callback, logout, AppState, AuthTokenLayer};
     use cx58::config::AppConfig;
     use cx58::rbac::{ensure_role, Authenticated, Role};
     use leptos::logging::log;
     use leptos::prelude::*;
     use leptos_oidc::AuthSignal;
     let app_config = AppConfig::from_env().expect("Failed to load config");
+    let session_store =
+        RedisSessionStore::new("redis://127.0.0.1:6379").expect("Redis must be running");
     let app_config_clone = app_config.clone();
     let conf = get_configuration(None).unwrap();
     let addr = conf.leptos_options.site_addr;
@@ -38,7 +39,9 @@ async fn main() {
     let app_state = AppState {
         leptos_options: leptos_options.clone(),
         config: app_config_clone,
+        session_store: Arc::new(session_store),
     };
+    use async_redis_session_v2::RedisSessionStore;
     /// --- 4. Router setup
     pub fn create_router(app_config: AppConfig, app_state: AppState) -> Router {
         let app = App;
@@ -46,8 +49,10 @@ async fn main() {
         let arc_app_config = Arc::new(app_config.clone());
         // ---- API router (no CSP needed)
         let api_router = Router::new()
+            .route("/api/start_login", get(start_login))
             .route("/api/auth/callback", get(auth_callback))
-            .route("/api/auth/logout", post(logout_handler))
+            //.route("/api/auth/logout", post(logout_handler))
+            .route("/api/logout", post(logout))
             .route("/api/me", get(me))
             .route("/api/admin/stats", get(admin_stats))
             .route("/api/health", get(|| async { "OK" }))

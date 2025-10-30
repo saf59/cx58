@@ -67,7 +67,7 @@ pub fn App() -> impl IntoView {
     use leptos_oidc::{Auth, AuthParameters};
 
     let auth_signal = Auth::signal();
-    provide_context(auth_signal.clone());
+    provide_context(auth_signal);
 
     // Move everything into a child component that lives *inside* Router
     view! {
@@ -129,10 +129,40 @@ pub fn Unauthenticated() -> impl IntoView {
             <span>Please
             <LoginLink class="sign-in"><i class="fa fa-sign-in"></i><span>Sign in</span></LoginLink>
             via SSO.</span>
+            <LoginButton/>
         </div>
         // Your Unauthenticated Page
     }
 }
+#[component]
+pub fn LoginButton() -> impl IntoView {
+    let on_click = move |_| {
+        if let Some(window) = web_sys::window() {
+            let _ = window.location().set_href("/api/start_login");
+        }
+    };
+
+    view! {
+        <button on:click=on_click class="btn btn-primary">
+            "Login"
+        </button>
+    }
+}
+#[component]
+pub fn LogoutButton() -> impl IntoView {
+    let on_click = move |_| {
+        if let Some(window) = web_sys::window() {
+            let _ = window.location().set_href("/api/logout");
+        }
+    };
+
+    view! {
+        <button on:click=on_click class="btn btn-secondary">
+            "Logout"
+        </button>
+    }
+}
+
 
 #[server]
 pub async fn get_csp_nonce() -> Result<Option<String>, ServerFnError> {
