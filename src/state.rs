@@ -4,7 +4,7 @@ use tokio::sync::Mutex;
 use leptos::config::LeptosOptions;
 use oauth2::{CsrfToken, PkceCodeVerifier};
 use openidconnect::Nonce;
-use crate::rback::Role;
+use crate::auth::Role;
 use crate::ssr::ISPOidcClient;
 
 #[derive(Clone)]

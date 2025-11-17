@@ -1,6 +1,5 @@
 pub mod app;
 pub mod server_fn;
-pub mod rback;
 pub mod config;
 pub mod components;
 #[cfg(feature = "ssr")]
@@ -8,6 +7,8 @@ pub mod ssr;
 #[cfg(feature = "ssr")]
 pub mod state;
 pub mod auth;
+#[cfg(feature = "ssr")]
+pub mod auth_ssr;
 
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]

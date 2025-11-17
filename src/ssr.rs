@@ -1,7 +1,7 @@
 ﻿use crate::app::shell;
 use crate::auth::*;
+use crate::auth_ssr::*;
 use crate::config::AppConfig;
-use crate::rback::*;
 use crate::state::{AppState, SessionData};
 use axum::extract::{OriginalUri, State};
 use axum::http::StatusCode;
@@ -309,11 +309,10 @@ async fn get_auth_state(state:AppState,headers: HeaderMap) -> Auth {
         .and_then(|h| h.to_str().ok())
         .and_then(|s| s.split(';')
             .find_map(|cookie_str| {
-                if let Ok(cookie) = Cookie::parse(cookie_str.trim()) {
-                    if cookie.name() == SESSION_ID {
+                if let Ok(cookie) = Cookie::parse(cookie_str.trim())
+                    && cookie.name() == SESSION_ID {
                         return Some(cookie.value().to_owned());
                     }
-                }
                 None
             })
         );
