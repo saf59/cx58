@@ -6,6 +6,10 @@ use leptos_meta::{provide_meta_context, Link, MetaTags, Stylesheet, Title};
 use leptos_router::components::{Route, Router, Routes};
 use leptos_router::*;
 use crate::auth::Auth;
+use crate::components::home_page::HomePage;
+use crate::components::side_body::SideBody;
+use crate::components::side_top::SideTop;
+use crate::components::sidebar::SideBar;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();
@@ -80,7 +84,7 @@ fn RootPage(is_authenticated: Resource<Result<bool, ServerFnError>>) -> impl Int
                         // Server Function succeeded
                         // User is authenticated, redirect
                         // Use the built-in Leptos <Redirect/> or <Navigate/>
-                        view! { <Chat /> }
+                        view! { <SideBar top=SideTop() side_body=SideBody() content=HomePage() /> }
                             .into_any()
                     }
                     Some(Ok(false)) => {

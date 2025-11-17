@@ -10,7 +10,7 @@ use crate::ssr::ISPOidcClient;
 #[derive(Clone)]
 pub struct AppState {
     pub leptos_options: Arc<LeptosOptions>,
-    pub oidc_client: Arc<ISPOidcClient>,
+    pub oidc_client: Arc<ISPOidcClient>, // with config: AppConfig
     pub sessions: Arc<Mutex<HashMap<String, SessionData>>>,
     pub async_http_client: reqwest::Client,
 }

@@ -41,11 +41,10 @@ use serde_urlencoded::de::Error as UrlError;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-
-//use tokio::sync::Mutex;
 #[allow(unused_imports)]
 use tracing::{info, warn};
 use uuid::Uuid;
+
 #[allow(clippy::type_complexity)]
 #[derive(Clone)]
 pub struct ISPOidcClient {
