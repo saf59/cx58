@@ -1,839 +1,311 @@
-#![allow(unused_imports)]
-use leptos::prelude::LeptosOptions;
-use std::collections::HashMap;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::{Arc, RwLock};
-use std::task::{Context, Poll};
-use std::time;
-use std::time::{Instant};
 #[cfg(feature = "ssr")]
 use axum::{
-    body::Body,
-    extract::{FromRef, Query, State},
-    http::{header, HeaderMap, StatusCode}, // Remove comma after StatusCode
+    Error,
+    extract::FromRequestParts,
+    http::{StatusCode, request::Parts},
     response::{IntoResponse, Redirect, Response},
 };
-use cookie::{Cookie}; // , CookieJar};
+use std::collections::HashSet;
+use std::fmt;
+use std::fmt::{Display, Formatter, Pointer};
+use crate::rback::Role;
 #[cfg(feature = "ssr")]
-use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
+use crate::state::AppState;
+#[cfg(feature = "ssr")]
+use crate::state::SessionData;
+#[cfg(feature = "ssr")]
+use axum_extra::extract::cookie::Cookie;
+use leptos::prelude::{RenderHtml, StorageAccess};
+use leptos::serde_json;
+use openidconnect::core::{CoreIdToken, CoreIdTokenClaims};
 use serde::{Deserialize, Serialize};
-//use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(feature = "ssr")]
-use tower::{Layer, Service};
-#[cfg(feature = "ssr")]
-use cookie::time::Duration;
-#[cfg(feature = "ssr")]
-use axum_extra::extract::CookieJar;
-#[cfg(feature = "ssr")]
-use async_redis_session_v2::RedisSessionStore;
-#[cfg(feature = "ssr")]
-use rand::Rng;
-#[cfg(feature = "ssr")]
-use async_session::{Session,SessionStore};
-#[cfg(feature = "ssr")]
-use oauth2::{PkceCodeChallenge, PkceCodeVerifier};
+use tokio::sync::Mutex;
 
-use crate::config::{AppConfig, CookieConfig, SameSiteConfig};
-use crate::error::AuthError;
-#[cfg(feature = "ssr")]
-const COOKIE_ID_TOKEN: &str = "id_token";
-#[cfg(feature = "ssr")]
-const COOKIE_ACCESS_TOKEN: &str = "access_token";
-#[cfg(feature = "ssr")]
-const COOKIE_REFRESH_TOKEN: &str = "refresh_token";
+pub const SESSION_ID: &str = "session_id";
+pub struct SessionId(pub String);
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Claims {
-    pub sub: String,
-    pub email: Option<String>,
-    pub name: Option<String>,
-    pub roles: Option<Vec<String>>,
-    pub exp: usize,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Auth {
+    Unauthenticated,
+    Authenticated(AuthenticatedUser),
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuthenticatedUser {
+    pub subject: String,
+    pub name: String,
+    pub roles: HashSet<Role>,
 }
 
-#[cfg(all(test, feature = "ssr"))]
-mod tests {
-    use super::*;
-    use axum::http::HeaderMap;
-    use jsonwebtoken::{EncodingKey, Header as JwtHeader};
-
-    #[test]
-    fn test_set_auth_cookie_attributes() {
-        let mut headers = HeaderMap::new();
-        let cfg = CookieConfig {
-            secure: true,
-            http_only: true,
-            same_site: SameSiteConfig::Lax,
-            max_age_secs: 120,
-            path: "/".into(),
-        };
-        set_auth_cookie(&mut headers, "id_token", "abc", &cfg);
-        let set_cookie = headers.get(axum::http::header::SET_COOKIE).unwrap();
-        let v = set_cookie.to_str().unwrap();
-        assert!(v.contains("id_token=abc"));
-        assert!(v.contains("HttpOnly"));
-        assert!(v.contains("Secure"));
-        assert!(v.contains("SameSite=Lax"));
-        assert!(v.contains("Max-Age=120"));
-        assert!(v.contains("Path=/"));
+impl AuthenticatedUser {
+    /// Check if user has a specific role
+    pub fn has_role(&self, role: &Role) -> bool {
+        self.roles.contains(role)
     }
 
-    #[tokio::test]
-    async fn test_validate_token_expired_maps_tokenexpired() {
-        // Create token that expired 10 seconds ago
-        let now = (chrono::Utc::now().timestamp() - 10) as usize;
-        let claims = Claims { sub: "u".into(), email: None, name: None, roles: None, exp: now };
-        let token = jsonwebtoken::encode(&JwtHeader::default(), &claims, &EncodingKey::from_secret(&[])).unwrap();
-        let cfg = AppConfig {
-            oidc_issuer_url: "http://example".into(),
-            oidc_client_id: "id".into(),
-            oidc_client_secret: "sec".into(),
-            oidc_redirect_uri: "http://example/cb".into(),
-            oidc_post_logout_redirect_uri: "http://example/cb".into(),
-            oidc_scopes: "openid".into(),
-            cookie_config: CookieConfig::default(),
-            trust_data_list:"".into(),
-            trust_connect_list:"".into(),
-            is_prod:false
-        };
-        let res = validate_token(&token, &cfg).await;
-        match res {
-            Err(AuthError::TokenExpired) => {},
-            other => panic!("expected TokenExpired, got {:?}", other),
-        }
+    /// Check if user has any of the specified roles
+    pub fn has_any_role(&self, roles: &[Role]) -> bool {
+        roles.iter().any(|role| self.roles.contains(role))
+    }
+
+    /// Check if user has all the specified roles
+    pub fn has_all_roles(&self, roles: &[Role]) -> bool {
+        roles.iter().all(|role| self.roles.contains(role))
+    }
+
+    /// Check if user is admin
+    pub fn is_admin(&self) -> bool {
+        self.has_role(&Role::Admin)
+    }
+
+}
+impl fmt::Display for AuthenticatedUser {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "User(sub:{}, name:{}, roles:{:?})", self.subject,self.name,self.roles)
     }
 }
 #[cfg(feature = "ssr")]
-#[derive(Debug, Deserialize)]
-pub struct CallbackQuery {
-    code: String,
-    _state: Option<String>,
-}
+fn extract_auth_user(session: &SessionData, claims: &CoreIdTokenClaims) -> Result<AuthenticatedUser, Error> {
+    use leptos::serde_json;
+    use oauth2::{RefreshToken, TokenResponse};
+    use openidconnect::core::CoreIdToken;
+    use std::str::FromStr;
+    use tracing::info;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TokenResponse {
-    pub access_token: String,
-    pub id_token: String,
-    pub refresh_token: String,
-    pub token_type: String,
-    pub expires_in: u64,
-}
-
-#[cfg(feature = "ssr")]
-#[derive(Clone)]
-pub struct AppState {
-    pub leptos_options: leptos::prelude::LeptosOptions,
-    pub config: AppConfig,
-    pub session_store: Arc<RedisSessionStore>,
-}
-
-#[cfg(feature = "ssr")]
-impl FromRef<AppState> for LeptosOptions {
-    fn from_ref(state: &AppState) -> Self {
-        state.leptos_options.clone()
-    }
-}
-#[cfg(feature = "ssr")]
-impl FromRef<AppState> for AppConfig {
-    fn from_ref(state: &AppState) -> Self {
-        state.config.clone()
-    }
-}
-#[cfg(feature = "ssr")]
-pub async fn start_login(State(state): State<AppState>) -> impl IntoResponse {
-    let (challenge,code_verifier) = PkceCodeChallenge::new_random_sha256();
-    let code_verifier_str = code_verifier.secret().to_owned();
-    let mut session = Session::new();
-    //session.expire_in(std::time::Duration::from_secs(600)); // 10 minutes else 1 hour
-    session.insert("code_verifier", &code_verifier_str).unwrap();
-
-    let cookie_value = match state.session_store.store_session(session).await {
-        Ok(Some(cookie_value)) => cookie_value,
-        _ => return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Failed to store session").into_response(),
-    };
-    println!("session_id==cookie_value:{:?}",&challenge);
-
-    let auth_url = format!(
-        "{issuer}/oidc/authorize?response_type=code&client_id={client_id}&redirect_uri={redirect}&scope=openid%20profile%20email&code_challenge={challenge}&code_challenge_method=S256",
-        issuer = state.config.oidc_issuer_url,
-        client_id = state.config.oidc_client_id,
-        redirect = state.config.oidc_redirect_uri,
-        challenge = challenge.as_str(),
-    );
-
-    let cookie_header = format!(
-        "session_id={}; Path=/; HttpOnly; Secure; SameSite=Lax",
-        cookie_value
-    );
-
-    let mut response = Redirect::to(&auth_url).into_response();
-    response.headers_mut().append("Set-Cookie", cookie_header.parse().unwrap());
-    response
-}
-
-#[cfg(feature = "ssr")]
-pub async fn auth_callback(
-    Query(query): Query<CallbackQuery>,
-    State(state): State<AppState>,
-    jar: CookieJar,
-) -> impl IntoResponse {
-
-    let session_id = match jar.get("session_id") {
-        Some(c) => c.value().to_string(),
-        None => return StatusCode::BAD_REQUEST.into_response(),
-    };
-
-    let session = match state.session_store.load_session(session_id.clone()).await {
-        Ok(Some(s)) => s,
-        Ok(None) | Err(_) => {
-            eprintln!("Session not found");
-            return StatusCode::BAD_REQUEST.into_response();
-        }
-    };
-
-    let code_verifier: String = match session.get("code_verifier") {
-        Some(v) => v,
-        None => return StatusCode::BAD_REQUEST.into_response(),
-    };
-
-    let token_response = match exchange_code_for_tokens_with_pkce(
-        &state.config,
-        &query.code,
-        &code_verifier,
-    )
-        .await
-    {
-        Ok(tr) => tr,
-        Err(e) => {
-            eprintln!("Token exchange failed: {e:?}");
-            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-        }
-    };
-
-    let _ = state.session_store.destroy_session(session).await;
-
-    let mut response = Redirect::to("/").into_response();
-    set_token_cookies(&mut response, &token_response, &state.config.cookie_config);
-    response.headers_mut().append(
-        "Set-Cookie",
-        "session_id=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax".parse().unwrap(),
-    );
-
-    response
-}
-
-#[cfg(feature = "ssr")]
-pub async fn auth_callback2(
-    Query(query): Query<CallbackQuery>,
-    State(state): State<AppState>,
-    jar: CookieJar,
-) -> impl IntoResponse {
-    // Extract the pkce verifier from cookie; return 400 if missing
-    let code_verifier = if let Some(cookie) = jar.get("pkce_code_verifier") {
-        cookie.value().to_string()
+    if let Ok(claims_json) = serde_json::to_value::<&_>(claims) {
+        tracing::info!("from id_token claims_json");
+        Ok(AuthenticatedUser {
+            subject: claims.subject().to_string(),
+            name: extract_name_from_claims(&claims_json), // UPDATED
+            roles: session.roles.clone(),
+        })
     } else {
-        return StatusCode::BAD_REQUEST.into_response();
-    };
-
-    println!("Callback query: {:?}", query);
-
-    let token_response = match exchange_code_for_tokens_with_pkce(
-        &state.config,
-        &query.code,
-        &code_verifier,
-    )
-        .await
-    {
-        Ok(tr) => tr,
-        Err(e) => {
-            eprintln!("Token exchange failed: {e:?}");
-            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-        }
-    };
-
-    // Build redirect response and set token cookies
-    let mut response = Redirect::to("/").into_response();
-    set_token_cookies(&mut response, &token_response, &state.config.cookie_config);
-
-    // Remove temporary pkce cookie
-    response
-        .headers_mut()
-        .append("Set-Cookie", "pkce_code_verifier=; Max-Age=0; Path=/; HttpOnly".parse().unwrap());
-
-    response
-}
-
-// Callback handler
-#[cfg(feature = "ssr")]
-pub async fn auth_callback_(
-    Query(query): Query<CallbackQuery>,
-    State(state): State<AppState>,
-) -> Result<Response, StatusCode> {
-    println!("{:?}",&query);
-    let token_response = match exchange_code_for_tokens(&state.config, &query.code).await {
-        Ok(tr) => tr,
-        Err(_) => {
-            #[cfg(test)]
-            {
-                // Fallback for tests to avoid flakiness due to external HTTP
-                TokenResponse {
-                    access_token: "at_test".into(),
-                    id_token: "it_test".into(),
-                    refresh_token: "rt_test".into(),
-                    token_type: "Bearer".into(),
-                    expires_in: 3600,
-                }
-            }
-            #[cfg(not(test))]
-            {
-                return Err(StatusCode::INTERNAL_SERVER_ERROR);
-            }
-        }
-    };
-
-    let mut response = Redirect::to("/").into_response();
-    set_token_cookies(&mut response, &token_response, &state.config.cookie_config);
-    Ok(response)
-}
-#[cfg(feature = "ssr")]
-async fn exchange_code_for_tokens_with_pkce(
-    config: &AppConfig,
-    code: &str,
-    code_verifier: &str,
-) -> Result<TokenResponse, AuthError> {
-    use reqwest::Client;
-
-    let client = Client::new();
-
-    let params = [
-        ("grant_type", "authorization_code"),
-        ("code", code),
-        ("redirect_uri", &config.oidc_redirect_uri),
-        ("client_id", &config.oidc_client_id),
-        ("client_secret", &config.oidc_client_secret),
-        ("code_verifier", code_verifier),
-    ];
-
-    println!("Exchanging d (confidential client + PKCE): {:?}", &params);
-
-    let response = client
-        .post(format!("{}/oidc/token", config.oidc_issuer_url))
-        .form(&params)
-        .send()
-        .await
-        .map_err(|e| AuthError::Network(e.to_string()))?;
-    let status =response.status();
-    if !status.is_success() {
-        let text = response.text().await.unwrap_or_default();
-        eprintln!("Token exchange failed: {} -> {}", &status, text);
-        return Err(AuthError::ExchangeFailed(status));
-    }
-
-    let token_response: TokenResponse = response
-        .json()
-        .await
-        .map_err(|e| AuthError::Parse(e.to_string()))?;
-
-    Ok(token_response)
-}
-
-#[cfg(feature = "ssr")]
-async fn exchange_code_for_tokens(
-    config: &AppConfig,
-    code: &str,
-) -> Result<TokenResponse, AuthError> {
-    let client = reqwest::Client::new();
-    let params = [
-        ("grant_type", "authorization_code"),
-        ("code", code),
-        ("redirect_uri", &config.oidc_redirect_uri),
-        ("client_id", &config.oidc_client_id),
-        ("client_secret", &config.oidc_client_secret),
-    ];
-    println!("{:?}",&params);
-    let response = client
-        .post(format!("{}/oidc/token", config.oidc_issuer_url))
-        .form(&params)
-        .send()
-        .await?;
-    println!("{:?}",&response);
-
-    let token_response: TokenResponse = response.json().await?;
-    Ok(token_response)
-}
-
-#[cfg(feature = "ssr")]
-async fn refresh_tokens(
-    config: &AppConfig,
-    refresh_token: &str,
-) -> Result<TokenResponse, AuthError> {
-    let client = reqwest::Client::new();
-    let params = [
-        ("grant_type", "refresh_token"),
-        ("refresh_token", refresh_token),
-        ("client_id", &config.oidc_client_id),
-        ("client_secret", &config.oidc_client_secret),
-    ];
-
-    let response = client
-        .post(format!("{}/oidc/token", config.oidc_issuer_url))
-        .form(&params)
-        .send()
-        .await?;
-
-    let token_response: TokenResponse = response.json().await?;
-    Ok(token_response)
-}
-
-#[cfg(feature = "ssr")]
-fn set_auth_cookie(headers: &mut HeaderMap, name: &str, value: &str, config: &CookieConfig) {
-    let cookie = Cookie::build((name, value))
-        .path(&config.path)
-        .secure(config.secure)
-        .http_only(config.http_only)
-        .same_site(config.same_site.clone().into())
-        .max_age(cookie::time::Duration::seconds(config.max_age_secs))
-        .build();
-
-    if let Ok(cookie_str) = cookie.to_string().parse() {
-        headers.append(header::SET_COOKIE, cookie_str);
-    }
-}
-#[cfg(feature = "ssr")]
-pub async fn logout(
-    State(state): State<AppState>,
-    jar: CookieJar,
-) -> impl IntoResponse {
-    use axum::response::Response;
-    use crate::config::CookieConfig;
-    //use axum_extra::extract::cookie::Expiration::Session;
-    use async_session::Session;
-    use std::fmt::Write as _;
-
-    // Try to destroy any existing PKCE/session_id cookie if still present
-    if let Some(session_cookie) = jar.get("session_id") {
-        let session_id = session_cookie.value().to_string();
-
-        // Ask the store (e.g., RedisSessionStore) to load the session
-        if let Ok(Some(session)) = state.session_store.load_session(session_id.clone()).await {
-            println!("✅ Restored session: {:?}", session);
-
-            if let Err(e) = state.session_store.destroy_session(session.clone()).await {
-                eprintln!("Failed to destroy session {:?}: {:?}", session, e);
-            }
-        } else {
-            println!("⚠️ Session not found or expired");
-        }
-    }
-
-    // Build a redirect and remove all leptos_oidc cookies
-    let mut response = Redirect::to("/").into_response();
-    fn clear_oidc_cookies(response: &mut Response) {
-        let mut cookie_headers = String::new();
-
-        for name in [
-            &COOKIE_ACCESS_TOKEN,
-            &COOKIE_ID_TOKEN,
-            &COOKIE_REFRESH_TOKEN
-        ] {
-            let _ = write!(
-                cookie_headers,
-                "{name}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure, "
-            );
-        }
-
-        if !cookie_headers.is_empty() {
-            // Remove trailing comma + space
-            let header_value = cookie_headers.trim_end_matches(", ");
-            response
-                .headers_mut()
-                .append("Set-Cookie", header_value.parse().unwrap());
-        }
-    }
-    // Remove OIDC token cookies that leptos_oidc uses internally
-    clear_oidc_cookies(&mut response);
-
-    // Explicitly remove session cookie as well
-    response.headers_mut().append(
-        "Set-Cookie",
-        "session_id=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax".parse().unwrap(),
-    );
-
-    response
-}
-#[cfg(feature = "ssr")]
-pub async fn logout_handler(State(state): State<AppState>) -> Response {
-    let mut response = Redirect::to("/").into_response();
-    let cookie_config = &state.config.cookie_config;
-
-    for name in [COOKIE_ID_TOKEN, COOKIE_ACCESS_TOKEN, COOKIE_REFRESH_TOKEN] {
-        let cookie = Cookie::build((name, ""))
-            .path(&cookie_config.path)
-            .max_age(cookie::time::Duration::seconds(0))
-            .http_only(cookie_config.http_only)
-            .secure(cookie_config.secure)
-            .same_site(cookie_config.same_site.clone().into())
-            .build();
-
-        if let Ok(cookie_str) = cookie.to_string().parse() {
-            response.headers_mut().append(header::SET_COOKIE, cookie_str);
-        }
-    }
-    response
-}
-
-#[cfg(feature = "ssr")]
-async fn validate_token(token: &str, config: &AppConfig) -> Result<Claims, AuthError> {
-    // PROD: verify against JWKS
-    let mut is_prod = std::env::var("APP_ENV").ok()
-        .map(|v| matches!(v.as_str(), "PROD" | "prod" | "Production" | "production"))
-        .unwrap_or(false);
-    // In tests, always treat as non-PROD to avoid external JWKS dependency
-    if cfg!(test) { is_prod = false; }
-
-    let header = decode_header(token)?;
-    let alg = header.alg;
-
-    // First: decode without signature to check expiration early
-    let mut no_sig_validation = Validation::new(alg);
-    no_sig_validation.insecure_disable_signature_validation();
-    no_sig_validation.validate_exp = false;
-    let prelim = decode::<Claims>(token, &DecodingKey::from_secret(b"dev"), &no_sig_validation)?;
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as usize;
-    if prelim.claims.exp <= now {
-        return Err(AuthError::TokenExpired);
-    }
-
-    if is_prod {
-        // Verify signature in PROD
-        let decoding_key = get_decoding_key_from_jwks(&config.oidc_issuer_url, header.kid.as_deref()).await?;
-        let mut validation = Validation::new(alg);
-        validation.validate_exp = true;
-        let token_data = decode::<Claims>(token, &decoding_key, &validation)?;
-        Ok(token_data.claims)
-    } else {
-        // DEV: return prelim claims (signature not verified)
-        Ok(prelim.claims)
-    }
-}
-
-#[cfg(feature = "ssr")]
-async fn get_decoding_key_from_jwks(issuer: &str, kid: Option<&str>) -> Result<DecodingKey, AuthError> {
-    use once_cell::sync::OnceCell;
-    use std::collections::HashMap;
-    use std::sync::RwLock;
-
-    static JWKS_CACHE: OnceCell<RwLock<HashMap<String, DecodingKey>>> = OnceCell::new();
-    let cache = JWKS_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
-
-    if let Some(kid) = kid {
-        if let Ok(map) = cache.read() {
-            if let Some(key) = map.get(kid) {
-                return Ok(key.clone());
-            }
-        }
-    }
-
-    // Fetch OIDC config
-    let conf_url = format!("{}/.well-known/openid-configuration", issuer.trim_end_matches('/'));
-    let oidc_conf: serde_json::Value = reqwest::get(conf_url).await?.json().await?;
-    let jwks_uri = oidc_conf["jwks_uri"].as_str().ok_or(AuthError::InvalidToken)?.to_string();
-    let jwks: serde_json::Value = reqwest::get(jwks_uri).await?.json().await?;
-    let keys = jwks["keys"].as_array().ok_or(AuthError::InvalidToken)?;
-
-    // Prefer matching kid; otherwise take first RSA key
-    let choose = |k: &serde_json::Value| {
-        k["kty"].as_str() == Some("RSA") && k["n"].is_string() && k["e"].is_string()
-    };
-    let selected = if let Some(kid) = kid {
-        keys.iter().find(|k| choose(k) && k["kid"].as_str() == Some(kid))
-            .or_else(|| keys.iter().find(|k| choose(k)))
-    } else {
-        keys.iter().find(|k| choose(k))
-    }.ok_or(AuthError::InvalidToken)?;
-
-    let n_b64 = selected["n"].as_str().ok_or(AuthError::InvalidToken)?;
-    let e_b64 = selected["e"].as_str().ok_or(AuthError::InvalidToken)?;
-    // jsonwebtoken accepts base64url (no padding) components directly
-    let key = DecodingKey::from_rsa_components(n_b64, e_b64).map_err(|_| AuthError::InvalidToken)?;
-
-    if let Some(kid) = selected["kid"].as_str() {
-        if let Ok(mut map) = cache.write() { map.insert(kid.to_string(), key.clone()); }
-    }
-    Ok(key)
-}
-
-// Middleware for token validation and refresh
-#[cfg(feature = "ssr")]
-#[derive(Clone)]
-pub struct AuthTokenLayer {
-    config: AppConfig,
-}
-
-#[cfg(feature = "ssr")]
-impl AuthTokenLayer {
-    pub fn new(config: AppConfig) -> Self {
-        Self { config }
-    }
-}
-
-#[cfg(feature = "ssr")]
-impl<S> Layer<S> for AuthTokenLayer {
-    type Service = AuthTokenMiddleware<S>;
-
-    fn layer(&self, inner: S) -> Self::Service {
-        AuthTokenMiddleware {
-            inner,
-            config: self.config.clone(),
-            rate_limiter: RateLimiter::new(5, time::Duration::from_secs(300)), // 5 attempts per 5 minutes
-        }
-    }
-}
-#[cfg(feature = "ssr")]
-#[derive(Clone)]
-pub struct RateLimiter {
-    attempts: Arc<RwLock<HashMap<String, (u32, Instant)>>>,
-    max_attempts: u32,
-    window_size: time::Duration,
-}
-
-#[cfg(feature = "ssr")]
-impl RateLimiter {
-    pub fn new(max_attempts: u32, window_size: time::Duration) -> Self {
-        Self {
-            attempts: Arc::new(RwLock::new(HashMap::new())),
-            max_attempts,
-            window_size,
-        }
-    }
-    async fn is_rate_limited(&self, key: &str) -> bool {
-        let mut attempts = match self.attempts.write() {
-            Ok(guard) => guard,
-            Err(e) => {
-                tracing::error!("RwLock poisoned: {}", e);
-                return true; // Fail safe: treat as rate limited
-            }
-        };
-        let now = Instant::now();
-
-        if let Some((count, timestamp)) = attempts.get(key).cloned() {
-            if now.duration_since(timestamp) > self.window_size {
-                // Window expired, reset counter
-                attempts.insert(key.to_string(), (1, now));
-                false
-            } else if count >= self.max_attempts {
-                // Too many attempts within window
-                true
-            } else {
-                // Increment counter
-                attempts.insert(key.to_string(), (count + 1, timestamp));
-                false
-            }
-        } else {
-            // First attempt for this key
-            attempts.insert(key.to_string(), (1, now));
-            false
-        }
-    }
-
-}
-#[cfg(feature = "ssr")]
-#[derive(Clone)]
-pub struct AuthTokenMiddleware<S> {
-    inner: S,
-    config: AppConfig,
-    rate_limiter: RateLimiter,
-}
-
-// Server function to get profile claims
-#[cfg(feature = "ssr")]
-use leptos::prelude::*;
-//use leptos::server;
-#[cfg(feature = "ssr")]
-use axum::http::Request;
-
-#[cfg(feature = "ssr")]
-#[server]
-pub async fn get_profile_claims() -> Result<Option<Claims>, ServerFnError> {
-    use axum::http::HeaderMap;
-    use leptos_axum::extract;
-
-    let headers: HeaderMap = extract().await?;
-
-    let cookies = headers
-        .get(axum::http::header::COOKIE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
-
-    for cookie_str in cookies.split(';') {
-        let cookie_str = cookie_str.trim();
-        if let Ok(cookie) = cookie_str.parse::<Cookie>() {
-            if cookie.name() == COOKIE_ID_TOKEN {
-                // In production, properly validate the token
-                if let Ok(claims) = decode::<Claims>(
-                    cookie.value(),
-                    &DecodingKey::from_secret(&[]),
-                    &{
-                        let mut v = Validation::default();
-                        v.insecure_disable_signature_validation();
-                        v
-                    },
-                ) {
-                    return Ok(Some(claims.claims));
-                }
-            }
-        }
-    }
-    Ok(None)
-}
-
-#[cfg(feature = "ssr")]
-impl<S> AuthTokenMiddleware<S> {
-    pub fn new(inner: S, config: AppConfig) -> Self {
-        Self {
-            inner,
-            config,
-            rate_limiter: RateLimiter::new(5, time::Duration::from_secs(300)), // 5 attempts per 5 minutes
-        }
-    }
-}
-#[cfg(feature = "ssr")]
-impl<S, B> Service<Request<B>> for AuthTokenMiddleware<S>
-where
-    S: Service<Request<B>, Response = Response> + Send + 'static + Clone,
-    S::Future: Send + 'static,
-    B: Send + 'static,
-{
-    type Response = S::Response;
-    type Error = S::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
-    }
-
-    fn call(&mut self, mut req: Request<B>) -> Self::Future {
-        let config = self.config.clone();
-        let mut inner = self.inner.clone();
-        let rate_limiter = self.rate_limiter.clone();
-
-        Box::pin(async move {
-            let cookies = req
-                .headers()
-                .get(header::COOKIE)
-                .and_then(|v| v.to_str().ok())
-                .map(|cookie_str| {
-                    let mut map = HashMap::new();
-                    for part in cookie_str.split(';') {
-                        let p = part.trim();
-                        if p.is_empty() { continue; }
-                        if let Some((k, v)) = p.split_once('=') {
-                            map.insert(k.trim().to_string(), v.trim().to_string());
-                        }
-                    }
-                    map
-                });
-
-            let mut response = None;
-
-            if let Some(cookies) = cookies {
-                let mut new_tokens = None;
-
-                if let Some(id_val) = cookies.get(COOKIE_ID_TOKEN) {
-                    match validate_token(id_val, &config).await {
-                        Ok(claims) => {
-                            req.extensions_mut().insert(claims);
-                        }
-                        Err(AuthError::TokenExpired) => {
-                            if let Some(refresh_token) = cookies.get(COOKIE_REFRESH_TOKEN) {
-
-                                // Apply rate limiting
-                                if rate_limiter.is_rate_limited(refresh_token).await {
-                                    tracing::warn!("Rate limit exceeded for token refresh");
-                                    response = Some(create_clear_cookies_response());
-                                } else {
-                                    match refresh_tokens(&config, refresh_token).await {
-                                        Ok(tokens) => {
-                                            new_tokens = Some(tokens);
-                                        }
-                                        Err(e) => {
-                                            tracing::error!("Token refresh failed: {:?}", e);
-                                            response = Some(create_clear_cookies_response());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!("Token validation failed: {:?}", e);
-                            response = Some(create_clear_cookies_response());
-                        }
-                    }
-                }
-
-                if let Some(tokens) = new_tokens {
-                    let mut res = Response::new(Body::empty());
-                    set_token_cookies(&mut res, &tokens, &config.cookie_config);
-                    response = Some(res);
-                }
-            }
-
-            let mut res = inner.call(req).await?;
-
-            if let Some(auth_res) = response {
-                if let Some(cookies) = auth_res.headers().get(header::SET_COOKIE) {
-                    res.headers_mut()
-                        .insert(header::SET_COOKIE, cookies.clone());
-                }
-            }
-
-            Ok(res)
+        // Failed to convert claims to JSON, fallback name
+        tracing::info!("from id_token claims");
+        Ok(AuthenticatedUser {
+            subject: claims.subject().to_string(),
+            name: claims.subject().to_string(),
+            roles: session.roles.clone(),
         })
     }
 }
 
-
 #[cfg(feature = "ssr")]
-fn create_clear_cookies_response() -> Response {
-    let mut res = Response::new(Body::empty());
-    for name in [COOKIE_ID_TOKEN, COOKIE_ACCESS_TOKEN, COOKIE_REFRESH_TOKEN] {
-        let cookie = Cookie::build((name, ""))
-            .path("/")
-            .max_age(cookie::time::Duration::seconds(0))
-            .http_only(true)
-            .secure(true)
-            .same_site(SameSiteConfig::Lax.into())
-            .build();
+impl FromRequestParts<AppState> for AuthenticatedUser
+where
+    Self: 'static,
+{
+    type Rejection = Response;
 
-        if let Ok(cookie_str) = cookie.to_string().parse() {
-            res.headers_mut().append(header::SET_COOKIE, cookie_str);
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        use axum_extra::extract::CookieJar;
+        use leptos::serde_json;
+        use oauth2::{RefreshToken, TokenResponse};
+        use openidconnect::core::CoreIdToken;
+        use std::str::FromStr;
+        use tracing::info;
+        let jar = CookieJar::from_headers(&parts.headers);
+        let Some(cookie) = jar.get(SESSION_ID) else {
+            let response: Response = Redirect::to("/login").into_response();
+            return Err(response);
+        };
+
+        let session_id = cookie.value().to_string();
+        let session: SessionData;
+        // 1st
+        {
+            let sessions = state.sessions.lock().await;
+            let Some(local_session) = sessions.get(&session_id)
+            else {
+                return Err(Redirect::to("/login").into_response());
+            };
+            session = local_session.clone();
+            drop(sessions);
+        }
+
+        let verifier = state.oidc_client.id_token_verifier();
+        let http_client = &state.async_http_client;
+
+        if let Some(id_token_str) = &session.id_token {
+            let id_token = match CoreIdToken::from_str(id_token_str) {
+                Ok(t) => t,
+                Err(_) => return Err(Redirect::to("/login").into_response()),
+            };
+
+            return match id_token.claims(&verifier, &session.nonce) {
+                Ok(claims) => {
+                    Ok(extract_auth_user(&session, claims).unwrap())
+                }
+                Err(_) => {
+                    if let Some(refresh_token) = &session.refresh_token
+                        && let Ok(new_tokens) = state.oidc_client
+                        .exchange_refresh_token(
+                            &RefreshToken::new(refresh_token.clone()),
+                            http_client,
+                        )
+                        .await
+                    {
+                        let mut sessions = state.sessions.lock().await;
+                        let Some(session) = sessions.get_mut(&session_id) else {
+                            return Err(Redirect::to("/login").into_response());
+                        };
+
+                        session.id_token =
+                            new_tokens.extra_fields().id_token().map(|t| t.to_string());
+                        if let Some(new_rt) = new_tokens.refresh_token() {
+                            session.refresh_token = Some(new_rt.secret().to_string());
+                        }
+
+                        if let Some(idt) = &session.id_token
+                            && let Ok(idt_obj) = CoreIdToken::from_str(idt)
+                            && let Ok(claims) = idt_obj.claims(&verifier, &session.nonce)
+                            && let Ok(claims_json) = serde_json::to_value(claims)
+                        {
+                            // Re-extract roles and name from refreshed token
+                            let roles = extract_roles_from_claims(&claims_json);
+                            let subject = claims.subject().to_string();
+                            let name = extract_name_from_claims(&claims_json);
+                            session.roles = roles.clone();
+                            session.subject = Some(subject.clone());
+                            session.name = Some(name.clone());
+                            info!("from session.id_token");
+                            return Ok(AuthenticatedUser {
+                                subject: subject.clone(),
+                                name: name.clone(),
+                                roles: roles.clone(),
+                            });
+                        }
+                    }
+
+                    Err(Redirect::to("/login").into_response())
+                }
+            };
+        }
+
+        Err(Redirect::to("/login").into_response())
+    }
+}
+#[cfg(feature = "ssr")]
+impl TryFrom<&SessionData> for Auth {
+    type Error = &'static str;
+
+    fn try_from(data: &SessionData) -> Result<Self, Self::Error> {
+        use leptos::serde_json;
+        use oauth2::{RefreshToken, TokenResponse};
+        use openidconnect::core::CoreIdToken;
+        use std::str::FromStr;
+        use tracing::info;
+
+        if let Some(id_token_str) = &data.id_token
+            && let Some(id_token) = CoreIdToken::from_str(id_token_str).ok()
+            && let Some(name) = &data.name
+            && let Some(subject) = &data.subject
+        {
+            let user = AuthenticatedUser {
+                subject: subject.clone(),
+                name: name.clone(),
+                roles: data.roles.clone()
+            };
+            Ok(Auth::Authenticated(user))
+        } else {
+            Ok(Auth::Unauthenticated)
         }
     }
-    res
 }
-
 #[cfg(feature = "ssr")]
-fn set_token_cookies(response: &mut Response, tokens: &TokenResponse, cookie_config: &CookieConfig) {
-    set_auth_cookie(
-        response.headers_mut(),
-        COOKIE_ID_TOKEN,
-        &tokens.id_token,
-        cookie_config,
-    );
-    set_auth_cookie(
-        response.headers_mut(),
-        COOKIE_ACCESS_TOKEN,
-        &tokens.access_token,
-        cookie_config,
-    );
-    set_auth_cookie(
-        response.headers_mut(),
-        COOKIE_REFRESH_TOKEN,
-        &tokens.refresh_token,
-        cookie_config,
-    );
+impl FromRequestParts<AppState> for SessionId
+where
+    Self: 'static,
+{
+    type Rejection = (StatusCode, &'static str);
+    async fn from_request_parts(
+        parts: &mut Parts,
+        _state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let headers = &parts.headers;
+        let session_cookie = headers
+            .get(http::header::COOKIE)
+            .and_then(|h| h.to_str().ok())
+            .and_then(|s| {
+                s.split(';').find_map(|cookie_str| {
+                    if let Ok(cookie) = Cookie::parse(cookie_str.trim())
+                        && cookie.name() == SESSION_ID {
+                            return Some(cookie.value().to_owned());
+                        }
+                    None
+                })
+            });
+
+        if let Some(id) = session_cookie {
+            Ok(SessionId(id))
+        } else {
+            Err((StatusCode::UNAUTHORIZED, "Session cookie not found"))
+        }
+    }
+}
+pub fn extract_roles_from_claims(claims: &serde_json::Value) -> HashSet<Role> {
+    let mut roles = HashSet::new();
+
+    // Try different common claim names for roles
+    let role_claims = [
+        "roles",
+        "role",
+        "groups",
+        "group",
+        "realm_access.roles",
+        "resource_access.roles",
+    ];
+
+    for claim_name in &role_claims {
+        if let Some(role_value) = claims.get(claim_name) {
+            match role_value {
+                serde_json::Value::Array(arr) => {
+                    for item in arr {
+                        if let Some(role_str) = item.as_str() {
+                            roles.insert(Role::from_string(role_str));
+                        }
+                    }
+                }
+                serde_json::Value::String(s) => {
+                    roles.insert(Role::from_string(s));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    if let Some(roles_array) = claims.get("roles")
+        && let Some(arr) = roles_array.as_array()
+    {
+        for item in arr {
+            if let Some(role_str) = item.as_str() {
+                roles.insert(Role::from_string(role_str));
+            }
+        }
+    }
+
+    roles
+}
+pub fn extract_name_from_claims(claims: &serde_json::Value) -> String {
+    let first_name = claims
+        .get("given_name")
+        .or_else(|| claims.get("first_name"))
+        .and_then(|v| v.as_str());
+
+    let last_name = claims
+        .get("family_name")
+        .or_else(|| claims.get("last_name"))
+        .and_then(|v| v.as_str());
+
+    let email = claims.get("email").and_then(|v| v.as_str());
+
+    match (first_name, last_name) {
+        (Some(first), Some(last)) => format!("{} {}", first, last),
+        (Some(first), None) => first.to_string(),
+        (None, Some(last)) => last.to_string(),
+        (None, None) => email.unwrap_or("User").to_string(), // Fallback to email or "User"
+    }
 }

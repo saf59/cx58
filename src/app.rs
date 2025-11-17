@@ -1,43 +1,11 @@
-#![allow(unused_imports)]
-
-#[cfg(feature = "ssr")]
-use crate::auth::AppState;
-pub use crate::components::home_page::HomePage;
-use crate::components::side_body::SideBody;
-use crate::components::side_top::SideTop;
-use crate::components::sidebar::SideBar;
-use crate::config::AppConfig;
-use base64::Engine;
-use leptos::{
-    attr::{crossorigin, Scope},
-    html::Link,
-    prelude::*,
-};
-use leptos_meta::{provide_meta_context, MetaTags, Stylesheet, Title};
-use leptos_oidc::{
-    Auth, AuthLoaded, AuthParameters, AuthSignal, Authenticated, Challenge, LoginLink, LogoutLink,
-};
-use leptos_router::{
-    components::{Route, Router, Routes},
-    StaticSegment,
-};
-use serde::{Deserialize, Serialize};
-
-#[cfg(feature = "ssr")]
-use crate::auth::get_profile_claims;
-#[cfg(feature = "ssr")]
-use axum::{
-    extract::{FromRef, Request, State},
-    http::HeaderValue,
-    response::{Html, IntoResponse, Response},
-};
-use leptos::__reexports::wasm_bindgen_futures::JsFuture;
-use leptos::reactive::spawn_local;
-#[cfg(feature = "ssr")]
-use leptos::server_fn::middleware::{Layer, Service};
-#[cfg(feature = "ssr")]
-use leptos_axum::{render_app_to_stream, ResponseOptions};
-use web_sys::RequestInit;
+use crate::components::user_info::UserRolesDisplay;
+use crate::server_fn::*;
+use leptos::prelude::*;
+use leptos::IntoView;
+use leptos_meta::{provide_meta_context, Link, MetaTags, Stylesheet, Title};
+use leptos_router::components::{Route, Router, Routes};
+use leptos_router::*;
+use crate::auth::Auth;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();
@@ -48,9 +16,11 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <Title text="CX58 AI agent" />
-                <AutoReload options=options.clone() />
+                // <AutoReload options=options.clone() />
+                <Link rel="shortcut icon" type_="image/ico" href="/favicon.ico" />
                 <Stylesheet id="leptos" href="/pkg/cx58-client.css" />
                 <Stylesheet href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+                // TODO - HydrationScripts add ruins /login /logout routes
                 <HydrationScripts options />
                 <MetaTags />
             </head>
@@ -60,166 +30,160 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
         </html>
     }
 }
-
 #[component]
 pub fn App() -> impl IntoView {
-    use leptos::prelude::*;
-    use leptos_oidc::{Auth, AuthParameters};
+/*    let location = use_location();
+    let current_path = location.pathname.get();
+    log!("Component mounted at path: {}", current_path);
+*/
+    //let is_authenticated = Resource::new(|| (), |_| async { get_is_authenticated().await });
+    let is_authenticated = Resource::new(|| (), |_| get_is_authenticated());
+    //let is_authenticated = OnceResource::new(get_is_authenticated());
 
-    let auth_signal = Auth::signal();
-    provide_context(auth_signal);
-
-    // Move everything into a child component that lives *inside* Router
     view! {
         <Router>
-            <AuthInitializer/>
+            <main>
+                <Routes fallback=|| view! { <NotFoundPage /> }>
+                    <Route path=path!("/") view=move || view! { <RootPage is_authenticated /> } />
+                    // <Route path="/login" view=LoginPage />
+                    <Route path=path!("/profile") view=ProfilePage />
+                </Routes>
+            </main>
         </Router>
     }
 }
-
+// *** New RootPage Component ***
 #[component]
-fn AuthInitializer() -> impl IntoView {
-    use leptos_oidc::{Auth, AuthParameters};
-
-    // Fetch and initialize
-    let auth_initialized: LocalResource<Result<(), String>> =
-        LocalResource::new(move || async move {
-            leptos::logging::log!("Fetching auth parameters...");
-            let params: AuthParameters = gloo_net::http::Request::get("/api/get_auth_parameters")
-                .send()
-                .await
-                .map_err(|e| format!("Fetch failed: {:?}", e))?
-                .json()
-                .await
-                .map_err(|e| format!("Parse failed: {:?}", e))?;
-
-            leptos::logging::log!("Initializing Auth...");
-            leptos::logging::log!("{:?}", &params);
-            Auth::init(params);
-            Ok::<(), String>(())
-        });
-
+fn RootPage(is_authenticated: Resource<Result<bool, ServerFnError>>) -> impl IntoView {
     view! {
-        <Suspense fallback=|| view! { <div class="sb-content">"Initializing authentication..."</div> }>
-            {move || {
-                auth_initialized.get().map(|_| {
-                    view! {
-                        <Transition  >
-                            <AuthLoaded>
-                                <Authenticated unauthenticated=Unauthenticated>
-                                    <SideBar top=SideTop() side_body=SideBody() content=HomePage() />
-                                </Authenticated>
-                            </AuthLoaded>
-
-                    </Transition>
-                        }
-                })
-            }}
+        // 3. Use <Suspense> for initial loading and <Transition> for smooth transitions
+        <Suspense fallback=move || view! { <h1>"Loading..."</h1> }>
+            // 4. Use <ErrorBoundary> to handle server function errors
+            <ErrorBoundary fallback=|errors| {
+                view! {
+                    <h1>"Error loading auth status."</h1>
+                    <p>{format!("{:?}", errors.get())}</p>
+                }
+            }>
+                {move || match is_authenticated.get() {
+                    None => {
+                        // Resource is still loading or hasn't started
+                        view! { <h1>"Checking Auth..."</h1> }
+                            .into_any()
+                    }
+                    Some(Err(_)) => {
+                        // Server Function returned an error
+                        view! { <LoginPage /> }
+                            .into_any()
+                    }
+                    Some(Ok(true)) => {
+                        // Server Function succeeded
+                        // User is authenticated, redirect
+                        // Use the built-in Leptos <Redirect/> or <Navigate/>
+                        view! { <Chat /> }
+                            .into_any()
+                    }
+                    Some(Ok(false)) => {
+                        // User is NOT authenticated, show the public landing page or login.
+                        view! { <PublicLandingPage /> }
+                            .into_any()
+                    }
+                }}
+            </ErrorBoundary>
         </Suspense>
     }
 }
 
 #[component]
-pub fn Unauthenticated() -> impl IntoView {
-    // <Title text="Unauthenticated"/>
+fn Chat() -> impl IntoView {
+    let auth = use_context::<Auth>();
     view! {
-        <div class="sb-content">
+        <div class="centered">
+            <h3>"Welcome  to CX58!"</h3>
+            <p>"This is the public chat page."</p>
+            <LogoutButton />
+        </div>
+        <div class="centered">
+            {move || match auth.clone() {
+                Some(Auth::Authenticated(user)) => view! { <p>{user.to_string()}</p> }.into_view(),
+                Some(Auth::Unauthenticated) | None => view! { <p>Unauthenticated</p> }.into_view(),
+            }}
+        </div>
+    }
+}
+
+// Dummy components
+#[component]
+fn PublicLandingPage() -> impl IntoView {
+    view! {
+        <div class="centered">
+            <h1>"Welcome! Please Log In."</h1>
+            <p>
+                <span>"This is the public"</span>
+                <span class="cx58">"Construct-X/5.8"</span>
+                <span>"home page."</span>
+            </p>
+            <LoginButton />
+        </div>
+    }
+}
+#[component]
+fn LoginPage() -> impl IntoView {
+    view! {
+        <div class="centered">
             <h3>"Welcome  to CX58!"</h3>
             <h3>You are unauthenticated!</h3>
-            <span>Please
-            <LoginLink class="sign-in"><i class="fa fa-sign-in"></i><span>Sign in</span></LoginLink>
-            via SSO.</span>
-            <LoginButton/>
+            <LoginButton />
         </div>
-        // Your Unauthenticated Page
+    }
+}
+#[component]
+fn ProfilePage() -> impl IntoView {
+    view! {
+        <div class="centered">
+            <UserRolesDisplay />
+            <LogoutButton />
+        </div>
     }
 }
 #[component]
 pub fn LoginButton() -> impl IntoView {
-    let on_click = move |_| {
-        if let Some(window) = web_sys::window() {
-            let _ = window.location().set_href("/api/start_login");
-        }
-    };
-
     view! {
-        <button on:click=on_click class="btn btn-primary">
-            "Login"
-        </button>
+        // it is axum route - not leptos
+        <a href="/login" class="sign" rel="external">
+            <i class="fa fa-sign-in"></i>
+            <span>Log In</span>
+        </a>
     }
 }
 #[component]
 pub fn LogoutButton() -> impl IntoView {
-    let on_click = move |_| {
-        if let Some(window) = web_sys::window() {
-            let _ = window.location().set_href("/api/logout");
-        }
-    };
-
     view! {
-        <button on:click=on_click class="btn btn-secondary">
-            "Logout"
-        </button>
+        // it is axum route - not leptos
+        <a href="/logout" class="sign sign-out" rel="external">
+            <i class="fa fa-sign-out"></i>
+            <span>Log Out</span>
+        </a>
     }
 }
 
-
-#[server]
-pub async fn get_csp_nonce() -> Result<Option<String>, ServerFnError> {
+#[component]
+fn NotFoundPage() -> impl IntoView {
+    // set an HTTP status code 404
+    // this is feature gated because it can only be done during
+    // initial server-side rendering
+    // if you navigate to the 404 page subsequently, the status
+    // code will not be set because there is not a new HTTP request
+    // to the server
     #[cfg(feature = "ssr")]
     {
-        use axum::http::HeaderMap;
-        use leptos_axum::extract;
-
-        let headers: HeaderMap = extract().await?;
-        let nonce = headers
-            .get("x-csp-nonce")
-            .and_then(|v| v.to_str().ok())
-            .map(|s| s.to_string());
-        println!("Read x-csp-nonce:{:?}", nonce.clone());
-        Ok(nonce)
+        // this can be done inline because it's synchronous
+        // if it were async, we'd use a server function
+        let resp = expect_context::<leptos_axum::ResponseOptions>();
+        resp.set_status(reqwest::StatusCode::NOT_FOUND);
     }
-    #[cfg(not(feature = "ssr"))]
-    {
-        Ok(None)
-    }
-}
-// Server function to get auth parameters
-#[server]
-pub async fn get_auth_parameters() -> Result<AuthParameters, ServerFnError> {
-    #[cfg(feature = "ssr")]
-    {
-        use axum::Extension;
-        use leptos_axum::extract;
-        use std::sync::Arc;
-
-        let Extension(config): Extension<Arc<AppConfig>> = extract().await?;
-        Ok(config.auth_parameters())
-    }
-
-    #[cfg(not(feature = "ssr"))]
-    {
-        Err(ServerFnError::ServerError(
-            "Not available on client".to_string(),
-        ))
-    }
-}
-#[server]
-pub async fn get_config() -> Result<AppConfig, ServerFnError> {
-    #[cfg(feature = "ssr")]
-    {
-        use axum::Extension;
-        use leptos_axum::extract;
-        use std::sync::Arc;
-
-        let Extension(config): Extension<Arc<AppConfig>> = extract().await?;
-        Ok(config.as_ref().clone())
-    }
-
-    #[cfg(not(feature = "ssr"))]
-    {
-        Err(ServerFnError::ServerError(
-            "Not available on client".to_string(),
-        ))
+    view! {
+        <h1>"404 - Page Not Found"</h1>
+        <p>"The requested page was not found."</p>
     }
 }

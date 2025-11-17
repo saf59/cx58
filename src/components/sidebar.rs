@@ -16,7 +16,8 @@ where
     let (is_pinned, set_is_pinned) = signal(false);
     view! {
         <div class="sb-wrapper" class:sb-collapsed=is_collapsed class:sb-pinned=is_pinned>
-            <div class="sb-sidebar"
+            <div
+                class="sb-sidebar"
                 on:mouseleave=move |_| {
                     if !is_pinned.get() {
                         set_is_collapsed.set(true)
@@ -25,9 +26,11 @@ where
             >
                 <header class="sb-sideHeader">
                     <button class="tooltip sb-pin" on:click=move |_| set_is_pinned.set(true)>
-                        <span class="tooltiptext">Pin sidebar</span></button>
+                        <span class="tooltiptext">Pin sidebar</span>
+                    </button>
                     <div class="sb-side-top">{top.into_view()}</div>
-                    <button class="tooltip sb-unpin"
+                    <button
+                        class="tooltip sb-unpin"
                         on:click=move |_| {
                             set_is_pinned.set(false);
                             set_is_collapsed.set(true)
@@ -43,9 +46,6 @@ where
                 {content.into_view()}
             </div>
         </div>
-        <div
-            class="sb-hoverStrip"
-            on:mouseenter=move |_| set_is_collapsed.set(false)
-        ></div>
+        <div class="sb-hoverStrip" on:mouseenter=move |_| set_is_collapsed.set(false)></div>
     }
 }

@@ -17,7 +17,10 @@ pub fn HomePage() -> impl IntoView {
     view! {
         <h3>"Welcome  to CX58 AI agent!"</h3>
         <button on:click=on_click>"Click Me: " {count}</button>
-        <LogoutLink class="sign_out"><i class="fa fa-sign-out"></i><span>Sign out</span></LogoutLink>
-        <LogoutButton/>
+        <LogoutLink class="sign_out">
+            <i class="fa fa-sign-out"></i>
+            <span>Sign out</span>
+        </LogoutLink>
+        <LogoutButton />
     }
 }
