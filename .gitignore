@@ -3,9 +3,8 @@
 debug/
 target/
 md/
-.idea/
-.continue/
-
+copy/
+/.*/
 # Remove Cargo.lock from gitignore if creating an executable, leave it for libraries
 # More information here https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html
 Cargo.lock
@@ -17,8 +16,6 @@ Dockerfile
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
 /.env
+/.gitignore
 /docker-compose.yaml
 *.cmd
-ask*
-index.html
-/.continue/rules/
