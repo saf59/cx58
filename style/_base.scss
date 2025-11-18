@@ -21,11 +21,15 @@ body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  width: auto;
+  width: 100vw;
+  height: 100vh;
   padding: 10px;
 }
 .cx58 {
   color: var(--cx58-color);
   margin: 10px;
   font-size: 1.1em;
+}
+.bg_oidc {
+  background-color: var(--bg-oidc);
 }

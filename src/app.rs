@@ -102,12 +102,12 @@ fn RootPage(is_authenticated: Resource<Result<bool, ServerFnError>>) -> impl Int
 fn Chat() -> impl IntoView {
     let auth = use_context::<Auth>();
     view! {
-        <div class="centered">
+        <div class="centered bg_oidc">
             <h3>"Welcome  to CX58!"</h3>
             <p>"This is the public chat page."</p>
             <LogoutButton />
         </div>
-        <div class="centered">
+        <div class="centered bg_oidc">
             {move || match auth.clone() {
                 Some(Auth::Authenticated(user)) => view! { <p>{user.to_string()}</p> }.into_view(),
                 Some(Auth::Unauthenticated) | None => view! { <p>Unauthenticated</p> }.into_view(),
@@ -120,7 +120,7 @@ fn Chat() -> impl IntoView {
 #[component]
 fn PublicLandingPage() -> impl IntoView {
     view! {
-        <div class="centered">
+        <div class="centered  bg_oidc">
             <h1>"Welcome! Please Log In."</h1>
             <p>
                 <span>"This is the public"</span>
@@ -134,7 +134,7 @@ fn PublicLandingPage() -> impl IntoView {
 #[component]
 fn LoginPage() -> impl IntoView {
     view! {
-        <div class="centered">
+        <div class="centered bg_oidc">
             <h3>"Welcome  to CX58!"</h3>
             <h3>You are unauthenticated!</h3>
             <LoginButton />
@@ -144,7 +144,7 @@ fn LoginPage() -> impl IntoView {
 #[component]
 fn ProfilePage() -> impl IntoView {
     view! {
-        <div class="centered">
+        <div class="centered  bg_oidc">
             <UserRolesDisplay />
             <LogoutButton />
         </div>
