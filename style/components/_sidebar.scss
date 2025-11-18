@@ -1,7 +1,7 @@
 .sb-wrapper {
   display: flex;
-  width: 100lvw;
-  height: 100lwh;
+  width: 100vw;
+  height: 100vh;
   background: var(--wrapper-bcolor);
   overflow: hidden;
 }
@@ -13,9 +13,9 @@
   background: var(--sidebar-bcolor);
   display: flex;
   align-items: center;
-  justify-content: stretch;
+  justify-content: start;
   transition: transform .4s ease, flex .4s ease;
-  overflow: hidden;
+  overflow: inherit;
   box-shadow: none;
   border-radius: 0;
   border: 0;
