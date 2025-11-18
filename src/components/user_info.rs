@@ -1,5 +1,6 @@
 use leptos::prelude::*;
 use leptos::IntoView;
+use crate::auth::Auth;
 use crate::server_fn::get_auth;
 
 #[component]
@@ -12,11 +13,10 @@ pub fn UserRolesDisplay() -> impl IntoView {
                 view! { <div class="loading">"Loading user info..."</div> }
             }>
                 {move || {
-                    auth
-                        .get()
+                    auth.get()
                         .map(|result| {
                             match result {
-                                Ok(info) => {
+                                Ok(Auth::Authenticated(info)) => {
                                     view! {
                                         <div class="user-info-card">
                                             <h2>"User Profile"</h2>
@@ -46,8 +46,18 @@ pub fn UserRolesDisplay() -> impl IntoView {
                                     }
                                         .into_any()
                                 }
+                                Ok(Auth::Unauthenticated) => {
+                                    view! {
+                                        <div class="unauthenticated">
+                                            <p>
+                                                "Please " <a href="/login">"log in"</a>
+                                                " to view your profile."
+                                            </p>
+                                        </div>
+                                    }
+                                        .into_any()
+                                }
                                 Err(e) => {
-
                                     view! {
                                         <div class="error">
                                             <p>"Error loading user info: " {e.to_string()}</p>
@@ -59,7 +69,6 @@ pub fn UserRolesDisplay() -> impl IntoView {
                         })
                 }}
             </Suspense>
-
         </div>
     }
 }

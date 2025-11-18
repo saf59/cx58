@@ -49,7 +49,6 @@ pub fn App() -> impl IntoView {
             <main>
                 <Routes fallback=|| view! { <NotFoundPage /> }>
                     <Route path=path!("/") view=move || view! { <RootPage is_authenticated /> } />
-                    // <Route path="/login" view=LoginPage />
                     <Route path=path!("/profile") view=ProfilePage />
                 </Routes>
             </main>

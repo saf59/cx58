@@ -18,8 +18,8 @@
 
   --accent-color: --f-color;
   --gradient-color: --c-color;
-  --sidebar-width: 18lvw;
-  --content-width: 82lvw;
+  --sidebar-width: 180px;
+  --content-width: calc(100dvw - --sidebar-width);
   --sidebar-bcolor: #f0f0f0;
   --wrapper-bcolor: #f4f4f4;
   --border-color: #cccccc;

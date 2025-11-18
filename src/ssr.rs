@@ -10,17 +10,17 @@ use axum::{
     http::request::Parts,
     response::{IntoResponse, Redirect, Response},
 };
-use axum_extra::extract::cookie::Cookie;
 use axum_extra::extract::CookieJar;
-use base64::prelude::BASE64_URL_SAFE_NO_PAD;
+use axum_extra::extract::cookie::Cookie;
 use base64::Engine;
+use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use http::HeaderMap;
 use leptos::config::LeptosOptions;
 use leptos::context::provide_context;
 use leptos::serde_json;
 use leptos_axum::handle_server_fns_with_context;
-use oauth2::basic::{BasicErrorResponseType, BasicRevocationErrorResponse};
 use oauth2::AccessToken;
+use oauth2::basic::{BasicErrorResponseType, BasicRevocationErrorResponse};
 use oauth2::{
     AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointMaybeSet, EndpointNotSet,
     EndpointSet, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope,
@@ -34,8 +34,8 @@ use openidconnect::core::{
 use openidconnect::{
     AuthenticationFlow, EmptyAdditionalClaims, IssuerUrl, Nonce, OAuth2TokenResponse,
 };
-use serde::de::Error;
 use serde::Deserialize;
+use serde::de::Error;
 use serde_json::Value;
 use serde_urlencoded::de::Error as UrlError;
 use std::collections::{HashMap, HashSet};
@@ -212,7 +212,11 @@ pub async fn logout_handler(State(state): State<AppState>, jar: CookieJar) -> im
             };
             let base_logout_url = format!("{}/oidc/logout", issuer_url.trim_end_matches('/'));
 
-            post_logout_redirect_uri=state.oidc_client.config.oidc_post_logout_redirect_uri.clone();
+            post_logout_redirect_uri = state
+                .oidc_client
+                .config
+                .oidc_post_logout_redirect_uri
+                .clone();
             let mut url = url::Url::parse(&base_logout_url).expect("Invalid base logout URL");
 
             url.query_pairs_mut()
@@ -236,12 +240,10 @@ pub async fn leptos_server_fn_handler(
     req: axum::extract::Request<axum::body::Body>,
 ) -> Response<axum::body::Body> {
     let headers = req.headers().clone();
-    let auth_state = get_auth_state(state.clone(),headers ).await;
+    let auth_state = get_auth_state(state.clone(), headers).await;
     handle_server_fns_with_context(
         move || {
             provide_context(state.sessions.clone());
-            provide_context(state.oidc_client.clone());
-            provide_context(state.async_http_client.clone());
             provide_context(jar.clone());
             provide_context(auth_state.clone());
         },
@@ -254,18 +256,15 @@ pub async fn leptos_server_fn_handler(
 pub async fn leptos_main_handler(
     State(state): State<AppState>,
     jar: CookieJar,
-    //OriginalUri(uri): OriginalUri,
     req: axum::http::Request<axum::body::Body>,
 ) -> Response {
-    //let current_path = uri.path().to_string();
-    //info!("path: {}",&current_path);
     let headers = req.headers().clone();
-	let auth_state = get_auth_state(state.clone(),headers ).await;
+    let auth_state = get_auth_state(state.clone(), headers).await;
     let leptos_options = state.leptos_options.as_ref().clone();
     let handler = leptos_axum::render_app_to_stream_with_context(
         move || {
             provide_context(jar.clone());
-            provide_context(state.clone());
+            provide_context(state.sessions.clone());
             provide_context(auth_state.clone());
         },
         move || shell(leptos_options.clone()),
@@ -286,8 +285,8 @@ pub async fn login_handler(State(state): State<AppState>, jar: CookieJar) -> imp
             pkce_verifier: Arc::new(Mutex::new(Some(pkce_verifier))),
             id_token: None,
             refresh_token: None,
-            subject:None,
-            name:None,
+            subject: None,
+            name: None,
             roles: HashSet::new(),
         },
     );
@@ -303,18 +302,20 @@ pub async fn login_handler(State(state): State<AppState>, jar: CookieJar) -> imp
     (jar, Redirect::to(auth_url.as_str()))
 }
 /// For both: leptos_main_handler and leptos_server_fn_handler
-async fn get_auth_state(state:AppState,headers: HeaderMap) -> Auth {
-    let session_id = headers.get(http::header::COOKIE)
+async fn get_auth_state(state: AppState, headers: HeaderMap) -> Auth {
+    let session_id = headers
+        .get(http::header::COOKIE)
         .and_then(|h| h.to_str().ok())
-        .and_then(|s| s.split(';')
-            .find_map(|cookie_str| {
+        .and_then(|s| {
+            s.split(';').find_map(|cookie_str| {
                 if let Ok(cookie) = Cookie::parse(cookie_str.trim())
-                    && cookie.name() == SESSION_ID {
-                        return Some(cookie.value().to_owned());
-                    }
+                    && cookie.name() == SESSION_ID
+                {
+                    return Some(cookie.value().to_owned());
+                }
                 None
             })
-        );
+        });
 
     if let Some(id) = session_id {
         let sessions = state.sessions.lock().await;
@@ -361,24 +362,13 @@ pub async fn callback_handler(
 
     let session_id = session_cookie.value().to_string();
 
-    //let mut sessions = state.sessions.lock().unwrap();
+    let mut sessions = state.sessions.lock().await;
+    let Some(session) = sessions.get_mut(&session_id) else {
+        return (StatusCode::BAD_REQUEST, "Invalid session").into_response();
+    };
+    let mut pkce_guard = session.pkce_verifier.lock().await;
+    let pkce_verifier_to_check = pkce_guard.take();
 
-    //let Some(session) = sessions.get_mut(&session_id) else {
-    //    return (StatusCode::BAD_REQUEST, "Invalid session").into_response();
-    //};
-//    let mut session: SessionData;
-//    let pkce_verifier_to_check: Option<PkceCodeVerifier>;
-//    {
-        let mut sessions = state.sessions.lock().await;
-        let Some(session) = sessions.get_mut(&session_id)
-        else {
-            return (StatusCode::BAD_REQUEST, "Invalid session").into_response();
-        };
-        let mut pkce_guard = session.pkce_verifier.lock().await;
-        let pkce_verifier_to_check = pkce_guard.take();
-  //      session = local_session;
-  //  }
-    
     if session.csrf_token.secret() != &query.state {
         return (StatusCode::BAD_REQUEST, "CSRF validation failed").into_response();
     };
@@ -387,12 +377,6 @@ pub async fn callback_handler(
         None => return (StatusCode::BAD_REQUEST, "Missing PKCE verifier").into_response(),
     };
 
-/*    let mut pkce_guard = session.pkce_verifier.lock().unwrap();
-
-    let Some(pkce_verifier) = pkce_guard.take() else {
-        return (StatusCode::BAD_REQUEST, "Missing PKCE verifier").into_response();
-    };
-*/
     let code = AuthorizationCode::new(query.code.clone());
     let http_client = &state.async_http_client;
 
@@ -409,7 +393,7 @@ pub async fn callback_handler(
                     id_token.claims(&state.oidc_client.id_token_verifier(), &session.nonce)
             {
                 session.subject = Some(claims.subject().to_string());
-                
+
                 if let Ok(claims_json) = serde_json::to_value(claims) {
                     session.roles = extract_roles_from_claims(&claims_json);
                     // Name is also extracted here
@@ -485,5 +469,5 @@ pub async fn chat_handler(user: AuthenticatedUser) -> impl IntoResponse {
         return (StatusCode::FORBIDDEN, "Chat permission required").into_response();
     }
 
-    (StatusCode::OK, format!("{} can chat!", user.name)).into_response() 
+    (StatusCode::OK, format!("{} can chat!", user.name)).into_response()
 }
