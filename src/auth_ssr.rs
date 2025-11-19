@@ -1,23 +1,51 @@
 use crate::auth::*;
-use crate::state::{AppState, SessionData};
+use crate::state::AppState;
 use axum::{
-    extract::FromRequestParts,
-    http::{request::Parts, StatusCode},
-    response::{IntoResponse, Redirect, Response},
     Error,
+    extract::FromRequestParts,
+    http::{StatusCode, request::Parts},
+    response::{IntoResponse, Redirect, Response},
 };
 
-use axum_extra::extract::{cookie::Cookie, CookieJar};
+use axum_extra::extract::{CookieJar, cookie::Cookie};
 use leptos::serde_json;
-use oauth2::{RefreshToken, TokenResponse};
+use oauth2::{CsrfToken, PkceCodeVerifier, RefreshToken, TokenResponse};
+use openidconnect::Nonce;
 use openidconnect::core::{CoreIdToken, CoreIdTokenClaims};
 use std::collections::HashSet;
 use std::str::FromStr;
-
+use std::sync::Arc;
+use std::collections::HashMap;
+use std::time::Duration;
+use std::time::Instant;
+use std::time::SystemTime;
+use tokio::sync::Mutex;
 use tracing::info;
 
-fn extract_auth_user(session: &SessionData, claims: &CoreIdTokenClaims) -> Result<AuthenticatedUser, Error> {
+/// Only Server side
+#[derive(Debug, Clone)]
+pub struct SessionData {
+    pub csrf_token: CsrfToken,
+    pub nonce: Nonce,
+    pub pkce_verifier: Arc<Mutex<Option<PkceCodeVerifier>>>,
+    pub id_token: Option<String>,
+    pub refresh_token: Option<String>,
+    pub subject: Option<String>,
+    pub name: Option<String>,
+    pub roles: HashSet<Role>,
+    pub id_token_expires_at: Option<Instant>,
+    pub is_refreshing: Arc<Mutex<bool>>,
+}
+// Время, за которое до истечения токена начинаем обновление (5 минут)
+const REFRESH_THRESHOLD: Duration = Duration::from_secs(5 * 60);
 
+// Тип для удобного извлечения (может быть и просто SessionData)
+pub struct SessionDataWithRefresh(pub SessionData);
+
+fn extract_auth_user(
+    session: &SessionData,
+    claims: &CoreIdTokenClaims,
+) -> Result<AuthenticatedUser, Error> {
     if let Ok(claims_json) = serde_json::to_value::<&_>(claims) {
         tracing::info!("from id_token claims_json");
         Ok(AuthenticatedUser {
@@ -35,8 +63,169 @@ fn extract_auth_user(session: &SessionData, claims: &CoreIdTokenClaims) -> Resul
         })
     }
 }
+// -------------------------------------------------------------------------
+// 💡 Вспомогательные функции, вынесенные из from_request_parts
+// -------------------------------------------------------------------------
 
+/// Извлекает ID сессии из заголовков Cookie.
+fn get_session_id_from_parts(parts: &Parts) -> Result<String, Box<Response>> {
 
+    // Получение заголовка Cookie
+    let cookie_header_value = parts.headers
+        .get(http::header::COOKIE)
+        .and_then(|h| h.to_str().ok());
+
+    let session_id = cookie_header_value
+        .and_then(|cookies_str| {
+            // Ищем куку с нужным именем
+            cookies_str.split(';')
+                .find_map(|cookie| {
+                    let mut parts = cookie.trim().split('=');
+                    // Проверяем, что есть имя и значение
+                    let name = parts.next()?;
+                    let value = parts.next()?;
+
+                    if name == SESSION_ID {
+                        // Возвращаем значение
+                        Some(value.to_string())
+                    } else {
+                        None
+                    }
+                })
+        });
+
+    // 2. Обработка ошибки, оборачивая Response в Box
+    match session_id {
+        Some(id) => Ok(id),
+        None => {
+            let response = (StatusCode::UNAUTHORIZED, "Missing or invalid session ID cookie.").into_response();
+            Err(Box::new(response))
+        }
+    }
+}
+
+/// Асинхронно сохраняет обновленные данные сессии в HashMap.
+async fn save_session_data_in_store(
+    store: &Arc<Mutex<HashMap<String, SessionData>>>,
+    session_id: String,
+    data: SessionData,
+) {
+    let mut map_guard = store.lock().await;
+    map_guard.insert(session_id, data);
+}
+
+// -------------------------------------------------------------------------
+// 🚀 Структура и Реализация FromRequestParts
+// -------------------------------------------------------------------------
+
+impl FromRequestParts<AppState> for SessionDataWithRefresh
+where
+// Требование Self: 'static не нужно, так как оно уже неявно
+// обеспечивается FromRequestParts и асинхронными блоками.
+{
+    type Rejection = Response;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        tracing::info!("FromRequestParts<AppState> for SessionDataWithRefresh");
+        // --- 1. Извлечение Session ID и данных ---
+
+        let session_id = get_session_id_from_parts(parts).unwrap();
+
+        // Получаем клонированные данные сессии
+        let session_data: SessionData = {
+            let map_guard = state.sessions.lock().await;
+            map_guard.get(&session_id)
+                .cloned()
+                .ok_or_else(|| (StatusCode::UNAUTHORIZED, "Session not found in store.").into_response())?
+        };
+
+        let now = Instant::now();
+
+        // --- 2. Проверка Hard Expiration ---
+
+        if session_data.id_token_expires_at.is_some_and(|exp_at| now >= exp_at) {
+            return Err((StatusCode::UNAUTHORIZED, "ID Token Expired. Please log in again.").into_response());
+        }
+
+        // --- 3. Проверка необходимости обновления (Refresh Threshold) ---
+/*        let needs_refresh = session_data.id_token_expires_at.map_or(false, |exp_at| {
+            exp_at.checked_sub(REFRESH_THRESHOLD).map_or(false, |threshold_time| {
+                now >= threshold_time
+            })
+        });
+*/
+        // Вместо вычитания из exp_at, мы прибавляем REFRESH_THRESHOLD к now
+        let needs_refresh = session_data.id_token_expires_at.is_some_and( |exp_at| {
+            now.checked_add(REFRESH_THRESHOLD).is_some_and(|future_time| {
+                // Если (текущее время + порог) >= время истечения
+                // значит, до истечения осталось меньше, чем порог.
+                future_time >= exp_at
+            })
+        });
+        // --- 4. Запуск фонового обновления, если необходимо ---
+
+        if needs_refresh && session_data.refresh_token.is_some() {
+            let mut is_refreshing_lock = session_data.is_refreshing.lock().await;
+
+            if !*is_refreshing_lock {
+                *is_refreshing_lock = true;
+                drop(is_refreshing_lock); // Освобождаем мьютекс
+
+                let refresh_token = session_data.refresh_token.clone().unwrap();
+                let session_id_clone = session_id.clone();
+
+                // Клонирование глобальных зависимостей (остаются прежними)
+                let session_store_clone = state.sessions.clone();
+                let oidc_client_clone = state.oidc_client.clone();
+                let http_client_clone = state.async_http_client.clone();
+
+                tokio::spawn(async move {
+
+                    match perform_token_refresh(
+                        refresh_token,
+                        &oidc_client_clone,
+                        &http_client_clone
+                    ).await {
+                        Ok((new_id_token, new_refresh_token, new_expires_at)) => {
+
+                            // Получаем данные, обновляем и сохраняем
+                            if let Some(mut current_data) = {
+                                let guard = session_store_clone.lock().await;
+                                guard.get(&session_id_clone).cloned()
+                            } {
+                                current_data.id_token = Some(new_id_token);
+                                current_data.refresh_token = new_refresh_token;
+                                current_data.id_token_expires_at = Some(new_expires_at);
+
+                                *current_data.is_refreshing.lock().await = false;
+
+                                save_session_data_in_store(&session_store_clone, session_id_clone, current_data).await;
+                            }
+                        },
+                        Err(e) => {
+                            eprintln!("Token refresh failed for session {}: {:?}", session_id_clone, e);
+
+                            // ⚠️ Очищаем флаг, чтобы не блокировать будущие попытки.
+                            if let Some( current_data) = {
+                                let guard = session_store_clone.lock().await;
+                                guard.get(&session_id_clone).cloned()
+                            } {
+                                *current_data.is_refreshing.lock().await = false;
+                                save_session_data_in_store(&session_store_clone, session_id_clone, current_data).await;
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // 5. Возвращаем текущие данные сессии
+        Ok(SessionDataWithRefresh(session_data))
+    }
+}
 impl FromRequestParts<AppState> for AuthenticatedUser
 where
     Self: 'static,
@@ -139,7 +328,7 @@ impl TryFrom<&SessionData> for Auth {
             let user = AuthenticatedUser {
                 subject: subject.clone(),
                 name: name.clone(),
-                roles: data.roles.clone()
+                roles: data.roles.clone(),
             };
             Ok(Auth::Authenticated(user))
         } else {
@@ -164,7 +353,8 @@ where
             .and_then(|s| {
                 s.split(';').find_map(|cookie_str| {
                     if let Ok(cookie) = Cookie::parse(cookie_str.trim())
-                        && cookie.name() == SESSION_ID {
+                        && cookie.name() == SESSION_ID
+                    {
                         return Some(cookie.value().to_owned());
                     }
                     None
@@ -177,6 +367,57 @@ where
             Err((StatusCode::UNAUTHORIZED, "Session cookie not found"))
         }
     }
+}
+
+type RefreshResult =
+    Result<(String, Option<String>, Instant), Box<dyn std::error::Error + Send + Sync>>;
+
+/// Выполняет запрос на обновление токена и валидирует новый ID Token.
+pub async fn perform_token_refresh(
+    current_refresh_token: String,
+    oidc_client: &crate::ssr::ISPOidcClient,
+    http_client: &reqwest::Client,
+) -> RefreshResult {
+    let refresh_token = RefreshToken::new(current_refresh_token);
+
+    // 1. Выполнение запроса на обновление токена
+    let token_response = oidc_client
+        .exchange_refresh_token(&refresh_token,http_client)
+        .await
+        .map_err(|e| format!("Refresh token request failed: {:?}", e))?;
+
+    // 2. Получение ID Token и его валидация
+    let id_token = token_response
+        .extra_fields()
+        .id_token()
+        .ok_or("Missing ID Token after refresh")?;
+
+    let claims = id_token
+        .claims(&oidc_client.id_token_verifier(), |_nonce: Option<&openidconnect::Nonce>| -> Result<(), String> {
+            Ok(())
+        },)
+        .map_err(|e| format!("ID Token validation failed after refresh: {:?}", e))?;
+
+    // 3. Извлечение нового срока действия (exp)
+    let exp_timestamp = claims.expiration().timestamp() as u64;
+
+    let expires_at_system_time = SystemTime::UNIX_EPOCH + Duration::from_secs(exp_timestamp);
+
+    // Вычисляем Instant
+    let remaining_duration = expires_at_system_time
+        .duration_since(SystemTime::now())
+        .unwrap_or(Duration::ZERO);
+
+    let new_expires_at = Instant::now() + remaining_duration;
+
+    // 4. Возврат данных
+    Ok((
+        id_token.to_string(),
+        token_response
+            .refresh_token()
+            .map(|t| t.secret().to_string()),
+        new_expires_at,
+    ))
 }
 pub fn extract_roles_from_claims(claims: &serde_json::Value) -> HashSet<Role> {
     let mut roles = HashSet::new();

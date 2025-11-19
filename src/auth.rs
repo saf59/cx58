@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::fmt::{Display,Formatter};
+use std::fmt::{Display, Formatter};
 
 pub const SESSION_ID: &str = "session_id";
 pub struct SessionId(pub String);

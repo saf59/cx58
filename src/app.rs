@@ -36,14 +36,7 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
 }
 #[component]
 pub fn App() -> impl IntoView {
-/*    let location = use_location();
-    let current_path = location.pathname.get();
-    log!("Component mounted at path: {}", current_path);
-*/
-    //let is_authenticated = Resource::new(|| (), |_| async { get_is_authenticated().await });
     let is_authenticated = Resource::new(|| (), |_| get_is_authenticated());
-    //let is_authenticated = OnceResource::new(get_is_authenticated());
-
     view! {
         <Router>
             <main>
@@ -55,6 +48,7 @@ pub fn App() -> impl IntoView {
         </Router>
     }
 }
+
 // *** New RootPage Component ***
 #[component]
 fn RootPage(is_authenticated: Resource<Result<bool, ServerFnError>>) -> impl IntoView {

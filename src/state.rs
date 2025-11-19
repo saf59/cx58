@@ -1,12 +1,10 @@
-use std::collections::{HashMap, HashSet};
+use crate::auth_ssr::SessionData;
+use crate::ssr::ISPOidcClient;
+use leptos::config::LeptosOptions;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use leptos::config::LeptosOptions;
-use oauth2::{CsrfToken, PkceCodeVerifier};
-use openidconnect::Nonce;
-use crate::auth::Role;
-use crate::ssr::ISPOidcClient;
-
+use axum::extract::{FromRef, State};
 #[derive(Clone)]
 pub struct AppState {
     pub leptos_options: Arc<LeptosOptions>,
@@ -14,7 +12,6 @@ pub struct AppState {
     pub sessions: Arc<Mutex<HashMap<String, SessionData>>>,
     pub async_http_client: reqwest::Client,
 }
-
 impl AppState {
     /// Initializes and returns the application state.
     ///
@@ -47,14 +44,23 @@ impl AppState {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct SessionData {
-    pub csrf_token: CsrfToken,
-    pub nonce: Nonce,
-    pub pkce_verifier: Arc<Mutex<Option<PkceCodeVerifier>>>,
-    pub id_token: Option<String>,
-    pub refresh_token: Option<String>,
-    pub subject: Option<String>,
-    pub name: Option<String>,
-    pub roles: HashSet<Role>,
+impl FromRef<AppState> for State<AppState> {
+    fn from_ref(state: &AppState) -> Self {
+        // Мы просто клонируем Arc<AppState> и оборачиваем его в State
+        // (Это работает, потому что AppState внутри State - это Arc)
+        State(state.clone())
+    }
+}
+impl FromRef<()> for AppState {
+    fn from_ref(_state: &()) -> Self {
+        // Мы не можем получить AppState из пустого контекста `&()`.
+        // ВАЖНО: Мы не должны дойти до этой реализации.
+        // Это заглушка, которая удовлетворяет компилятору,
+        // но является индикатором неправильной настройки.
+        //
+        // ❌ Это решение, если бы вы извлекали State<T> из () в стандартном Axum хендлере.
+        // Поскольку вы используете leptos_axum::extract, нам нужна другая стратегия.
+
+        panic!("This FromRef<()> implementation should not be reached when using leptos_axum::extract().");
+    }
 }

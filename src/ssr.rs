@@ -2,7 +2,7 @@
 use crate::auth::*;
 use crate::auth_ssr::*;
 use crate::config::AppConfig;
-use crate::state::{AppState, SessionData};
+use crate::state::AppState;
 use axum::extract::{OriginalUri, State};
 use axum::http::StatusCode;
 use axum::{
@@ -288,6 +288,8 @@ pub async fn login_handler(State(state): State<AppState>, jar: CookieJar) -> imp
             subject: None,
             name: None,
             roles: HashSet::new(),
+            id_token_expires_at:None,
+            is_refreshing: Mutex::new(false).into()
         },
     );
 
