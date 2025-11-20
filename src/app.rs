@@ -102,8 +102,8 @@ fn Chat() -> impl IntoView {
         </div>
         <div class="centered bg_oidc">
             {move || match auth.clone() {
-                Some(Auth::Authenticated(user)) => view! { <p>{user.to_string()}</p> }.into_view(),
-                Some(Auth::Unauthenticated) | None => view! { <p>Unauthenticated</p> }.into_view(),
+                Some(Auth::Authenticated(user)) => view! { <p>{user.to_string()}</p> }.into_any(),
+                Some(Auth::Unauthenticated) | None => view! { <p>Unauthenticated</p> }.into_any(),
             }}
         </div>
     }
