@@ -499,12 +499,17 @@ pub async fn perform_token_refresh(
 
     let expires_at_system_time = SystemTime::UNIX_EPOCH + Duration::from_secs(exp_timestamp);
 
-    // Вычисляем Instant
-    let remaining_duration = expires_at_system_time
+    let time_until_expiry = expires_at_system_time
         .duration_since(SystemTime::now())
         .unwrap_or(Duration::ZERO);
 
-    let new_expires_at = Instant::now() + remaining_duration;
+    let duration_to_wait = time_until_expiry.saturating_sub(REFRESH_THRESHOLD);
+    if duration_to_wait.is_zero() {
+        tracing::info!("Refresh window reached, refreshing immediately...");
+    } else {
+        tracing::info!("Waiting {:?} before refreshing...", duration_to_wait);
+    }
+    let new_expires_at = Instant::now() + duration_to_wait;
 
     // 4. Возврат данных
     Ok((

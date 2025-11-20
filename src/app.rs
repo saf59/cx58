@@ -5,6 +5,7 @@ use leptos::IntoView;
 use leptos_meta::{provide_meta_context, Link, MetaTags, Stylesheet, Title};
 use leptos_router::components::{Route, Router, Routes};
 use leptos_router::*;
+use leptos_router::hooks::use_location;
 use crate::auth::Auth;
 use crate::components::home_page::HomePage;
 use crate::components::side_body::SideBody;
@@ -37,9 +38,11 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
 #[component]
 pub fn App() -> impl IntoView {
     let is_authenticated = Resource::new(|| (), |_| get_is_authenticated());
+    //let auth = leptos::context::use_context::<Auth>().expect("to have found the Auth provided");
     view! {
         <Router>
             <main>
+                // <div>{move || use_location().pathname.get()}</div>
                 <Routes fallback=|| view! { <NotFoundPage /> }>
                     <Route path=path!("/") view=move || view! { <RootPage is_authenticated /> } />
                     <Route path=path!("/profile") view=ProfilePage />

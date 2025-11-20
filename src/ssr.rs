@@ -40,6 +40,9 @@ use serde_json::Value;
 use serde_urlencoded::de::Error as UrlError;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::time::Duration;
+use std::time::Instant;
+use std::time::SystemTime;
 use tokio::sync::Mutex;
 #[allow(unused_imports)]
 use tracing::{info, warn};
@@ -288,8 +291,8 @@ pub async fn login_handler(State(state): State<AppState>, jar: CookieJar) -> imp
             subject: None,
             name: None,
             roles: HashSet::new(),
-            id_token_expires_at:None,
-            is_refreshing: Mutex::new(false).into()
+            id_token_expires_at: None,
+            is_refreshing: Mutex::new(false).into(),
         },
     );
 
@@ -397,6 +400,35 @@ pub async fn callback_handler(
             {
                 session.subject = Some(claims.subject().to_string());
 
+                // 1. Получаем DateTime<Utc> напрямую (это не Option)
+                let expiry_datetime_utc = claims.expiration();
+
+                // 2. Конвертируем chrono::DateTime<Utc> -> std::time::SystemTime
+                // Chrono обычно реализует From/Into для SystemTime
+                let expiry_system_time: SystemTime = expiry_datetime_utc.into();
+
+                // 3. Вычисляем, сколько осталось времени от "сейчас"
+                let duration_until_expiry = expiry_system_time
+                    .duration_since(SystemTime::now())
+                    .unwrap_or(Duration::ZERO); // Если время уже прошло -> 0
+
+                // 4. Устанавливаем Instant для таймеров
+                session.id_token_expires_at = Some(Instant::now() + duration_until_expiry);
+                if let Some(expiry_instant) = session.id_token_expires_at {
+                    // 1. Считаем, сколько осталось времени (Duration)
+                    let duration_left = expiry_instant.saturating_duration_since(Instant::now());
+
+                    // 2. Преобразуем std::time::Duration в chrono::Duration
+                    if let Ok(chrono_duration) = chrono::Duration::from_std(duration_left) {
+                        // 3. Прибавляем к текущему локальному времени
+                        let local_expiry = chrono::Local::now() + chrono_duration;
+
+                        tracing::info!(
+                            "Session ID Token expires at (Local): {}",
+                            local_expiry.format("%Y-%m-%d %H:%M:%S")
+                        );
+                    }
+                }
                 if let Ok(claims_json) = serde_json::to_value(claims) {
                     session.roles = extract_roles_from_claims(&claims_json);
                     // Name is also extracted here

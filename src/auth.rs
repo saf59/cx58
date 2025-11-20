@@ -16,6 +16,29 @@ pub struct AuthenticatedUser {
     pub name: String,
     pub roles: HashSet<Role>,
 }
+impl Auth {
+    pub fn is_authenticated(&self) -> bool {
+        if let Auth::Authenticated(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+    pub fn is_authenticated_guest(&self) -> bool {
+        if let Auth::Authenticated(user) = self {
+            user.roles.is_empty()
+        } else {
+            false
+        }
+    }
+    pub fn is_authenticated_admin(&self) -> bool {
+        if let Auth::Authenticated(user) = self {
+            user.has_role(&Role::Admin)
+        } else {
+            false
+        }
+    }
+}
 
 impl AuthenticatedUser {
     /// Check if user has a specific role
@@ -37,11 +60,14 @@ impl AuthenticatedUser {
     pub fn is_admin(&self) -> bool {
         self.has_role(&Role::Admin)
     }
-
 }
 impl Display for AuthenticatedUser {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "User(sub:{}, name:{}, roles:{:?})", self.subject,self.name,self.roles)
+        write!(
+            f,
+            "User(sub:{}, name:{}, roles:{:?})",
+            self.subject, self.name, self.roles
+        )
     }
 }
 
@@ -68,4 +94,3 @@ impl Role {
         }
     }
 }
-
