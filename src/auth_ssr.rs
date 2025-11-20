@@ -114,6 +114,102 @@ async fn save_session_data_in_store(
     map_guard.insert(session_id, data);
 }
 
+// Предполагаем, что REFRESH_THRESHOLD и SESSION_ID определены где-то как константы
+// const REFRESH_THRESHOLD: std::time::Duration = ...;
+// const SESSION_ID: &str = ...;
+
+/// Эта функция возвращает SessionData, если сессия валидна (не истек Hard Expiration).
+/// Она также запускает фоновое обновление токена, если подошло время (Soft Expiration).
+pub async fn get_and_refresh_session(
+    state: &AppState,
+    session_id: &str,
+) -> Option<SessionData> {
+    // 1. Получаем данные сессии (клонируем, чтобы отпустить мьютекс)
+    let session_data = {
+        let sessions = state.sessions.lock().await;
+        sessions.get(session_id).cloned()? // Если нет в базе -> None
+    };
+
+    let now = Instant::now();
+
+    // 2. Проверка Hard Expiration
+    // Если токен протух окончательно -> возвращаем None (пользователь разлогинен)
+    if session_data.id_token_expires_at.is_some_and(|exp_at| now >= exp_at) {
+        return None;
+    }
+
+    // 3. Проверка необходимости обновления (Refresh Threshold)
+    let needs_refresh = session_data.id_token_expires_at.is_some_and(|exp_at| {
+        now.checked_add(REFRESH_THRESHOLD).is_some_and(|future_time| {
+            future_time >= exp_at
+        })
+    });
+
+    // 4. Запуск фонового обновления
+    if needs_refresh && session_data.refresh_token.is_some() {
+        // Проверяем флаг is_refreshing без блокирования всей мапы сессий
+        let mut is_refreshing_lock = session_data.is_refreshing.lock().await;
+
+        if !*is_refreshing_lock {
+            *is_refreshing_lock = true;
+            drop(is_refreshing_lock); // Важно: освобождаем lock перед спавном
+
+            let refresh_token = session_data.refresh_token.clone().unwrap();
+            let session_id_clone = session_id.to_owned();
+
+            // Клонируем зависимости для задней задачи
+            let session_store_clone = state.sessions.clone();
+            let oidc_client_clone = state.oidc_client.clone();
+            let http_client_clone = state.async_http_client.clone();
+
+            tokio::spawn(async move {
+                tracing::info!("Background refresh started for session: {}", session_id_clone);
+
+                match perform_token_refresh(
+                    refresh_token,
+                    &oidc_client_clone,
+                    &http_client_clone
+                ).await {
+                    Ok((new_id_token, new_refresh_token, new_expires_at)) => {
+                        // Шаг 1: Обновляем в памяти и получаем копию
+                        let updated_session = {
+                            let mut guard = session_store_clone.lock().await;
+                            if let Some(current_data) = guard.get_mut(&session_id_clone) {
+                                current_data.id_token = Some(new_id_token);
+                                current_data.refresh_token = new_refresh_token;
+                                current_data.id_token_expires_at = Some(new_expires_at);
+                                *current_data.is_refreshing.lock().await = false;
+
+                                // Возвращаем клон обновленных данных
+                                Some(current_data.clone())
+                            } else {
+                                None
+                            }
+                        }; // <--- Здесь guard уничтожается, и лок освобождается
+
+                        // Шаг 2: Сохраняем (в БД/Redis или просто перезаписываем, если функция требует этого)
+                        if let Some(data) = updated_session {
+                            save_session_data_in_store(&session_store_clone, session_id_clone, data).await;
+                        }
+                    },
+
+                    Err(e) => {
+                        tracing::error!("Token refresh failed for session {}: {:?}", session_id_clone, e);
+                        // Сбрасываем флаг при ошибке
+                        let guard = session_store_clone.lock().await;
+                        if let Some(current_data) = guard.get(&session_id_clone) {
+                            *current_data.is_refreshing.lock().await = false;
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    // 5. Возвращаем текущие данные (даже если обновление запущено, возвращаем старые валидные данные)
+    Some(session_data)
+}
+
 // -------------------------------------------------------------------------
 // 🚀 Структура и Реализация FromRequestParts
 // -------------------------------------------------------------------------

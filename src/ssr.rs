@@ -305,6 +305,7 @@ pub async fn login_handler(State(state): State<AppState>, jar: CookieJar) -> imp
 }
 /// For both: leptos_main_handler and leptos_server_fn_handler
 async fn get_auth_state(state: AppState, headers: HeaderMap) -> Auth {
+    // Извлечение Session ID из кук
     let session_id = headers
         .get(http::header::COOKIE)
         .and_then(|h| h.to_str().ok())
@@ -320,10 +321,10 @@ async fn get_auth_state(state: AppState, headers: HeaderMap) -> Auth {
         });
 
     if let Some(id) = session_id {
-        let sessions = state.sessions.lock().await;
-        if let Some(data) = sessions.get(&id) {
-            //Auth::Unauthenticated
-            Auth::try_from(data).unwrap_or(Auth::Unauthenticated)
+        // ИСПОЛЬЗУЕМ НОВУЮ ФУНКЦИЮ
+        // Если она вернет None, значит токен протух окончательно -> Unauthenticated
+        if let Some(data) = get_and_refresh_session(&state, &id).await {
+            Auth::try_from(&data).unwrap_or(Auth::Unauthenticated)
         } else {
             Auth::Unauthenticated
         }
