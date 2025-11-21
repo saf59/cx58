@@ -43,24 +43,3 @@ impl AppState {
         Ok(state)
     }
 }
-
-impl FromRef<AppState> for State<AppState> {
-    fn from_ref(state: &AppState) -> Self {
-        // Мы просто клонируем Arc<AppState> и оборачиваем его в State
-        // (Это работает, потому что AppState внутри State - это Arc)
-        State(state.clone())
-    }
-}
-impl FromRef<()> for AppState {
-    fn from_ref(_state: &()) -> Self {
-        // Мы не можем получить AppState из пустого контекста `&()`.
-        // ВАЖНО: Мы не должны дойти до этой реализации.
-        // Это заглушка, которая удовлетворяет компилятору,
-        // но является индикатором неправильной настройки.
-        //
-        // ❌ Это решение, если бы вы извлекали State<T> из () в стандартном Axum хендлере.
-        // Поскольку вы используете leptos_axum::extract, нам нужна другая стратегия.
-
-        panic!("This FromRef<()> implementation should not be reached when using leptos_axum::extract().");
-    }
-}

@@ -47,14 +47,19 @@ pub fn App() -> impl IntoView {
     });
 
     view! {
-        <Router>
-            <main>
-                <Routes fallback=|| view! { <NotFoundPage /> }>
-                    <Route path=path!("/") view=move || { RootPage } />
-                    <Route path=path!("/profile") view=ProfilePage />
-                </Routes>
-            </main>
-        </Router>
+        
+        <Suspense fallback=move || {
+            view! { <p>"Loading authentication status..."</p> }
+        }>
+            <Router>
+                <main>
+                    <Routes fallback=|| view! { <NotFoundPage /> }>
+                        <Route path=path!("/") view=move || { RootPage } />
+                        <Route path=path!("/profile") view=ProfilePage />
+                    </Routes>
+                </main>
+            </Router>
+        </Suspense>
     }
 }
 #[component]

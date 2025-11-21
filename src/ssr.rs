@@ -3,28 +3,23 @@ use crate::auth::*;
 use crate::auth_ssr::*;
 use crate::config::AppConfig;
 use crate::state::AppState;
-use axum::extract::{OriginalUri, State};
-use axum::http::StatusCode;
 use axum::{
-    extract::{FromRef, FromRequestParts},
-    http::request::Parts,
+    extract::{FromRef, OriginalUri, State},
+    http::StatusCode,
     response::{IntoResponse, Redirect, Response},
 };
-use axum_extra::extract::CookieJar;
-use axum_extra::extract::cookie::Cookie;
-use base64::Engine;
-use base64::prelude::BASE64_URL_SAFE_NO_PAD;
+use axum_extra::extract::{cookie::Cookie, CookieJar};
+use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use http::HeaderMap;
 use leptos::config::LeptosOptions;
 use leptos::context::provide_context;
 use leptos::serde_json;
 use leptos_axum::handle_server_fns_with_context;
-use oauth2::AccessToken;
 use oauth2::basic::{BasicErrorResponseType, BasicRevocationErrorResponse};
-use oauth2::{
-    AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointMaybeSet, EndpointNotSet,
-    EndpointSet, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope,
-    StandardErrorResponse, StandardRevocableToken,
+use oauth2::{AccessToken,
+             AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointMaybeSet, EndpointNotSet,
+             EndpointSet, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope,
+             StandardErrorResponse, StandardRevocableToken,
 };
 use openidconnect::core::{
     CoreAuthDisplay, CoreAuthPrompt, CoreClient, CoreGenderClaim, CoreIdTokenVerifier,
@@ -34,15 +29,12 @@ use openidconnect::core::{
 use openidconnect::{
     AuthenticationFlow, EmptyAdditionalClaims, IssuerUrl, Nonce, OAuth2TokenResponse,
 };
-use serde::Deserialize;
-use serde::de::Error;
+use serde::{de::Error, Deserialize};
 use serde_json::Value;
 use serde_urlencoded::de::Error as UrlError;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::time::Duration;
-use std::time::Instant;
-use std::time::SystemTime;
+use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::Mutex;
 #[allow(unused_imports)]
 use tracing::{info, warn};
@@ -180,7 +172,7 @@ pub struct CallbackQuery {
 
 /// Extract name from ID token claims
 /// Extractor that requires specific roles
-pub struct RequireRole(pub Vec<Role>);
+/*pub struct RequireRole(pub Vec<Role>);
 
 impl FromRequestParts<AppState> for RequireRole {
     type Rejection = Response;
@@ -195,7 +187,7 @@ impl FromRequestParts<AppState> for RequireRole {
         Ok(RequireRole(user.roles.into_iter().collect()))
     }
 }
-
+*/
 pub async fn logout_handler(State(state): State<AppState>, jar: CookieJar) -> impl IntoResponse {
     let mut post_logout_redirect_uri = "/".to_string();
     let mut rauthy_logout_url = None;
@@ -325,8 +317,6 @@ async fn get_auth_state(state: AppState, headers: HeaderMap) -> Auth {
         });
 
     if let Some(id) = session_id {
-        // ИСПОЛЬЗУЕМ НОВУЮ ФУНКЦИЮ
-        // Если она вернет None, значит токен протух окончательно -> Unauthenticated
         if let Some(data) = get_and_refresh_session(&state, &id).await {
             Auth::try_from(&data).unwrap_or(Auth::Unauthenticated)
         } else {
@@ -401,22 +391,14 @@ pub async fn callback_handler(
             {
                 session.subject = Some(claims.subject().to_string());
 
-                // 1. Получаем DateTime<Utc> напрямую (это не Option)
                 let expiry_datetime_utc = claims.expiration();
-
-                // 2. Конвертируем chrono::DateTime<Utc> -> std::time::SystemTime
-                // Chrono обычно реализует From/Into для SystemTime
                 let expiry_system_time: SystemTime = expiry_datetime_utc.into();
-
-                // 3. Вычисляем, сколько осталось времени от "сейчас"
                 let duration_until_expiry = expiry_system_time
                     .duration_since(SystemTime::now())
                     .unwrap_or(Duration::ZERO); // Если время уже прошло -> 0
-
-                // 4. Устанавливаем Instant для таймеров
                 session.id_token_expires_at = Some(Instant::now() + duration_until_expiry);
 
-                trace_time("Session ID Token expires at",&session.id_token_expires_at);
+                //trace_time("Session ID Token expires at",&session.id_token_expires_at);
 
                 if let Ok(claims_json) = serde_json::to_value(claims) {
                     session.roles = extract_roles_from_claims(&claims_json);
