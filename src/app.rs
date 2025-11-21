@@ -38,6 +38,43 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
 #[component]
 pub fn App() -> impl IntoView {
     let initial_auth_resource = Resource::new(|| (), |_| async { get_auth().await });
+    view! {
+        <Suspense fallback=|| {
+            view! { <p>"Checking Auth Status..."</p> }
+        }>
+            {move || {
+                match initial_auth_resource.get() {
+                    None => view! {}.into_any(),
+                    Some(Err(e)) => {
+                        view! {
+                            <h1>"Error loading initial authentication status."</h1>
+                            <p>{format!("{:?}", e)}</p>
+                        }
+                            .into_any()
+                    }
+                    Some(Ok(auth_state)) => {
+                        let auth_signal = RwSignal::new(auth_state.clone());
+                        provide_context(auth_signal);
+                        view! {
+                            <Router>
+                                <main>
+                                    <Routes fallback=|| view! { <NotFoundPage /> }>
+                                        <Route path=path!("/") view=move || { RootPage } />
+                                        <Route path=path!("/profile") view=ProfilePage />
+                                    </Routes>
+                                </main>
+                            </Router>
+                        }
+                            .into_any()
+                    }
+                }
+            }}
+        </Suspense>
+    }
+}
+#[component]
+pub fn App2() -> impl IntoView {
+    let initial_auth_resource = Resource::new(|| (), |_| async { get_auth().await });
     let auth_signal = RwSignal::new(Auth::Unauthenticated);
     provide_context(auth_signal);
     Effect::new(move |_| {
@@ -47,7 +84,6 @@ pub fn App() -> impl IntoView {
     });
 
     view! {
-        
         <Suspense fallback=move || {
             view! { <p>"Loading authentication status..."</p> }
         }>
