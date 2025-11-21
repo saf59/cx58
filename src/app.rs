@@ -39,7 +39,7 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
 pub fn App() -> impl IntoView {
     let initial_auth_resource = Resource::new(|| (), |_| async { get_auth().await });
     view! {
-        <Suspense fallback=|| {
+        <Transition fallback=|| {
             view! { <p>"Checking Auth Status..."</p> }
         }>
             {move || {
@@ -69,7 +69,7 @@ pub fn App() -> impl IntoView {
                     }
                 }
             }}
-        </Suspense>
+        </Transition>
     }
 }
 #[component]
