@@ -43,7 +43,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 use std::time::SystemTime;
-use leptos::prelude::RwSignal;
 use tokio::sync::Mutex;
 #[allow(unused_imports)]
 use tracing::{info, warn};
@@ -250,7 +249,7 @@ pub async fn leptos_server_fn_handler(
         move || {
             provide_context(state.sessions.clone());
             provide_context(jar.clone());
-            provide_context(RwSignal::new(auth_state.clone()));
+            provide_context(auth_state.clone());
         },
         req,
     )
@@ -270,7 +269,7 @@ pub async fn leptos_main_handler(
         move || {
             provide_context(jar.clone());
             provide_context(state.sessions.clone());
-            provide_context(RwSignal::new(auth_state.clone()));
+            provide_context(auth_state.clone());
         },
         move || shell(leptos_options.clone()),
     );

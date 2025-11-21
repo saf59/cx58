@@ -18,11 +18,7 @@ pub struct AuthenticatedUser {
 }
 impl Auth {
     pub fn is_authenticated(&self) -> bool {
-        if let Auth::Authenticated(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Auth::Authenticated(_))
     }
     pub fn is_authenticated_guest(&self) -> bool {
         if let Auth::Authenticated(user) = self {

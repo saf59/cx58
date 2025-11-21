@@ -35,6 +35,15 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
 }
 #[component]
 pub fn App() -> impl IntoView {
+    let initial_auth_resource = Resource::new(|| (), |_| async { get_auth().await });
+    let auth_signal = RwSignal::new(Auth::Unauthenticated);
+    provide_context(auth_signal);
+    Effect::new(move |_| {
+        if let Some(Ok(auth)) = initial_auth_resource.get() {
+            auth_signal.set(auth);
+        }
+    });
+
     view! {
         <Router>
             <main>
