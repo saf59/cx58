@@ -33,6 +33,8 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
         </html>
     }
 }
+/// Auth init is root for all role base auth
+/// rest is only with use_context::<RwSignal<Auth>>() like in RootPage
 #[component]
 pub fn App() -> impl IntoView {
     let initial_auth_resource = Resource::new(|| (), |_| async { get_auth().await });
@@ -72,39 +74,6 @@ fn RootPage() -> impl IntoView {
         {move || {
             let auth = auth_signal.get();
             if !auth.is_authenticated() {
-                // Get the current value of the signal
-
-                // Simplified rendering logic based on the required conditions
-                // User is not authenticated
-                view! { <LoginPage /> }
-                    .into_any()
-            } else if auth.is_authenticated_guest() {
-                // User is authenticated but is a GUEST (based on your is_authenticated_guest method)
-                view! { <PublicLandingPage /> }
-                    .into_any()
-            } else {
-                // User is authenticated and is NOT a guest (e.g., a standard or admin user)
-                view! { <SideBar top=SideTop() side_body=SideBody() content=HomePage() /> }
-                    .into_any()
-            }
-        }}
-    }
-}
-#[component]
-fn RootPage2() -> impl IntoView {
-    // 1. Retrieve the Auth state from context.
-    // Using expect() is common here, but you should ensure the context is set up.
-    let auth = use_context::<Auth>()
-        .expect("Auth context not found. Did you set up the provider?");
-
-    view! {
-        // You don't typically need Suspense/ErrorBoundary
-        // if the initial Auth state is provided synchronously via context.
-        // The context should handle initial loading/fetching before rendering this page.
-        // If the context itself is handling async loading, the logic below still works.
-
-        {move || {
-            if !auth.is_authenticated() {
                 // User is not authenticated
                 view! { <LoginPage /> }
                     .into_any()
@@ -118,24 +87,6 @@ fn RootPage2() -> impl IntoView {
                     .into_any()
             }
         }}
-    }
-}
-
-#[component]
-fn Chat() -> impl IntoView {
-    let auth = use_context::<Auth>();
-    view! {
-        <div class="centered bg_oidc">
-            <h3>"Welcome  to CX58!"</h3>
-            <p>"This is the public chat page."</p>
-            <LogoutButton />
-        </div>
-        <div class="centered bg_oidc">
-            {move || match auth.clone() {
-                Some(Auth::Authenticated(user)) => view! { <p>{user.to_string()}</p> }.into_any(),
-                Some(Auth::Unauthenticated) | None => view! { <p>Unauthenticated</p> }.into_any(),
-            }}
-        </div>
     }
 }
 
