@@ -43,6 +43,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 use std::time::SystemTime;
+use leptos::prelude::RwSignal;
 use tokio::sync::Mutex;
 #[allow(unused_imports)]
 use tracing::{info, warn};
@@ -139,7 +140,7 @@ impl ISPOidcClient {
             .expect("OIDC client misconfigured (missing token endpoint)")
             .request_async(async_http_client)
             .await;
-        println!("{:?}",&token_response);
+        
         Ok(token_response?)
     }
 
@@ -249,7 +250,7 @@ pub async fn leptos_server_fn_handler(
         move || {
             provide_context(state.sessions.clone());
             provide_context(jar.clone());
-            provide_context(auth_state.clone());
+            provide_context(RwSignal::new(auth_state.clone()));
         },
         req,
     )
@@ -269,7 +270,7 @@ pub async fn leptos_main_handler(
         move || {
             provide_context(jar.clone());
             provide_context(state.sessions.clone());
-            provide_context(auth_state.clone());
+            provide_context(RwSignal::new(auth_state.clone()));
         },
         move || shell(leptos_options.clone()),
     );
@@ -438,7 +439,7 @@ pub async fn callback_handler(
             session.refresh_token = token_response
                 .refresh_token()
                 .map(|t| t.secret().to_string());
-            println!("{:?}",&session.refresh_token);
+            
             Redirect::to("/").into_response()
         }
         Err(e) => (

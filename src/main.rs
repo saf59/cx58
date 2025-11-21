@@ -10,10 +10,6 @@ async fn main() {
     use tokio::net::TcpListener;
     use tower_cookies::CookieManagerLayer;
     use tracing::info;
-    use axum::extract::Request;
-    use axum::response::Response;
-    use axum::middleware::Next;
-    use axum::middleware;
 
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
@@ -28,15 +24,16 @@ async fn main() {
         .route("/api/{*fn_name}", get( leptos_server_fn_handler).post( leptos_server_fn_handler))
         //.nest_service("/pkg", ServeDir::new("/pkg"))
         .leptos_routes_with_handler(leptos_routes, leptos_main_handler)
-        .layer(middleware::from_fn(log_uri))
+        //.layer(axum::middleware::from_fn(log_uri))
         .fallback(file_and_error_handler::<AppState, _>(shell))
         .layer(axum::extract::Extension(state.clone()))
         .layer(CookieManagerLayer::new())
         .with_state(state.clone());
-    async fn log_uri(req: Request, next: Next) -> Response {
+/*    async fn log_uri(req: axum::extract::Request, axum::middleware::next: Next) -> axum::response::Response {
         tracing::info!("[{}] {}", req.method(), req.uri());
         next.run(req).await
     }
+*/
     let listener = TcpListener::bind(state.leptos_options.site_addr).await.unwrap();
     info!(
         "Server running on http://{}",

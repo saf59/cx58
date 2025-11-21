@@ -1,16 +1,15 @@
-use crate::components::user_info::UserRolesDisplay;
-use crate::server_fn::*;
-use leptos::prelude::*;
-use leptos::IntoView;
-use leptos_meta::{provide_meta_context, Link, MetaTags, Stylesheet, Title};
-use leptos_router::components::{Route, Router, Routes};
-use leptos_router::*;
-use leptos_router::hooks::use_location;
 use crate::auth::Auth;
 use crate::components::home_page::HomePage;
 use crate::components::side_body::SideBody;
 use crate::components::side_top::SideTop;
 use crate::components::sidebar::SideBar;
+use crate::components::user_info::UserRolesDisplay;
+use crate::server_fn::*;
+use leptos::IntoView;
+use leptos::prelude::*;
+use leptos_meta::{Link, MetaTags, Stylesheet, Title, provide_meta_context};
+use leptos_router::components::{Route, Router, Routes};
+use leptos_router::*;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();
@@ -21,11 +20,10 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <Title text="CX58 AI agent" />
-                // <AutoReload options=options.clone() />
+                <AutoReload options=options.clone() />
                 <Link rel="shortcut icon" type_="image/ico" href="/favicon.ico" />
                 <Stylesheet id="leptos" href="/pkg/cx58-client.css" />
                 <Stylesheet href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-                // TODO - HydrationScripts add ruins /login /logout routes
                 <HydrationScripts options />
                 <MetaTags />
             </head>
@@ -37,61 +35,80 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
 }
 #[component]
 pub fn App() -> impl IntoView {
-    let is_authenticated = Resource::new(|| (), |_| get_is_authenticated());
-    //let location = use_location();
-    //let auth = leptos::context::use_context::<Auth>().expect("to have found the Auth provided");
     view! {
         <Router>
             <main>
-                // <div>{move || use_location().pathname.get()}</div>
                 <Routes fallback=|| view! { <NotFoundPage /> }>
-                    <Route path=path!("/") view=move || view! { <RootPage is_authenticated /> } />
+                    <Route path=path!("/") view=move || { RootPage } />
                     <Route path=path!("/profile") view=ProfilePage />
                 </Routes>
             </main>
         </Router>
     }
 }
-
-// *** New RootPage Component ***
 #[component]
-fn RootPage(is_authenticated: Resource<Result<bool, ServerFnError>>) -> impl IntoView {
+fn RootPage() -> impl IntoView {
+    // 1. Retrieve the Auth state from context.
+    // This assumes the context provides an RwSignal<Auth>.
+    // Using expect() is common here, but you should ensure the context is set up.
+    let auth_signal = use_context::<RwSignal<Auth>>()
+        .expect("Auth context not found. Did you set up the provider?");
+
     view! {
-        // 3. Use <Suspense> for initial loading and <Transition> for smooth transitions
-        <Suspense fallback=move || view! { <h1>"Loading..."</h1> }>
-            // 4. Use <ErrorBoundary> to handle server function errors
-            <ErrorBoundary fallback=|errors| {
-                view! {
-                    <h1>"Error loading auth status."</h1>
-                    <p>{format!("{:?}", errors.get())}</p>
-                }
-            }>
-                {move || match is_authenticated.get() {
-                    None => {
-                        // Resource is still loading or hasn't started
-                        view! { <h1>"Checking Auth..."</h1> }
-                            .into_any()
-                    }
-                    Some(Err(_)) => {
-                        // Server Function returned an error
-                        view! { <LoginPage /> }
-                            .into_any()
-                    }
-                    Some(Ok(true)) => {
-                        // Server Function succeeded
-                        // User is authenticated, redirect
-                        // Use the built-in Leptos <Redirect/> or <Navigate/>
-                        view! { <SideBar top=SideTop() side_body=SideBody() content=HomePage() /> }
-                            .into_any()
-                    }
-                    Some(Ok(false)) => {
-                        // User is NOT authenticated, show the public landing page or login.
-                        view! { <PublicLandingPage /> }
-                            .into_any()
-                    }
-                }}
-            </ErrorBoundary>
-        </Suspense>
+        // You don't typically need Suspense/ErrorBoundary here anymore
+        // if the initial Auth state is provided synchronously via context.
+        // The context should handle initial loading/fetching before rendering this page.
+        // If the context itself is handling async loading, the logic below still works.
+
+        {move || {
+            let auth = auth_signal.get();
+            if !auth.is_authenticated() {
+                // Get the current value of the signal
+
+                // Simplified rendering logic based on the required conditions
+                // User is not authenticated
+                view! { <LoginPage /> }
+                    .into_any()
+            } else if auth.is_authenticated_guest() {
+                // User is authenticated but is a GUEST (based on your is_authenticated_guest method)
+                view! { <PublicLandingPage /> }
+                    .into_any()
+            } else {
+                // User is authenticated and is NOT a guest (e.g., a standard or admin user)
+                view! { <SideBar top=SideTop() side_body=SideBody() content=HomePage() /> }
+                    .into_any()
+            }
+        }}
+    }
+}
+#[component]
+fn RootPage2() -> impl IntoView {
+    // 1. Retrieve the Auth state from context.
+    // Using expect() is common here, but you should ensure the context is set up.
+    let auth = use_context::<Auth>()
+        .expect("Auth context not found. Did you set up the provider?");
+
+    view! {
+        // You don't typically need Suspense/ErrorBoundary
+        // if the initial Auth state is provided synchronously via context.
+        // The context should handle initial loading/fetching before rendering this page.
+        // If the context itself is handling async loading, the logic below still works.
+
+        {move || {
+            if !auth.is_authenticated() {
+                // User is not authenticated
+                view! { <LoginPage /> }
+                    .into_any()
+            } else if auth.is_authenticated_guest() {
+                // User is authenticated but is a GUEST
+                view! { <PublicLandingPage /> }
+                    .into_any()
+            } else {
+                // User is authenticated and is NOT a guest (e.g., a user or admin)
+                view! { <SideBar top=SideTop() side_body=SideBody() content=HomePage() /> }
+                    .into_any()
+            }
+        }}
     }
 }
 
@@ -118,13 +135,15 @@ fn Chat() -> impl IntoView {
 fn PublicLandingPage() -> impl IntoView {
     view! {
         <div class="centered  bg_oidc">
-            <h1>"Welcome! Please Log In."</h1>
+            <h1>"Welcome! You are authenticated!"</h1>
             <p>
                 <span>"This is the public"</span>
                 <span class="cx58">"Construct-X/5.8"</span>
                 <span>"home page."</span>
             </p>
-            <LoginButton />
+            <p>"Unfortunately, you do not have access to any objects."</p>
+            <p>"Please contact the administrator to gain access!"</p>
+            <LogoutButton />
         </div>
     }
 }

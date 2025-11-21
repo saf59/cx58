@@ -314,7 +314,7 @@ where
                             }
                         },
                         Err(e) => {
-                            eprintln!("Token refresh failed for session {}: {:?}", session_id_clone, e);
+                            tracing::error!("Token refresh failed for session {}: {:?}", session_id_clone, e);
 
                             // ⚠️ Очищаем флаг, чтобы не блокировать будущие попытки.
                             if let Some( current_data) = {
@@ -486,7 +486,6 @@ pub async fn perform_token_refresh(
     oidc_client: &crate::ssr::ISPOidcClient,
     http_client: &reqwest::Client,
 ) -> RefreshResult {
-    println!("{:?}",&current_refresh_token);
     let refresh_token = RefreshToken::new(current_refresh_token);
 
     // 1. Выполнение запроса на обновление токена
