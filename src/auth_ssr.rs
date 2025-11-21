@@ -140,8 +140,9 @@ pub async fn get_and_refresh_session(
 
     // 3. Проверка необходимости обновления (Refresh Threshold)
     let needs_refresh = session_data.id_token_expires_at.is_some_and(|exp_at| {
-        now.checked_add(REFRESH_THRESHOLD).is_some_and(|future_time| {
-            future_time >= exp_at
+        exp_at.checked_sub(REFRESH_THRESHOLD).is_some_and(|future_time| {
+            trace_time("Refresh time at",&Some(future_time));
+            future_time <= now
         })
     });
 
@@ -180,6 +181,8 @@ pub async fn get_and_refresh_session(
                                 current_data.id_token_expires_at = Some(new_expires_at);
                                 *current_data.is_refreshing.lock().await = false;
 
+                                trace_time("Updated session ID Token expires at",&current_data.id_token_expires_at);
+
                                 // Возвращаем клон обновленных данных
                                 Some(current_data.clone())
                             } else {
@@ -208,6 +211,15 @@ pub async fn get_and_refresh_session(
 
     // 5. Возвращаем текущие данные (даже если обновление запущено, возвращаем старые валидные данные)
     Some(session_data)
+}
+
+pub fn trace_time(text:&str,id_token_expires_at: &Option<Instant>) {
+    if let Some(expiry_instant) = id_token_expires_at {
+        let duration_left = expiry_instant.saturating_duration_since(Instant::now());
+        if let Ok(chrono_duration) = chrono::Duration::from_std(duration_left) {
+            let local_expiry = chrono::Local::now() + chrono_duration;
+            tracing::info!("{} (Local): {}",text,local_expiry.format("%Y-%m-%d %H:%M:%S")                       ); }
+    }
 }
 
 // -------------------------------------------------------------------------
@@ -474,6 +486,7 @@ pub async fn perform_token_refresh(
     oidc_client: &crate::ssr::ISPOidcClient,
     http_client: &reqwest::Client,
 ) -> RefreshResult {
+    println!("{:?}",&current_refresh_token);
     let refresh_token = RefreshToken::new(current_refresh_token);
 
     // 1. Выполнение запроса на обновление токена

@@ -138,8 +138,9 @@ impl ISPOidcClient {
             .exchange_refresh_token(refresh_token)
             .expect("OIDC client misconfigured (missing token endpoint)")
             .request_async(async_http_client)
-            .await?;
-        Ok(token_response)
+            .await;
+        println!("{:?}",&token_response);
+        Ok(token_response?)
     }
 
     pub fn id_token_verifier(&'_ self) -> CoreIdTokenVerifier<'_> {
@@ -414,21 +415,9 @@ pub async fn callback_handler(
 
                 // 4. Устанавливаем Instant для таймеров
                 session.id_token_expires_at = Some(Instant::now() + duration_until_expiry);
-                if let Some(expiry_instant) = session.id_token_expires_at {
-                    // 1. Считаем, сколько осталось времени (Duration)
-                    let duration_left = expiry_instant.saturating_duration_since(Instant::now());
 
-                    // 2. Преобразуем std::time::Duration в chrono::Duration
-                    if let Ok(chrono_duration) = chrono::Duration::from_std(duration_left) {
-                        // 3. Прибавляем к текущему локальному времени
-                        let local_expiry = chrono::Local::now() + chrono_duration;
+                trace_time("Session ID Token expires at",&session.id_token_expires_at);
 
-                        tracing::info!(
-                            "Session ID Token expires at (Local): {}",
-                            local_expiry.format("%Y-%m-%d %H:%M:%S")
-                        );
-                    }
-                }
                 if let Ok(claims_json) = serde_json::to_value(claims) {
                     session.roles = extract_roles_from_claims(&claims_json);
                     // Name is also extracted here
@@ -449,7 +438,7 @@ pub async fn callback_handler(
             session.refresh_token = token_response
                 .refresh_token()
                 .map(|t| t.secret().to_string());
-
+            println!("{:?}",&session.refresh_token);
             Redirect::to("/").into_response()
         }
         Err(e) => (
@@ -459,6 +448,8 @@ pub async fn callback_handler(
             .into_response(),
     }
 }
+
+
 
 /// Extract claims from Access Token, (if it is JWT).
 pub fn extract_claims_from_access_token(token: &AccessToken) -> Option<Value> {

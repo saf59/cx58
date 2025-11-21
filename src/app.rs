@@ -38,6 +38,7 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
 #[component]
 pub fn App() -> impl IntoView {
     let is_authenticated = Resource::new(|| (), |_| get_is_authenticated());
+    //let location = use_location();
     //let auth = leptos::context::use_context::<Auth>().expect("to have found the Auth provided");
     view! {
         <Router>
