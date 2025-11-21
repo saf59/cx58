@@ -462,20 +462,3 @@ pub fn extract_claims_from_access_token(token: &AccessToken) -> Option<Value> {
         }
     }
 }
-/// route that requires admin role
-pub async fn admin_only_handler(user: AuthenticatedUser) -> impl IntoResponse {
-    if !user.is_admin() {
-        return (StatusCode::FORBIDDEN, "Admin access required").into_response();
-    }
-
-    (StatusCode::OK, format!("Welcome, admin {}!", user.name)).into_response() // UPDATED: using user.name
-}
-
-/// route that requires specific permission
-pub async fn chat_handler(user: AuthenticatedUser) -> impl IntoResponse {
-    if !user.has_any_role(&[Role::User, Role::Admin]) {
-        return (StatusCode::FORBIDDEN, "Chat permission required").into_response();
-    }
-
-    (StatusCode::OK, format!("{} can chat!", user.name)).into_response()
-}

@@ -88,7 +88,7 @@ pub async fn get_and_refresh_session(
 
     let needs_refresh = session_data.id_token_expires_at.is_some_and(|exp_at| {
         exp_at.checked_sub(REFRESH_THRESHOLD).is_some_and(|future_time| {
-            trace_time("Refresh time at",&Some(future_time));
+            //trace_time("Refresh time at",&Some(future_time));
             future_time <= now
         })
     });
@@ -134,8 +134,7 @@ pub async fn get_and_refresh_session(
                             save_session_data_in_store(&session_store_clone, session_id_clone, data).await;
                         }
                     },
-
-                    Err(e) => {
+                    Err(_e) => {
                         //tracing::error!("Token refresh failed for session {}: {:?}", session_id_clone, e);
                         let guard = session_store_clone.lock().await;
                         if let Some(current_data) = guard.get(&session_id_clone) {

@@ -4,7 +4,6 @@ use leptos::config::LeptosOptions;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use axum::extract::{FromRef, State};
 #[derive(Clone)]
 pub struct AppState {
     pub leptos_options: Arc<LeptosOptions>,
