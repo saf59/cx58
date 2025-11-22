@@ -17,7 +17,10 @@ impl AppState {
     /// This function is asynchronous because it initializes the OIDC client.
     pub async fn init() -> Result<Self, Box<dyn std::error::Error>> {
         // 1. Initialize HTTP Client
-        let async_http_client = reqwest::Client::new();
+        //let async_http_client = reqwest::Client::new();
+        let async_http_client = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build().expect("async_http_client build");
 
         // 2. Load Configuration and Options
         let conf = leptos::prelude::get_configuration(None)?;

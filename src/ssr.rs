@@ -69,7 +69,7 @@ pub struct ISPOidcClient {
 impl ISPOidcClient {
     pub async fn new(async_http_client: &reqwest::Client) -> anyhow::Result<Self> {
         let config = AppConfig::from_env().expect("Failed to load config");
-
+        tracing::info!("issuer={:?}",&config.oidc_issuer_url);
         let issuer = IssuerUrl::new(config.oidc_issuer_url.clone())?;
         let provider_metadata =
             CoreProviderMetadata::discover_async(issuer, async_http_client).await?;
@@ -171,24 +171,6 @@ pub struct CallbackQuery {
     pub state: String,
 }
 
-/// Extract name from ID token claims
-/// Extractor that requires specific roles
-/*pub struct RequireRole(pub Vec<Role>);
-
-impl FromRequestParts<AppState> for RequireRole {
-    type Rejection = Response;
-
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &AppState,
-    ) -> Result<Self, Self::Rejection> {
-        let user = AuthenticatedUser::from_request_parts(parts, state).await?;
-
-        // This is a placeholder - actual role requirements should be checked by the handler
-        Ok(RequireRole(user.roles.into_iter().collect()))
-    }
-}
-*/
 pub async fn logout_handler(State(state): State<AppState>, jar: CookieJar) -> impl IntoResponse {
     let mut post_logout_redirect_uri = "/".to_string();
     let mut rauthy_logout_url = None;
@@ -477,20 +459,10 @@ pub async fn security_headers(
     mut req: axum::http::Request<axum::body::Body>,
     next: Next,
 ) -> impl IntoResponse {
-    //println!(">>> security_headers called for {}", req.uri());
     let uri = req.uri().path().to_string();
     // ❌ We do not add CSP for static or API
-    if uri.starts_with("/pkg")
-        || uri.starts_with("/assets")
-        || uri.starts_with("/api")
-        || uri.ends_with(".js")
-        || uri.ends_with(".css")
-        || uri.ends_with(".wasm")
-        || uri.ends_with(".map")
-        || uri.ends_with(".ico")
-    {
-        return next.run(req).await;
-    }
+    if is_static(uri) { return next.run(req).await; }
+    // tracing::info!(">> security_headers called for {}", req.uri());
     let config = &app_state.oidc_client.config;
     let is_prod = config.is_prod;
     let trust_data_list = &config.trust_data_list;
@@ -571,4 +543,18 @@ pub async fn security_headers(
     }
 
     res
+}
+
+fn is_static(uri: String) -> bool {
+    uri.starts_with("/pkg")
+        || uri.starts_with("/assets")
+        || uri.starts_with("/api")
+        || uri.starts_with("/login")
+        || uri.starts_with("/logout")
+        || uri.starts_with("/callback")
+        || uri.ends_with(".js")
+        || uri.ends_with(".css")
+        || uri.ends_with(".wasm")
+        || uri.ends_with(".map")
+        || uri.ends_with(".ico")
 }
