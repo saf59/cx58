@@ -44,8 +44,9 @@ pub fn App() -> impl IntoView {
         }>
             {move || {
                 match initial_auth_resource.get() {
-                    None => view! {}.into_any(),
+                    None => view! { <></> }.into_any(),
                     Some(Err(e)) => {
+
                         view! {
                             <h1>"Error loading initial authentication status."</h1>
                             <p>{format!("{:?}", e)}</p>

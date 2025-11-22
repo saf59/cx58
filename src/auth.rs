@@ -22,7 +22,7 @@ impl Auth {
     }
     pub fn is_authenticated_guest(&self) -> bool {
         if let Auth::Authenticated(user) = self {
-            tracing::info!("is guest: {:?}",&user.roles);
+            //tracing::info!("is guest: {:?}",&user.roles);
             user.roles.is_empty() || !user.has_any_role(&[Role::User,Role::Admin])
         } else {
             false

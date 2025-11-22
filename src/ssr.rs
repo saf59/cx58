@@ -5,7 +5,8 @@ use crate::config::AppConfig;
 use crate::state::AppState;
 use axum::{
     extract::{FromRef, OriginalUri, State},
-    http::StatusCode,
+    http::{HeaderValue, StatusCode},
+    middleware::Next,
     response::{IntoResponse, Redirect, Response},
 };
 use axum_extra::extract::{cookie::Cookie, CookieJar};
@@ -27,7 +28,7 @@ use openidconnect::core::{
     CoreTokenIntrospectionResponse, CoreTokenResponse,
 };
 use openidconnect::{
-    AuthenticationFlow, EmptyAdditionalClaims, IssuerUrl, Nonce, OAuth2TokenResponse,
+    AuthenticationFlow, EmptyAdditionalClaims, IssuerUrl, OAuth2TokenResponse, Nonce
 };
 use serde::{de::Error, Deserialize};
 use serde_json::Value;
@@ -257,11 +258,17 @@ pub async fn leptos_main_handler(
     let headers = req.headers().clone();
     let auth_state = get_auth_state(state.clone(), headers).await;
     let leptos_options = state.leptos_options.as_ref().clone();
+    let nonce = req
+        .extensions()
+        .get::<leptos::nonce::Nonce>()
+        .cloned()
+        .unwrap_or_else(leptos::nonce::Nonce::new);
     let handler = leptos_axum::render_app_to_stream_with_context(
         move || {
             provide_context(jar.clone());
             provide_context(state.sessions.clone());
             provide_context(auth_state.clone());
+            provide_context(nonce.clone());
         },
         move || shell(leptos_options.clone()),
     );
@@ -461,4 +468,107 @@ pub fn extract_claims_from_access_token(token: &AccessToken) -> Option<Value> {
             None
         }
     }
+}
+
+/// Middleware, with CSP 3 && security headers
+/// && nonce in Request Extensions, for Leptos
+pub async fn security_headers(
+    State(app_state): State<AppState>,
+    mut req: axum::http::Request<axum::body::Body>,
+    next: Next,
+) -> impl IntoResponse {
+    //println!(">>> security_headers called for {}", req.uri());
+    let uri = req.uri().path().to_string();
+    // ❌ We do not add CSP for static or API
+    if uri.starts_with("/pkg")
+        || uri.starts_with("/assets")
+        || uri.starts_with("/api")
+        || uri.ends_with(".js")
+        || uri.ends_with(".css")
+        || uri.ends_with(".wasm")
+        || uri.ends_with(".map")
+        || uri.ends_with(".ico")
+    {
+        return next.run(req).await;
+    }
+    let config = &app_state.oidc_client.config;
+    let is_prod = config.is_prod;
+    let trust_data_list = &config.trust_data_list;
+    let trust_connect_list = &config.trust_connect_list;
+
+    let nonce = leptos::nonce::Nonce::new();//use_nonce().unwrap();
+    req.extensions_mut().insert(nonce.clone());
+    let mut res = next.run(req).await;
+
+    // Content-Security-Policy
+    let csp = if !is_prod {
+        // DEV: relaxed to support HMR/hydration;
+        // include nonce as we prepare to remove 'unsafe-inline' later
+        format!(
+            "default-src 'self'; \
+                frame-ancestors 'none'; \
+                script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' 'nonce-{}'; \
+                style-src 'self' 'unsafe-inline' {trust_data_list} 'nonce-{}'; \
+                img-src 'self' data: blob:; \
+                font-src 'self' data: {trust_data_list}; \
+                connect-src 'self' ws: wss: {trust_connect_list}",
+            nonce, nonce
+        )
+    } else {
+        // PROD: no ws/wss and no 'unsafe-eval'; keep 'unsafe-inline' for styles,
+        // include nonce for scripts/styles
+        format!(
+            "default-src 'self';\
+                 frame-ancestors 'none'; \
+                 script-src 'self' 'nonce-{}' 'wasm-unsafe-eval'; \
+                 style-src 'self' {trust_data_list} 'nonce-{}'; \
+                 img-src 'self' data: blob:; \
+                 font-src 'self' data: {trust_data_list}; \
+                 connect-src 'self' {trust_connect_list}",
+            nonce, nonce
+        )
+    };
+    //println!("{csp}");
+    let headers = res.headers_mut();
+    //println!("{:?}",&headers);
+    headers.insert(
+        "Content-Security-Policy",
+        HeaderValue::from_str(&csp).unwrap(),
+    );
+    headers.insert(
+        "X-Content-Type-Options",
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert("X-Frame-Options", HeaderValue::from_static("DENY"));
+    headers.insert("Referrer-Policy", HeaderValue::from_static("no-referrer"));
+    headers.insert(
+        "Cross-Origin-Embedder-Policy",
+        HeaderValue::from_static("require-corp"),
+    );
+    headers.insert(
+        "Cross-Origin-Opener-Policy",
+        HeaderValue::from_static("same-origin"),
+    );
+    headers.insert(
+        "Cross-Origin-Resource-Policy",
+        HeaderValue::from_static("same-origin"),
+    );
+
+    headers.insert(
+        "X-XSS-Protection",
+        HeaderValue::from_static("1; mode=block"),
+    );
+    headers.insert(
+        "Permissions-Policy",
+        HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
+    );
+    // HSTS only in PROD (assumes HTTPS termination in front)
+    if is_prod {
+        headers.insert(
+            "Strict-Transport-Security",
+            HeaderValue::from_static("max-age=31536000; includeSubDomains; preload"),
+        );
+    }
+
+    res
 }

@@ -4,6 +4,7 @@
 async fn main() {
     use gm::state::AppState;
     use axum::{routing::get, Router}; //post
+    use axum::middleware;
     use gm::{app::*, ssr::*};
     use leptos_axum::file_and_error_handler;
     use leptos_axum::{generate_route_list, LeptosRoutes};
@@ -23,17 +24,15 @@ async fn main() {
         .route("/api/health", get(|| async { "OK" }))
         .route("/api/{*fn_name}", get( leptos_server_fn_handler).post( leptos_server_fn_handler))
         //.nest_service("/pkg", ServeDir::new("/pkg"))
+
         .leptos_routes_with_handler(leptos_routes, leptos_main_handler)
+        .layer(middleware::from_fn_with_state(state.clone(),security_headers))
         //.layer(axum::middleware::from_fn(log_uri))
         .fallback(file_and_error_handler::<AppState, _>(shell))
         .layer(axum::extract::Extension(state.clone()))
         .layer(CookieManagerLayer::new())
         .with_state(state.clone());
-/*    async fn log_uri(req: axum::extract::Request, axum::middleware::next: Next) -> axum::response::Response {
-        tracing::info!("[{}] {}", req.method(), req.uri());
-        next.run(req).await
-    }
-*/
+
     let listener = TcpListener::bind(state.leptos_options.site_addr).await.unwrap();
     info!(
         "Server running on http://{}",
