@@ -1,5 +1,4 @@
 use crate::auth::Auth;
-use crate::components::home_page::HomePage;
 use crate::components::side_body::SideBody;
 use crate::components::side_top::SideTop;
 use crate::components::sidebar::SideBar;
@@ -10,6 +9,7 @@ use leptos::prelude::*;
 use leptos_meta::{Link, MetaTags, Stylesheet, Title, provide_meta_context};
 use leptos_router::components::{Route, Router, Routes};
 use leptos_router::*;
+use crate::components::chat::Chat;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();
@@ -44,7 +44,7 @@ pub fn App() -> impl IntoView {
         }>
             {move || {
                 match initial_auth_resource.get() {
-                    None => view! { <></> }.into_any(),
+                    None => ().into_any(),
                     Some(Err(e)) => {
 
                         view! {
@@ -125,7 +125,7 @@ fn RootPage() -> impl IntoView {
                     .into_any()
             } else {
                 // User is authenticated and is NOT a guest (e.g., a user or admin)
-                view! { <SideBar top=SideTop() side_body=SideBody() content=HomePage() /> }
+                view! { <SideBar top=SideTop() side_body=SideBody() content=Chat() /> }
                     .into_any()
             }
         }}

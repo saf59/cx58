@@ -1,5 +1,5 @@
 [package]
-name = "gm"
+name = "gmr"
 version = "0.1.0"
 edition = "2024"
 
@@ -7,19 +7,17 @@ edition = "2024"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-# for leptos_axum 0.8.x
 axum = { version = "0.8.7", optional = true, features = ["macros"] }
 axum-extra ={ version= "0.12.2", features = ["cookie"] }
-leptos_axum = { version = "0.8.6", optional = true }
-# for LEPTOS (0.8.x)
-leptos = { version = "0.8.12", features = ["nonce"] }
-leptos_router = { version = "0.8.9", features = [] }
+leptos_axum = { version = "0.8.7", optional = true }
+leptos = { version = "0.8.14", features = ["nonce"] }
+leptos_router = { version = "0.8.10", features = [] }
 leptos_meta = { version = "0.8.5" }
-leptos_macro = "0.8.11"
-oauth2 = "5.0.0"
-openidconnect = "4.0.1"
+leptos_macro = "0.8.12"
+oauth2 = { version = "5.0.0",optional = true }
+openidconnect = { version = "4.0.1",optional = true }
 tokio = { version = "1.48.0", features = ["macros","rt-multi-thread"], optional = true }
-reqwest = { version = "0.12.24", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12.24", features = ["json", "rustls-tls", "stream"]}
 serde = { version = "1.0.228", features = ["derive"] }
 serde_urlencoded = "0.7.1"
 anyhow = "1.0.100"
@@ -30,11 +28,35 @@ tower-cookies = "0.10"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 url = "2.5.7"
 uuid = { version = "1.18.1", features = ["v4", "rng-rand"] }
-wasm-bindgen = { version = "0.2", optional = true }
+wasm-bindgen = { version = "=0.2.105", features = [], optional = true }
 base64 = "0.22.1"
 cookie = "0.18.1"
-http = "1.3.1"
-chrono = "0.4.42"
+http = "1.4.0"
+chrono = { version = "0.4.42",optional = true }
+tokio-stream = { version = "0.1.17" }
+futures = "0.3.31"
+tokio-util = { version = "0.7.17", features = ["io"],optional = true }
+urlencoding = "2.1.3"
+gloo-net = "0.6.0"
+serde_json = "1.0.145"
+async-stream = "0.3.6"
+eventsource-stream = "0.2.3"
+bytes = "1.11.0"
+leptos-use = { version = "0.16.3",features = ["ssr","wasm_ssr"] }
+futures-util = { version = "0.3.31",features = ["sink"] }
+log = "0.4.28"
+wasm-bindgen-futures = { version = "0.4.55"}
+js-sys = "0.3.82"
+web-sys = { version = "0.3.82", features = [
+    "Window",
+    "Document",
+    "Element",
+    "HtmlElement",
+    "HtmlDivElement",
+    "ScrollIntoViewOptions",
+    "ScrollBehavior",
+    "Node",
+] }
 
 [dev-dependencies]
 tokio = { version = "1.48.0", features = ["rt-multi-thread", "macros"] }
@@ -48,9 +70,14 @@ hydrate = [
 ssr = [
     "dep:axum",
     "dep:tokio",
-#    "dep:async-session",
-#    "dep:async-redis-session-v2",
     "dep:leptos_axum",
+#    "dep:tokio-stream",
+    "dep:tokio-util",
+    "dep:chrono",
+#    "dep:futures",
+#    "dep:reqwest",
+    "dep:oauth2",
+    "dep:openidconnect",
     "leptos/ssr",
     "leptos_meta/ssr",
     "leptos_router/ssr",

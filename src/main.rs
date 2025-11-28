@@ -2,10 +2,9 @@
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() {
-    use gm::state::AppState;
+    use gmr::{state::AppState, app::*, ssr::*, llm_stream::*};
     use axum::{routing::{post,get}, Router}; //post
     use axum::middleware;
-    use gm::{app::*, ssr::*};
     use leptos_axum::file_and_error_handler;
     use leptos_axum::{generate_route_list, LeptosRoutes};
     use tokio::net::TcpListener;
@@ -23,6 +22,8 @@ async fn main() {
         .route("/logout", get(logout_handler))
         .route("/api/health", get(|| async { "OK" }))
         .route("/api/get_auth{_}", post( leptos_server_fn_handler).get( leptos_server_fn_handler))
+        //.route("/api/stream", get(llm_stream)) // chat_g
+        .route("/api/chat_stream", axum::routing::post(chat_stream_handler)) // chat_z via handler
         //.nest_service("/pkg", ServeDir::new("/pkg"))
 
         .leptos_routes_with_handler(leptos_routes, leptos_main_handler)
@@ -32,6 +33,7 @@ async fn main() {
         .layer(axum::extract::Extension(state.clone()))
         .layer(CookieManagerLayer::new())
         .with_state(state.clone());
+        //.layer(tower_http::compression::CompressionLayerCompressionLayer::new().gzip(true));
 
     let listener = TcpListener::bind(state.leptos_options.site_addr).await.unwrap();
     info!(

@@ -3,7 +3,6 @@ use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 
 pub const SESSION_ID: &str = "session_id";
-pub struct SessionId(pub String);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Auth {

@@ -1,24 +1,19 @@
 use crate::auth::*;
 use crate::state::AppState;
 use axum::{
-    Error,
     extract::FromRequestParts,
-    http::{StatusCode, request::Parts},
+    http::request::Parts,
     response::{IntoResponse, Redirect, Response},
+    Error,
 };
-
-use axum_extra::extract::{CookieJar, cookie::Cookie};
+use axum_extra::extract::CookieJar;
 use leptos::serde_json;
 use oauth2::{CsrfToken, PkceCodeVerifier, RefreshToken, TokenResponse};
-use openidconnect::Nonce;
-use openidconnect::core::{CoreIdToken, CoreIdTokenClaims};
-use std::collections::HashSet;
+use openidconnect::{core::{CoreIdToken, CoreIdTokenClaims}, Nonce};
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::Arc;
-use std::collections::HashMap;
-use std::time::Duration;
-use std::time::Instant;
-use std::time::SystemTime;
+use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::Mutex;
 use tracing::info;
 
@@ -264,38 +259,6 @@ impl TryFrom<&SessionData> for Auth {
             Ok(Auth::Authenticated(user))
         } else {
             Ok(Auth::Unauthenticated)
-        }
-    }
-}
-
-impl FromRequestParts<AppState> for SessionId
-where
-    Self: 'static,
-{
-    type Rejection = (StatusCode, &'static str);
-    async fn from_request_parts(
-        parts: &mut Parts,
-        _state: &AppState,
-    ) -> Result<Self, Self::Rejection> {
-        let headers = &parts.headers;
-        let session_cookie = headers
-            .get(http::header::COOKIE)
-            .and_then(|h| h.to_str().ok())
-            .and_then(|s| {
-                s.split(';').find_map(|cookie_str| {
-                    if let Ok(cookie) = Cookie::parse(cookie_str.trim())
-                        && cookie.name() == SESSION_ID
-                    {
-                        return Some(cookie.value().to_owned());
-                    }
-                    None
-                })
-            });
-
-        if let Some(id) = session_cookie {
-            Ok(SessionId(id))
-        } else {
-            Err((StatusCode::UNAUTHORIZED, "Session cookie not found"))
         }
     }
 }

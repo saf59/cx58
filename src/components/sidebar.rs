@@ -1,5 +1,6 @@
 use leptos::prelude::{signal, ClassAttribute, ElementChild, Get, OnAttribute, Set};
 use leptos::{component, view, IntoView};
+use crate::app::LogoutButton;
 
 #[component]
 pub fn SideBar<Top,SideBody,Content>(
@@ -47,5 +48,6 @@ where
             </div>
         </div>
         <div class="sb-hoverStrip" on:mouseenter=move |_| set_is_collapsed.set(false)></div>
+         <LogoutButton />
     }
 }

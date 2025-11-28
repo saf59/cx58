@@ -1,0 +1,110 @@
+﻿.chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 95vh;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    overflow: hidden;
+    gap: 10px;
+}
+
+.chat-history {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    flex-basis: 0;
+    width: 60vw;
+    padding: 1rem;
+    overflow-y: auto;
+
+    // Дополнительные стили для красивой полосы прокрутки (необязательно)
+    &::-webkit-scrollbar {
+        width: 8px;
+    }
+    &::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+    &::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+    &::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    .message {
+        padding: 6px 10px;
+        margin: 10px;
+        border-radius: 8px;
+        flex-basis: max-content;
+        flex-shrink: 1;
+    }
+    .user {
+        text-align: right;
+        background: #d7f7ff;
+        align-self: end;
+        max-width: 60%;
+    }
+    .bot {
+        text-align: left;
+        background: #eee;
+        white-space: pre-wrap;
+        align-self: start;
+        max-width: 95%;
+    }
+}
+.chat-input {
+    display: flex;
+    flex-basis: 15%;
+    width: 60%;
+    position: relative;
+    align-self: center;
+    margin-bottom: 10px;
+    background-color: #fff;
+    border-radius: 13px;
+
+    .chat-input-form {
+        width: 100%;
+        margin-top: 15px;
+
+        .input-zone {
+            width: 98%;
+            height: calc(100% - 30px);;
+            margin: 0 5px;
+            border: none;
+            resize: none;
+            outline: none;
+        }
+
+        .input-submit {
+            position: absolute;
+            bottom: 1px;
+            right: 1px;
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            padding-block: 0;
+            padding-inline: 0;
+            color: var(--cx58-color);
+            border-color: var(--cx58-color);
+            background-color: transparent;
+        }
+    }
+}
+/* HTML: <div class="loader"></div> */
+.loader {
+    width: 10px;
+    height: 10px;
+    position: absolute;
+    top: 5px;
+    left: 40px;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    animation: l5 1s infinite linear alternate;
+}
+@keyframes l5 {
+    0%  {box-shadow: 20px 0 #000, -20px 0 #0002;background: #000 }
+    33% {box-shadow: 20px 0 #000, -20px 0 #0002;background: #0002}
+    66% {box-shadow: 20px 0 #0002,-20px 0 #000; background: #0002}
+    100%{box-shadow: 20px 0 #0002,-20px 0 #000; background: #000 }
+}
