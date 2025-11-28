@@ -14,6 +14,8 @@ pub struct AppConfig {
     pub cookie_config: CookieConfig,
     pub trust_data_list:String,
     pub trust_connect_list:String,
+    pub agent_url:String,
+    pub default_model:String,
     pub is_prod:bool
 }
 
@@ -74,6 +76,9 @@ impl AppConfig {
             cookie_config: cookie,
             trust_data_list:env::var("TRUST_DATA_LIST").unwrap_or_else(|_| "".to_string()),
             trust_connect_list:env::var("TRUST_CONNECT_LIST").unwrap_or_else(|_| "".to_string()),
+            agent_url:env::var("AGENT_API_URL")
+            .unwrap_or_else(|_| "http://localhost:11434/api/generate".to_string()),
+            default_model:env::var("AGENT_MODEL").unwrap_or_else(|_| "llava:latest".to_string()),
             is_prod
         })
     }

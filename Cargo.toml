@@ -33,18 +33,10 @@ base64 = "0.22.1"
 cookie = "0.18.1"
 http = "1.4.0"
 chrono = { version = "0.4.42",optional = true }
-tokio-stream = { version = "0.1.17" }
-futures = "0.3.31"
 tokio-util = { version = "0.7.17", features = ["io"],optional = true }
-urlencoding = "2.1.3"
-gloo-net = "0.6.0"
 serde_json = "1.0.145"
-async-stream = "0.3.6"
-eventsource-stream = "0.2.3"
-bytes = "1.11.0"
-leptos-use = { version = "0.16.3",features = ["ssr","wasm_ssr"] }
 futures-util = { version = "0.3.31",features = ["sink"] }
-log = "0.4.28"
+#log = "0.4.28"
 wasm-bindgen-futures = { version = "0.4.55"}
 js-sys = "0.3.82"
 web-sys = { version = "0.3.82", features = [

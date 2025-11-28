@@ -48,6 +48,6 @@ where
             </div>
         </div>
         <div class="sb-hoverStrip" on:mouseenter=move |_| set_is_collapsed.set(false)></div>
-         <LogoutButton />
+        <LogoutButton />
     }
 }
