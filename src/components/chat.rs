@@ -3,6 +3,7 @@ use leptos::prelude::*;
 use leptos::reactive::spawn_local;
 use leptos::web_sys::Headers;
 use leptos::*;
+use leptos::logging::log;
 use serde_json::json;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::closure::Closure;
@@ -24,7 +25,9 @@ pub fn Chat() -> impl IntoView {
     let (input, set_input) = signal("".to_string());
     let (is_loading, set_is_loading) = signal(false);
     let chat_history_ref = NodeRef::new();
-
+	let form_ref:NodeRef<html::Form> = NodeRef::new();
+    let client = reqwest_wasm::Client::new();
+    let session_id = uuid::Uuid::new_v4().to_string();
     // Scroll down Effect
     Effect::new(move |_| {
         // Just tracking the change in history.
@@ -47,7 +50,9 @@ pub fn Chat() -> impl IntoView {
         }
     });
     // append user request
-    let on_submit = move |ev: ev::SubmitEvent| {
+    let on_submit = {
+		let session_id = session_id.clone();
+		move |ev: ev::SubmitEvent| {
         ev.prevent_default();
         let prompt = input.get();
         if prompt.is_empty() || is_loading.get() {
@@ -60,7 +65,7 @@ pub fn Chat() -> impl IntoView {
                 content: prompt.clone(),
             });
         });
-
+        let session_id = session_id.clone();
         // asynchronous task for working with SSE
         spawn_local(async move {
             let headers = Headers::new().unwrap();
@@ -68,7 +73,7 @@ pub fn Chat() -> impl IntoView {
             let opts = RequestInit::new();
             opts.set_method("POST");
             opts.set_body(&wasm_bindgen::JsValue::from_str(
-                &json!({ "prompt": prompt }).to_string(),
+                &json!({ "prompt": prompt, "session_id": session_id  }).to_string(),
             ));
             opts.set_headers(&headers);
 
@@ -145,6 +150,25 @@ pub fn Chat() -> impl IntoView {
         });
 
         set_input.set("".to_string());
+    }};
+    // Stop action: POST /api/stop
+    let stop = move |_| {
+        let client = client.clone();
+		let session_id = session_id.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+			log!("STOP CLICKED");
+			let payload = serde_json::json!({
+			    "session_id": session_id
+			}).to_string();
+            let origin = web_sys::window().unwrap().location().origin().unwrap();
+            let url = format!("{}/api/stop", origin);
+            let _ = client
+                .post(&url)
+			    .header("Content-Type", "application/json")
+			    .body(payload)
+			    .send()
+			    .await;
+        });
     };
     view! {
         <div class="chat-container">
@@ -167,24 +191,37 @@ pub fn Chat() -> impl IntoView {
                 }}
             </div>
             <div class="chat-input">
-                <div
+                <i
                     class=(["loader"], move || is_loading.get())
                     class=(["none"], move || !is_loading.get())
                 />
-                <form class="chat-input-form" on:submit=on_submit>
+                <form class="chat-input-form" on:submit=on_submit node_ref=form_ref>
                     <textarea
                         name="chat-input-name"
                         prop:value=input
                         on:input=move |ev| {
                             set_input.set(event_target_value(&ev));
                         }
+                        on:keydown=move |ev:ev::KeyboardEvent| {
+                            if ev.key() == "Enter" && !ev.shift_key() {
+									log!("Enter CLICKED");
+                                    ev.prevent_default();
+									if let Some(form) = form_ref.get() {
+                     				   let _ = form.request_submit();
+				                    }
+                            }
+                        }
                         placeholder="Ask me anything..."
                         class="input-zone"
                         disabled=is_loading
                     />
+                    <button on:click= stop
+                        class="input-submit"
+                        class=(["fa","fa-stop-circle"], move || is_loading.get())
+                        class=(["none"], move || !is_loading.get())
+                    />
                     <button
                         type="submit"
-                        disabled=is_loading
                         class="input-submit"
                         class=(["fa", "fa-arrow-up"], move || !is_loading.get())
                         class=(["none"], move || is_loading.get())

@@ -4,13 +4,21 @@ use leptos::config::LeptosOptions;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio::sync::watch;
 #[derive(Clone)]
 pub struct AppState {
     pub leptos_options: Arc<LeptosOptions>,
     pub oidc_client: Arc<ISPOidcClient>, // with config: AppConfig
     pub sessions: Arc<Mutex<HashMap<String, SessionData>>>,
     pub async_http_client: reqwest::Client,
+    pub chat_sessions: Arc<Mutex<HashMap<String, Arc<ChatSession>>>>
 }
+pub struct ChatSession {
+    pub cancel_tx: watch::Sender<bool>,
+    pub cancel_rx: watch::Receiver<bool>,
+    pub cache: tokio::sync::Mutex<Vec<String>>,
+}
+
 impl AppState {
     /// Initializes and returns the application state.
     ///
@@ -40,6 +48,8 @@ impl AppState {
             sessions: Arc::new(Mutex::new(HashMap::new())),
             // The reqwest::Client is typically cheap to clone for use in AppState.
             async_http_client: async_http_client.clone(),
+
+            chat_sessions: Arc::new(Mutex::new(HashMap::new())),
         };
 
         Ok(state)

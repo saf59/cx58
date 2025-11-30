@@ -4,33 +4,21 @@ use leptos::{component, view, IntoView};
 #[component]
 pub fn SideBody() -> impl IntoView {
     view! {
-        <a href="#" class="active">
-            <i class="fas fa-qrcode"></i>
-            <span>Dashboard</span>
+        <a href="#">
+            <i class="fas fa-edit"></i>
+            <span>New chat</span>
         </a>
         <a href="#">
-            <i class="fas fa-link"></i>
-            <span>Shortcuts</span>
+            <i class="fas fa-book"></i>
+            <span>FAQ</span>
         </a>
         <a href="#">
-            <i class="fas fa-stream"></i>
-            <span>Overview</span>
+            <i class="fas fa-building"></i>
+            <span>Objects</span>
         </a>
         <a href="#">
-            <i class="fas fa-calendar"></i>
-            <span>Events</span>
-        </a>
-        <a href="#">
-            <i class="far fa-question-circle"></i>
-            <span>About</span>
-        </a>
-        <a href="#">
-            <i class="fas fa-sliders-h"></i>
-            <span>Services</span>
-        </a>
-        <a href="#">
-            <i class="far fa-envelope"></i>
-            <span>Contact</span>
+            <i class="fas fa-users"></i>
+            <span>Users</span>
         </a>
     }
 }

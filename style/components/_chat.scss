@@ -82,13 +82,20 @@
             right: 1px;
             height: 24px;
             width: 24px;
+			border-style: solid;
+			border-width: unset;
             border-radius: 50%;
             padding-block: 0;
             padding-inline: 0;
-            color: var(--cx58-color);
-            border-color: var(--cx58-color);
-            background-color: transparent;
+            color: #fff;
+            background-color: var(--cx58-color);
+			border-color: var(--cx58-color);
         }
+		.input-submit:hover {
+			border-width: medium;
+			color: var(--cx58-color);
+			background-color: transparent;
+		}
     }
 }
 /* HTML: <div class="loader"></div> */

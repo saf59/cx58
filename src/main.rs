@@ -3,6 +3,7 @@
 #[tokio::main]
 async fn main() {
     use gmr::{state::AppState, app::*, ssr::*, llm_stream::*};
+    use gmr::stop::stop_handler;
     use axum::{routing::{post,get}, Router}; //post
     use axum::middleware;
     use leptos_axum::file_and_error_handler;
@@ -22,10 +23,8 @@ async fn main() {
         .route("/logout", get(logout_handler))
         .route("/api/health", get(|| async { "OK" }))
         .route("/api/get_auth{_}", post( leptos_server_fn_handler).get( leptos_server_fn_handler))
-        //.route("/api/stream", get(llm_stream)) // chat_g
-        .route("/api/chat_stream", axum::routing::post(chat_stream_handler)) // chat_z via handler
-        //.nest_service("/pkg", ServeDir::new("/pkg"))
-
+        .route("/api/stop", post(stop_handler))
+        .route("/api/chat_stream", axum::routing::post(chat_stream_handler))
         .leptos_routes_with_handler(leptos_routes, leptos_main_handler)
         .layer(middleware::from_fn_with_state(state.clone(),security_headers))
         //.layer(axum::middleware::from_fn(log_uri))

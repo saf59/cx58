@@ -1,27 +1,49 @@
-use crate::state::AppState;
+use crate::state::{AppState, ChatSession};
+use async_stream::stream;
 use axum::{
-    Json,
     extract::State,
     response::{IntoResponse, Response, Sse, sse::Event},
 };
-use futures_util::{Stream, StreamExt, stream};
-use reqwest::StatusCode;
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::convert::Infallible;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
-use std::pin::Pin;
-use tracing::{info, warn, error};
+use tokio::sync::watch;
+#[allow(unused_imports)]
+use tracing::{error, warn, info};
 
 #[derive(Deserialize)]
 pub struct PromptRequest {
     pub prompt: String,
+    pub session_id: String,
 }
 
 pub async fn chat_stream_handler(
     State(state): State<AppState>,
-    Json(req): Json<PromptRequest>,
+    axum::Json(req): axum::Json<PromptRequest>,
 ) -> Result<impl IntoResponse, Response> {
     info!("Received streaming request for prompt: {}", req.prompt);
+    let session_id = req.session_id;
+
+    let chat_session = {
+        let mut guard = state.chat_sessions.lock().await;
+        guard
+            .entry(session_id.clone())
+            .or_insert_with(|| {
+                let (tx, rx) = watch::channel(false);
+                Arc::new(ChatSession {
+                    cancel_tx: tx,
+                    cancel_rx: rx,
+                    cache: tokio::sync::Mutex::new(Vec::new()),
+                })
+            })
+            .clone()
+    };
+
+    let start_at = Instant::now();
+    let max_duration = Duration::from_secs(60);
+    let max_tokens: usize = 2000;
+    let mut token_counter: usize = 0;
 
     let agent_url = state.oidc_client.config.agent_url.clone();
     let model_name = state.oidc_client.config.default_model.clone();
@@ -35,65 +57,143 @@ pub async fn chat_stream_handler(
 
     let request_body = OllamaRequest {
         model: model_name,
-        prompt: req.prompt,
+        prompt: req.prompt.clone(),
         stream: true,
     };
 
-    let client = reqwest::Client::new();
-
-    let response = match client.post(&agent_url).json(&request_body).send().await {
-        Ok(res) => res,
-        Err(e) => {
-            error!("Failed to send request to Ollama: {}", e);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Failed to connect to LLM: {}", e)})),
-            ).into_response());
-        }
-    };
-
-    if !response.status().is_success() {
-        let error_text = response.text().await.unwrap_or_default();
-        error!("Ollama returned an error: {}", error_text);
-        return Err((
-            StatusCode::BAD_GATEWAY,
-            Json(serde_json::json!({"error": format!("LLM API Error: {}", error_text)})),
-        ).into_response());
+    #[derive(Debug)]
+    enum FinishReason {
+        Complete,
+        Stopped,
+        Timeout,
+        MaxTokens,
+        TransportError,
     }
 
-    let byte_stream = response.bytes_stream();
+    let client = reqwest::Client::new();
 
-    let sse_stream = byte_stream.flat_map(|chunk_result| {
-        match chunk_result {
-            Ok(chunk) => {
-                let chunk_str = String::from_utf8_lossy(&chunk);
-                let mut events: Vec<Result<Event, Infallible>> = Vec::new();
-                for line in chunk_str.lines() {
-                    if line.trim().is_empty() { continue; }
-                    if let Ok(ollama_resp) = serde_json::from_str::<serde_json::Value>(line) {
-                        if ollama_resp.get("done").and_then(|v| v.as_bool()).unwrap_or(false) {
-                            info!("LLM stream finished.");
-                            continue;
-                        }
-                        if let Some(response_text) = ollama_resp.get("response").and_then(|v| v.as_str()) {
-                            events.push(Ok(Event::default().data(response_text)));
+    // ---- SSE авто-переподключение + восстановление кеша ----
+    let sse_stream = stream! {
+        let mut stop_flag = chat_session.cancel_rx.clone();
+        let mut retries = 0;
+        let max_retries = 3;
+
+        loop {
+            let response_result = client.post(&agent_url).json(&request_body).send().await;
+
+            let mut byte_stream = match response_result {
+                Ok(res) if res.status().is_success() => res.bytes_stream(),
+                Ok(res) => {
+                    let text = res.text().await.unwrap_or_default();
+                    yield Ok(Event::default().event("error").data(format!("LLM error: {}", text)));
+                    break;
+                }
+                Err(e) => {
+                    yield Ok(Event::default().event("error").data(format!("Transport error: {}", e)));
+                    if retries < max_retries {
+                        retries += 1;
+                        tokio::time::sleep(Duration::from_secs(1 << retries)).await; // экспоненциальный бэкофф
+                        continue; // попытка переподключения
+                    } else {
+                        break;
+                    }
+                }
+            };
+
+            // Воспроизведение кеша при переподключении
+            {
+                let cache_guard = chat_session.cache.lock().await;
+                for cached in cache_guard.iter() {
+                    yield Ok(Event::default().event("replay").data(cached.clone()));
+                }
+            }
+
+            let finish_reason = 'outer: loop {
+                tokio::select! {
+                    _ = stop_flag.changed() => {
+                        break 'outer FinishReason::Stopped;
+                    }
+                    _ = tokio::time::sleep_until((start_at + max_duration).into()) => {
+                        break 'outer FinishReason::Timeout;
+                    }
+                    maybe_chunk = byte_stream.next() => {
+                        let bytes_chunk = match maybe_chunk {
+                            Some(Ok(b)) => b,
+                            Some(Err(e)) => {
+                                yield Err(std::io::Error::other(e.to_string()));
+                                break 'outer FinishReason::TransportError;
+                            }
+                            None => break 'outer FinishReason::Complete,
+                        };
+
+                        let text = String::from_utf8_lossy(&bytes_chunk);
+
+                        for line in text.lines() {
+                            let line = line.trim();
+                            if line.is_empty() { continue; }
+
+                            if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+                                if json.get("done").and_then(|v| v.as_bool()).unwrap_or(false) {
+                                    break 'outer FinishReason::Complete;
+                                }
+                                if let Some(resp) = json.get("response").and_then(|v| v.as_str()) {
+                                    token_counter += resp.split_whitespace().count();
+                                    {
+                                        let mut cache_guard = chat_session.cache.lock().await;
+                                        cache_guard.push(resp.to_string());
+                                    }
+
+                                    yield Ok(Event::default().data(resp));
+
+                                    if token_counter >= max_tokens {
+                                        break 'outer FinishReason::MaxTokens;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-                Box::pin(stream::iter(events)) as Pin<Box<dyn Stream<Item = Result<Event, Infallible>> + Send>>
-            }
-            Err(e) => {
-                error!("Stream error: {}", e);
-                Box::pin(stream::once(async move {
-                    Ok::<Event, Infallible>(Event::default().event("error").data(format!("Stream error: {}", e)))
-                })) as Pin<Box<dyn Stream<Item = Result<Event, Infallible>> + Send>>
+            };
+
+            match finish_reason {
+                FinishReason::Complete => {
+                    yield Ok(Event::default().event("on_complete").data("ok"));
+                    break;
+                }
+                FinishReason::Stopped => {
+                    yield Ok(Event::default().event("on_stop").data("by_user"));
+                    break;
+                }
+                FinishReason::Timeout => {
+                    yield Ok(Event::default().event("on_stop").data("timeout"));
+                    break;
+                }
+                FinishReason::MaxTokens => {
+                    yield Ok(Event::default().event("on_stop").data("max_tokens"));
+                    break;
+                }
+                FinishReason::TransportError => {
+                    retries += 1;
+                    if retries <= max_retries {
+                        tokio::time::sleep(Duration::from_secs(1 << retries)).await;
+                        continue; // повторное подключение
+                    } else {
+                        yield Ok(Event::default().event("on_stop").data("transport_error"));
+                        break;
+                    }
+                }
             }
         }
-    });
+
+        // Авто-GC сессии
+        let mut guard = state.chat_sessions.lock().await;
+        guard.remove(&session_id);
+        info!("GC: ChatSession {} removed", session_id);
+    };
 
     Ok(Sse::new(sse_stream).keep_alive(
         axum::response::sse::KeepAlive::new()
-            .interval(std::time::Duration::from_secs(15))
+            .interval(Duration::from_secs(15))
             .text("keepalive-text"),
     ))
 }
