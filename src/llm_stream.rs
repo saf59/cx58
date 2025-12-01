@@ -72,7 +72,7 @@ pub async fn chat_stream_handler(
 
 	let client = reqwest::Client::builder().danger_accept_invalid_certs(true).build().unwrap();
 
-    // ---- SSE авто-переподключение + восстановление кеша ----
+    // ---- SSE auto-reconnection + cache rebuilding ----
     let sse_stream = stream! {
         let mut stop_flag = chat_session.cancel_rx.clone();
         let mut retries = 0;
@@ -94,18 +94,19 @@ pub async fn chat_stream_handler(
                     break;
                 }
                 Err(e) => {
+                    tracing::warn!("{:#?}",e);
                     yield Ok(Event::default().event("error").data(format!("Transport error: {}", e)));
                     if retries < max_retries {
                         retries += 1;
-                        tokio::time::sleep(Duration::from_secs(1 << retries)).await; // экспоненциальный бэкофф
-                        continue; // попытка переподключения
+                        tokio::time::sleep(Duration::from_secs(1 << retries)).await; // exponential backoff
+                        continue; // reconnection attempt
                     } else {
                         break;
                     }
                 }
             };
 
-            // Воспроизведение кеша при переподключении
+            // Play cache when reconnecting
             {
                 let cache_guard = chat_session.cache.lock().await;
                 for cached in cache_guard.iter() {
@@ -125,6 +126,7 @@ pub async fn chat_stream_handler(
                         let bytes_chunk = match maybe_chunk {
                             Some(Ok(b)) => b,
                             Some(Err(e)) => {
+                                tracing::warn!("{:#?}",e);
                                 yield Err(std::io::Error::other(e.to_string()));
                                 break 'outer FinishReason::TransportError;
                             }
@@ -181,7 +183,7 @@ pub async fn chat_stream_handler(
                     retries += 1;
                     if retries <= max_retries {
                         tokio::time::sleep(Duration::from_secs(1 << retries)).await;
-                        continue; // повторное подключение
+                        continue; // reconnect
                     } else {
                         yield Ok(Event::default().event("on_stop").data("transport_error"));
                         break;
@@ -190,7 +192,7 @@ pub async fn chat_stream_handler(
             }
         }
 
-        // Авто-GC сессии
+        // Auto-GC sessions
         let mut guard = state.chat_sessions.lock().await;
         guard.remove(&session_id);
         info!("GC: ChatSession {} removed", session_id);
