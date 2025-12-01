@@ -14,11 +14,29 @@ pub struct AppConfig {
     pub cookie_config: CookieConfig,
     pub trust_data_list:String,
     pub trust_connect_list:String,
-    pub agent_url:String,
-    pub default_model:String,
+    pub chat_config: ChatConfig,
     pub is_prod:bool
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ChatConfig {
+	pub agent_api_url: String,
+	pub agent_api_key: Option<String>,
+	pub agent_model: String,
+	pub max_duration_sec: u64,
+	pub max_chat_tokens: usize
+}
+impl Default for ChatConfig {
+    fn default() -> Self {
+        Self {
+            agent_api_url: "http://localhost:11434/api/generate".to_string(),
+            agent_api_key: None,
+            agent_model: "llava:latest".to_string(),
+            max_duration_sec: 120,
+            max_chat_tokens: 2000,
+        }
+    }
+}
 impl AppConfig {
     pub fn from_env() -> Result<Self, env::VarError> {
         // Determine environment (DEV/PROD)
@@ -62,6 +80,26 @@ impl AppConfig {
             cookie.path = v;
         }
 
+        let mut chat_config = ChatConfig::default();
+		if let Ok(v) = env::var("AGENT_API_URL") {
+            chat_config.agent_api_url = v;
+        }
+		if let Ok(v) = env::var("AGENT_API_KEY") {
+            chat_config.agent_api_key = Some(v);
+        }
+		if let Ok(v) = env::var("AGENT_MODEL") {
+            chat_config.agent_model = v;
+        }
+		if let Ok(v) = env::var("MAX_DURATION_SEC") 
+			&& let Ok(parsed) = v.parse::<u64>() {
+            	chat_config.max_duration_sec = parsed;
+			}
+		if let Ok(v) = env::var("MAX_CHAT_TOKENS") 
+			&& let Ok(parsed) = v.parse::<usize>() {
+            	chat_config.max_chat_tokens = parsed;
+			}	
+
+
         Ok(Self {
             oidc_issuer_url: env::var("OIDC_ISSUER_URL").expect("OIDC_ISSUER_URL must be set"),
             oidc_client_id: env::var("OIDC_CLIENT_ID").expect("OIDC_CLIENT_ID must be set"),
@@ -76,9 +114,7 @@ impl AppConfig {
             cookie_config: cookie,
             trust_data_list:env::var("TRUST_DATA_LIST").unwrap_or_else(|_| "".to_string()),
             trust_connect_list:env::var("TRUST_CONNECT_LIST").unwrap_or_else(|_| "".to_string()),
-            agent_url:env::var("AGENT_API_URL")
-            .unwrap_or_else(|_| "http://localhost:11434/api/generate".to_string()),
-            default_model:env::var("AGENT_MODEL").unwrap_or_else(|_| "llava:latest".to_string()),
+			chat_config,
             is_prod
         })
     }

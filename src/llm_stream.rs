@@ -39,23 +39,23 @@ pub async fn chat_stream_handler(
             })
             .clone()
     };
+	let chat_config = state.oidc_client.config.chat_config.clone();
 
     let start_at = Instant::now();
-    let max_duration = Duration::from_secs(60);
-    let max_tokens: usize = 2000;
+    let max_duration = Duration::from_secs(chat_config.max_duration_sec);
+    let max_tokens: usize = chat_config.max_chat_tokens;
     let mut token_counter: usize = 0;
-
-    let agent_url = state.oidc_client.config.agent_url.clone();
-    let model_name = state.oidc_client.config.default_model.clone();
+    let agent_url = chat_config.agent_api_url.clone();
+    let model_name = chat_config.agent_model.clone();
 
     #[derive(Serialize)]
-    struct OllamaRequest {
+    struct AgentRequest {
         model: String,
         prompt: String,
         stream: bool,
     }
 
-    let request_body = OllamaRequest {
+    let request_body = AgentRequest {
         model: model_name,
         prompt: req.prompt.clone(),
         stream: true,
@@ -70,7 +70,7 @@ pub async fn chat_stream_handler(
         TransportError,
     }
 
-    let client = reqwest::Client::new();
+	let client = reqwest::Client::builder().danger_accept_invalid_certs(true).build().unwrap();
 
     // ---- SSE авто-переподключение + восстановление кеша ----
     let sse_stream = stream! {
@@ -79,11 +79,16 @@ pub async fn chat_stream_handler(
         let max_retries = 3;
 
         loop {
-            let response_result = client.post(&agent_url).json(&request_body).send().await;
+			let mut llm_req = client.post(&agent_url).json(&request_body);
+			if let Some(ref agent_api_key) = chat_config.agent_api_key {
+				llm_req = llm_req.header("Authorization", format!("Basic {}", agent_api_key));
+			}
+            let response_result = llm_req.send().await;
 
             let mut byte_stream = match response_result {
                 Ok(res) if res.status().is_success() => res.bytes_stream(),
                 Ok(res) => {
+					tracing::error!("{:#?}",res);
                     let text = res.text().await.unwrap_or_default();
                     yield Ok(Event::default().event("error").data(format!("LLM error: {}", text)));
                     break;
