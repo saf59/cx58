@@ -13,7 +13,8 @@ pub mod auth_ssr;
 pub mod llm_stream;
 #[cfg(feature = "ssr")]
 pub mod stop;
-
+#[cfg(feature = "ssr")]
+pub mod chunk_assembler;
 
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]

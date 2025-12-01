@@ -1,3 +1,4 @@
+use crate::chunk_assembler::*;
 use crate::state::{AppState, ChatSession};
 use async_stream::stream;
 use axum::{
@@ -10,7 +11,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::watch;
 #[allow(unused_imports)]
-use tracing::{error, warn, info};
+use tracing::{error, info, warn};
 
 #[derive(Deserialize)]
 pub struct PromptRequest {
@@ -39,7 +40,7 @@ pub async fn chat_stream_handler(
             })
             .clone()
     };
-	let chat_config = state.oidc_client.config.chat_config.clone();
+    let chat_config = state.oidc_client.config.chat_config.clone();
 
     let start_at = Instant::now();
     let max_duration = Duration::from_secs(chat_config.max_duration_sec);
@@ -48,17 +49,50 @@ pub async fn chat_stream_handler(
     let agent_url = chat_config.agent_api_url.clone();
     let model_name = chat_config.agent_model.clone();
 
-    #[derive(Serialize)]
+    #[derive(Debug, Serialize)]
     struct AgentRequest {
         model: String,
         prompt: String,
         stream: bool,
+        format: serde_json::Value,
     }
+    let format = serde_json::from_str(
+        r#"{
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string"
+                },
+                "objects": {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "item": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "url": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "required": [
+                "text"
+            ]
+    }"#,
+    )
+    .unwrap();
 
     let request_body = AgentRequest {
         model: model_name,
         prompt: req.prompt.clone(),
         stream: true,
+        format: format,
     };
 
     #[derive(Debug)]
@@ -70,25 +104,27 @@ pub async fn chat_stream_handler(
         TransportError,
     }
 
-	let client = reqwest::Client::builder().danger_accept_invalid_certs(true).build().unwrap();
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .unwrap();
 
-    // ---- SSE auto-reconnection + cache rebuilding ----
     let sse_stream = stream! {
         let mut stop_flag = chat_session.cancel_rx.clone();
         let mut retries = 0;
         let max_retries = 3;
-
+        //tracing::info!("{:#?}",&request_body);
         loop {
-			let mut llm_req = client.post(&agent_url).json(&request_body);
-			if let Some(ref agent_api_key) = chat_config.agent_api_key {
-				llm_req = llm_req.header("Authorization", format!("Basic {}", agent_api_key));
-			}
+            let mut llm_req = client.post(&agent_url).json(&request_body);
+            if let Some(ref agent_api_key) = chat_config.agent_api_key {
+                llm_req = llm_req.header("Authorization", format!("Basic {}", agent_api_key));
+            }
             let response_result = llm_req.send().await;
 
             let mut byte_stream = match response_result {
                 Ok(res) if res.status().is_success() => res.bytes_stream(),
                 Ok(res) => {
-					tracing::error!("{:#?}",res);
+                    tracing::error!("{:#?}",res);
                     let text = res.text().await.unwrap_or_default();
                     yield Ok(Event::default().event("error").data(format!("LLM error: {}", text)));
                     break;
@@ -98,21 +134,22 @@ pub async fn chat_stream_handler(
                     yield Ok(Event::default().event("error").data(format!("Transport error: {}", e)));
                     if retries < max_retries {
                         retries += 1;
-                        tokio::time::sleep(Duration::from_secs(1 << retries)).await; // exponential backoff
-                        continue; // reconnection attempt
+                        tokio::time::sleep(Duration::from_secs(1 << retries)).await;
+                        continue;
                     } else {
                         break;
                     }
                 }
             };
 
-            // Play cache when reconnecting
             {
                 let cache_guard = chat_session.cache.lock().await;
                 for cached in cache_guard.iter() {
                     yield Ok(Event::default().event("replay").data(cached.clone()));
                 }
             }
+
+            let mut assembler = ChunkAssembler::new();
 
             let finish_reason = 'outer: loop {
                 tokio::select! {
@@ -134,27 +171,44 @@ pub async fn chat_stream_handler(
                         };
 
                         let text = String::from_utf8_lossy(&bytes_chunk);
+                        tracing::info!("{:?}",text);
+                        let chunks = assembler.push_sse_line(&text);
 
-                        for line in text.lines() {
-                            let line = line.trim();
-                            if line.is_empty() { continue; }
-
-                            if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
-                                if json.get("done").and_then(|v| v.as_bool()).unwrap_or(false) {
-                                    break 'outer FinishReason::Complete;
-                                }
-                                if let Some(resp) = json.get("response").and_then(|v| v.as_str()) {
-                                    token_counter += resp.split_whitespace().count();
+                        for chunk in chunks {
+                            match chunk {
+                                // Стриминг текста - отправляем сразу
+                                UiChunk::Text(text) => {
+                                    token_counter += text.split_whitespace().count();
                                     {
                                         let mut cache_guard = chat_session.cache.lock().await;
-                                        cache_guard.push(resp.to_string());
+                                        cache_guard.push(text.clone());
                                     }
-
-                                    yield Ok(Event::default().data(resp));
+                                    yield Ok(Event::default().data(text));
 
                                     if token_counter >= max_tokens {
                                         break 'outer FinishReason::MaxTokens;
                                     }
+                                }
+
+                                // Markdown тоже стримим
+                                UiChunk::Markdown(md) => {
+                                    token_counter += md.split_whitespace().count();
+                                    {
+                                        let mut cache_guard = chat_session.cache.lock().await;
+                                        cache_guard.push(md.clone());
+                                    }
+                                    yield Ok(Event::default().data(md));
+
+                                    if token_counter >= max_tokens {
+                                        break 'outer FinishReason::MaxTokens;
+                                    }
+                                }
+
+                                // Финальный JSON - отправляем с событием "json"
+                                UiChunk::Json(val) => {
+                                    let data_str = serde_json::to_string(&val).unwrap_or_default();
+                                    yield Ok(Event::default().event("json").data(data_str));
+                                    break 'outer FinishReason::Complete;
                                 }
                             }
                         }
@@ -183,7 +237,7 @@ pub async fn chat_stream_handler(
                     retries += 1;
                     if retries <= max_retries {
                         tokio::time::sleep(Duration::from_secs(1 << retries)).await;
-                        continue; // reconnect
+                        continue;
                     } else {
                         yield Ok(Event::default().event("on_stop").data("transport_error"));
                         break;
@@ -192,7 +246,6 @@ pub async fn chat_stream_handler(
             }
         }
 
-        // Auto-GC sessions
         let mut guard = state.chat_sessions.lock().await;
         guard.remove(&session_id);
         info!("GC: ChatSession {} removed", session_id);

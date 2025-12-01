@@ -53,6 +53,7 @@ async-stream = "0.3.6"
 futures = "0.3.31"
 bytes = "1.11.0"
 reqwest-wasm = "0.11.16"
+regex = "1.12.2"
 
 [dev-dependencies]
 tokio = { version = "1.48.0", features = ["rt-multi-thread", "macros"] }

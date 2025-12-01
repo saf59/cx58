@@ -1,4 +1,4 @@
-use leptos::prelude::{ClassAttribute, ElementChild};
+use leptos::prelude::ElementChild;
 use leptos::{component, view, IntoView};
 
 #[component]
