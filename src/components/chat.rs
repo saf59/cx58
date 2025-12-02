@@ -1,3 +1,4 @@
+use crate::components::chat_context::ChatContext;
 use leptos::prelude::*;
 use leptos::reactive::spawn_local;
 use leptos::*;
@@ -63,6 +64,25 @@ pub fn Chat() -> impl IntoView {
     let chat_history_ref = NodeRef::new();
     let form_ref = NodeRef::<html::Form>::new();
     let session_id = uuid::Uuid::new_v4().to_string();
+
+    //  Subscribe to context
+    if let Some(ctx) = use_context::<ChatContext>() {
+        // Следим за сигналом очистки
+        Effect::new(move |_| {
+            if ctx.clear_history.get() {
+                set_history.set(Vec::new());
+                ctx.clear_history.set(false);
+            }
+        });
+
+        // Следим за сигналом вставки текста
+        Effect::new(move |_| {
+            if let Some(text) = ctx.insert_text.get() {
+                set_input.set(text);
+                ctx.insert_text.set(None);
+            }
+        });
+    }
 
     // Autoscroll when history changes
     Effect::new(move |_| {

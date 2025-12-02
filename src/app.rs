@@ -1,4 +1,6 @@
 use crate::auth::Auth;
+use crate::components::chat::Chat;
+use crate::components::chat_context::ChatContext;
 use crate::components::side_body::SideBody;
 use crate::components::side_top::SideTop;
 use crate::components::sidebar::SideBar;
@@ -9,7 +11,6 @@ use leptos::prelude::*;
 use leptos_meta::{Link, MetaTags, Stylesheet, Title, provide_meta_context};
 use leptos_router::components::{Route, Router, Routes};
 use leptos_router::*;
-use crate::components::chat::Chat;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();
@@ -38,6 +39,9 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
 #[component]
 pub fn App() -> impl IntoView {
     let initial_auth_resource = Resource::new(|| (), |_| async { get_auth().await });
+    let chat_context = ChatContext::new();
+    provide_context(chat_context);
+
     view! {
         <Transition fallback=|| {
             view! { <p>"Checking Auth Status..."</p> }
