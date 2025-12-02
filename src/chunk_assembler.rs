@@ -26,23 +26,23 @@ impl ChunkAssembler {
         }
     }
 
-    /// Извлекает текст из незавершенного JSON вручную
+    /// Extracts text from the buffer
     fn extract_text_from_buffer(&self) -> Option<String> {
-        // Ищем начало "text":"
+        // Find the start of "text":"
         let text_start_pattern = r#""text""#;
         let text_start = self.response_buffer.find(text_start_pattern)?;
 
-        // Находим начало значения (после :)
+        // Find the start of the value (after :)
         let after_key = &self.response_buffer[text_start + text_start_pattern.len()..];
         let colon_pos = after_key.find(':')?;
         let after_colon = &after_key[colon_pos + 1..].trim_start();
 
-        // Проверяем, что значение начинается с кавычки
+        // Check if the value starts with a quote
         if !after_colon.starts_with('"') {
             return None;
         }
 
-        // Извлекаем текст до закрывающей кавычки (или до конца, если её нет)
+        // Extract text until the closing quote (or until the end if there is no closing quote)
         let mut result = String::new();
         let chars = after_colon[1..].chars();
         let mut escaped = false;
@@ -50,7 +50,7 @@ impl ChunkAssembler {
         //while let Some(ch) = chars.next() {
         for ch in chars {
             if escaped {
-                // Обрабатываем escape-последовательности
+                // Match escape sequences
                 match ch {
                     'n' => result.push('\n'),
                     't' => result.push('\t'),
@@ -66,7 +66,7 @@ impl ChunkAssembler {
             } else if ch == '\\' {
                 escaped = true;
             } else if ch == '"' {
-                // Закрывающая кавычка - конец текста
+                // End of text
                 break;
             } else {
                 result.push(ch);
@@ -76,7 +76,7 @@ impl ChunkAssembler {
         Some(result)
     }
 
-    /// Добавляем JSON-строку из SSE и возвращаем UiChunk, если текст готов
+    ///   Add JSON string from SSE and return UiChunk if text is ready
     pub fn push_sse_line(&mut self, line: &str) -> Vec<UiChunk> {
         let mut output = Vec::new();
         let line = line.trim();
@@ -84,16 +84,16 @@ impl ChunkAssembler {
             return output;
         }
 
-        // Парсим каждую строку как отдельный JSON
+        // Parse JSON string from SSE line
         match serde_json::from_str::<Value>(line) {
             Ok(val) => {
-                // Накапливаем response для финального JSON
+                // Collect response for final JSON
                 if let Some(resp) = val.get("response").and_then(|v| v.as_str()) {
                     self.response_buffer.push_str(resp);
 
-                    // Извлекаем текст из незавершенного JSON
+                    // Extract text from buffer
                     if let Some(current_text) = self.extract_text_from_buffer() {
-                        // Если появился новый текст - отправляем чанк
+                        // Send chunk if new text is available
                         if current_text.len() > self.text_buffer.len() {
                             let new_part = &current_text[self.text_buffer.len()..];
                             if !new_part.is_empty() {
@@ -105,7 +105,7 @@ impl ChunkAssembler {
                     }
                 }
 
-                // Когда done=true, отправляем финальный JSON
+                // Send final chunk if done=true
                 if val.get("done").and_then(|v| v.as_bool()).unwrap_or(false) {
                     tracing::info!(
                         "Done=true, final buffer length: {}",
