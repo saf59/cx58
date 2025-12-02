@@ -1,32 +1,32 @@
 :root {
-  --1-color: #111111;
-  --2-color: #222222;
-  --3-color: #333333;
-  --4-color: #444444;
-  --5-color: #555555;
-  --6-color: #666666;
-  --7-color: #777777;
-  --8-color: #888888;
-  --9-color: #999999;
-  --a-color: #aaaaaa;
-  --b-color: #bbbbbb;
-  --c-color: #cccccc;
-  --d-color: #dddddd;
-  --e-color: #eeeeee;
-  --f-color: #ffffff;
-  --bg-oidc: #F6F4F0;
+    --1-color: #111111;
+    --2-color: #222222;
+    --3-color: #333333;
+    --4-color: #444444;
+    --5-color: #555555;
+    --6-color: #666666;
+    --7-color: #777777;
+    --8-color: #888888;
+    --9-color: #999999;
+    --a-color: #aaaaaa;
+    --b-color: #bbbbbb;
+    --c-color: #cccccc;
+    --d-color: #dddddd;
+    --e-color: #eeeeee;
+    --f-color: #ffffff;
+    --f0-color: #f0f0f0;
+    --f4-color: #f4f4f4;
 
-  --accent-color: --f-color;
-  --gradient-color: --c-color;
-  --sidebar-width: 180px;
-  --content-width: calc(100dvw - --sidebar-width);
-  --sidebar-bcolor: #f0f0f0;
-  --wrapper-bcolor: #f4f4f4;
-  --border-color: #cccccc;
-  --tooltip-bgcolor: #888888;
-  --h-textcolor: #454545;
-  --cx58-color: #40c0e7;
-
-
+    --bg-oidc: #f6f4f0;
+    --accent-color: --f-color;
+    --gradient-color: --c-color;
+    --sidebar-width: 180px;
+    --content-width: calc(100dvw - --sidebar-width);
+    --sidebar-bcolor: --f0-color;
+    --wrapper-bcolor: --f4-color;
+    --border-color: --c-color;
+    --tooltip-bgcolor: --8-color;
+    --h-textcolor: --f5-color;
+    --text-color: --4-color;
+    --cx58-color: #40c0e7;
 }
-

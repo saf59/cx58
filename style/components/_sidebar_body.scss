@@ -1,28 +1,46 @@
 .sb-sidebar-body {
-  a {
-    display: flex;
-    height: 65px;
-    width: 100%;
-    color: var(--4-color);
-    line-height: 65px;
-    box-sizing: border-box;
-    transition: all .5s ease;
-  }
+    a {
+        display: flex;
+        width: 100%;
+        color: var(--4-color);
+        box-sizing: border-box;
+        transition: all 0.5s ease;
+        height: 30px;
+        line-height: 30px;
+        cursor: pointer;
+    }
 
-  a.active, a:hover {
-    color: var(--d-color);
-    background: var(--6-color);;
-  }
+    a.active,
+    a:hover {
+        color: var(--d-color);
+        background: var(--6-color);
+    }
 
-  a i {
-    font-size: 23px;
-    margin-left: 16px;
-    margin-right: 16px;
-    align-content: center;
-  }
+    a i {
+        font-size: 20px;
+        margin-left: 16px;
+        margin-right: 16px;
+        align-content: center;
+    }
 
-  a span {
-    letter-spacing: 1px;
-//    text-transform: uppercase;
-  }
+    a span {
+        letter-spacing: 1px;
+        //    text-transform: uppercase;
+    }
+
+    .faq-buttons {
+        padding-left: 10px;
+        transition: all 0.5s ease;
+
+        a {
+            height: 30px;
+            line-height: 30px;
+        }
+
+        a.active,
+        a:hover {
+            color: var(--d-color);
+            background: var(--6-color);
+        }
+    }
 }

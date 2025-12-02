@@ -11,6 +11,8 @@ use leptos::prelude::*;
 use leptos_meta::{Link, MetaTags, Stylesheet, Title, provide_meta_context};
 use leptos_router::components::{Route, Router, Routes};
 use leptos_router::*;
+//use leptos_use::use_locale;
+//use unic_langid::langid_slice;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();
@@ -40,8 +42,11 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
 pub fn App() -> impl IntoView {
     let initial_auth_resource = Resource::new(|| (), |_| async { get_auth().await });
     let chat_context = ChatContext::new();
+    //let locale = use_locale(langid_slice!["de", "en"]);
+    //let language = locale.get().language;
+    //chat_context.locale.set(language.to_string());
     provide_context(chat_context);
-
+    //leptos::logging::log("lang:{:?}", language);
     view! {
         <Transition fallback=|| {
             view! { <p>"Checking Auth Status..."</p> }
@@ -188,7 +193,6 @@ pub fn LogoutButton() -> impl IntoView {
         // it is axum route - not leptos
         <a href="/logout" class="sign sign-out" rel="external">
             <i class="fa fa-sign-out"></i>
-            <span>Log Out</span>
         </a>
     }
 }

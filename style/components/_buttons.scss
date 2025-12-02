@@ -1,39 +1,37 @@
-
 .login_logout_button {
-  margin: 0 10px;
-  background: var(--wrapper-bcolor);
-  color: var(--h-textcolor);
-  padding: 5px;
-  border-radius: 5px;
+    margin: 0 10px;
+    background: var(--wrapper-bcolor);
+    color: var(--h-textcolor);
+    padding: 5px;
+    border-radius: 5px;
 }
 .login_logout_button:hover {
-  background: var(--border-bcolor);
+    background: var(--border-bcolor);
 }
 
 .sign-out {
-  right: 5px;
-  position: absolute;
-  top: 5px;
+    right: 5px;
+    position: absolute;
+    top: 5px;
 }
 
 .sign {
-  display: inline-block;
-  color: #444;
-  background: #ccc;
-  line-height: 28px;
-  border-radius: 5px;
-  border: none;
-  text-decoration: none;
+    display: inline-block;
+    color: var(--text-color);
+    //background: #ccc;
+    line-height: 28px;
+    border-radius: 5px;
+    border: none;
+    text-decoration: none;
 }
 .sign:hover {
-    color: #cccccc;
-    background: #555;
-  }
+    color: var(--cx58-color);
+    background: var(--f-color);
+}
 
 .sign i {
-  margin: 5px;
+    margin: 5px;
 }
 .sign span {
-  margin-right: 5px;
+    margin-right: 5px;
 }
-
