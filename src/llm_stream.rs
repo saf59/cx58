@@ -92,7 +92,7 @@ pub async fn chat_stream_handler(
         model: model_name,
         prompt: req.prompt.clone(),
         stream: true,
-        format: format,
+        format,
     };
 
     #[derive(Debug)]
