@@ -43,19 +43,21 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
         </a>
 
         <hr />
+        <a href="/">
+            <i class="fas fa-home"></i>
+            <span>Home</span>
+        </a>
+        <a href="/play">
+            <i class="fas fa-gear"></i>
+            <span>Play</span>
+        </a>
+        <hr />
+
         {if is_admin {
             view! {
-                <a href="/">
-                    <i class="fas fa-home"></i>
-                    <span>Home</span>
-                </a>
                 <a href="/profile">
                     <i class="fas fa-user"></i>
                     <span>Profile</span>
-                </a>
-                <a href="/play">
-                    <i class="fas fa-language"></i>
-                    <span>Play</span>
                 </a>
                 <a href="#">
                     <i class="fas fa-users"></i>
