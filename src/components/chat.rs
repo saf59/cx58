@@ -149,14 +149,15 @@ pub fn Chat() -> impl IntoView {
         <div class="chat-container">
             <div class="chat-history" node_ref=chat_history_ref>
                 {move || {
-                    history.get().into_iter().map(|message| {
-                        view! {
-                            <div
-                                class=message.role.css_class()
-                                inner_html=message.content
-                            />
-                        }
-                    }).collect_view()
+                    history
+                        .get()
+                        .into_iter()
+                        .map(|message| {
+                            view! {
+                                <div class=message.role.css_class() inner_html=message.content />
+                            }
+                        })
+                        .collect_view()
                 }}
             </div>
 
@@ -179,12 +180,15 @@ pub fn Chat() -> impl IntoView {
                         class="input-zone"
                         prop:disabled=is_loading
                     />
-                    <button type="button" on:click=on_stop
+                    <button
+                        type="button"
+                        on:click=on_stop
                         class="input-submit"
-                        class=(["fa","fa-stop-circle"], move || is_loading.get())
+                        class=(["fa", "fa-stop-circle"], move || is_loading.get())
                         class=(["none"], move || !is_loading.get())
                     />
-                    <button type="submit"
+                    <button
+                        type="submit"
                         class="input-submit"
                         class=(["fa", "fa-arrow-up"], move || !is_loading.get())
                         class:none=move || is_loading.get()

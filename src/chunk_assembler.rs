@@ -97,7 +97,7 @@ impl ChunkAssembler {
                         if current_text.len() > self.text_buffer.len() {
                             let new_part = &current_text[self.text_buffer.len()..];
                             if !new_part.is_empty() {
-                                tracing::info!("Streaming text chunk: {:?}", new_part);
+                                //tracing::info!("Streaming text chunk: {:?}", new_part);
                                 output.push(UiChunk::Text(new_part.to_string()));
                             }
                             self.text_buffer = current_text;
@@ -107,14 +107,11 @@ impl ChunkAssembler {
 
                 // Send final chunk if done=true
                 if val.get("done").and_then(|v| v.as_bool()).unwrap_or(false) {
-                    tracing::info!(
-                        "Done=true, final buffer length: {}",
-                        self.response_buffer.len()
-                    );
+                    //tracing::info!("Done=true, final buffer length: {}",self.response_buffer.len());
                     if !self.response_buffer.is_empty() {
                         match serde_json::from_str::<Value>(&self.response_buffer) {
                             Ok(final_json) => {
-                                tracing::info!("Pushing final JSON");
+                                //tracing::info!("Pushing final JSON");
                                 output.push(UiChunk::Json(final_json));
                             }
                             Err(e) => {

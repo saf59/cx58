@@ -1,4 +1,4 @@
-﻿use crate::app::shell;
+use crate::app::shell;
 use crate::auth::*;
 use crate::auth_ssr::*;
 use crate::config::AppConfig;
@@ -9,18 +9,18 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Redirect, Response},
 };
-use axum_extra::extract::{cookie::Cookie, CookieJar};
-use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
+use axum_extra::extract::{CookieJar, cookie::Cookie};
+use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use http::HeaderMap;
 use leptos::config::LeptosOptions;
 use leptos::context::provide_context;
 use leptos::serde_json;
 use leptos_axum::handle_server_fns_with_context;
 use oauth2::basic::{BasicErrorResponseType, BasicRevocationErrorResponse};
-use oauth2::{AccessToken,
-             AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointMaybeSet, EndpointNotSet,
-             EndpointSet, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope,
-             StandardErrorResponse, StandardRevocableToken,
+use oauth2::{
+    AccessToken, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointMaybeSet,
+    EndpointNotSet, EndpointSet, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken,
+    Scope, StandardErrorResponse, StandardRevocableToken,
 };
 use openidconnect::core::{
     CoreAuthDisplay, CoreAuthPrompt, CoreClient, CoreGenderClaim, CoreIdTokenVerifier,
@@ -28,9 +28,9 @@ use openidconnect::core::{
     CoreTokenIntrospectionResponse, CoreTokenResponse,
 };
 use openidconnect::{
-    AuthenticationFlow, EmptyAdditionalClaims, IssuerUrl, OAuth2TokenResponse, Nonce
+    AuthenticationFlow, EmptyAdditionalClaims, IssuerUrl, Nonce, OAuth2TokenResponse,
 };
-use serde::{de::Error, Deserialize};
+use serde::{Deserialize, de::Error};
 use serde_json::Value;
 use serde_urlencoded::de::Error as UrlError;
 use std::collections::{HashMap, HashSet};
@@ -69,7 +69,7 @@ pub struct ISPOidcClient {
 impl ISPOidcClient {
     pub async fn new(async_http_client: &reqwest::Client) -> anyhow::Result<Self> {
         let config = AppConfig::from_env().expect("Failed to load config");
-        tracing::info!("issuer={:?}",&config.oidc_issuer_url);
+        tracing::info!("issuer={:?}", &config.oidc_issuer_url);
         let issuer = IssuerUrl::new(config.oidc_issuer_url.clone())?;
         let provider_metadata =
             CoreProviderMetadata::discover_async(issuer, async_http_client).await?;
@@ -132,7 +132,7 @@ impl ISPOidcClient {
             .expect("OIDC client misconfigured (missing token endpoint)")
             .request_async(async_http_client)
             .await;
-        
+
         Ok(token_response?)
     }
 
@@ -409,7 +409,7 @@ pub async fn callback_handler(
             session.refresh_token = token_response
                 .refresh_token()
                 .map(|t| t.secret().to_string());
-            
+
             Redirect::to("/").into_response()
         }
         Err(e) => (
@@ -419,8 +419,6 @@ pub async fn callback_handler(
             .into_response(),
     }
 }
-
-
 
 /// Extract claims from Access Token, (if it is JWT).
 pub fn extract_claims_from_access_token(token: &AccessToken) -> Option<Value> {
@@ -461,14 +459,16 @@ pub async fn security_headers(
 ) -> impl IntoResponse {
     let uri = req.uri().path().to_string();
     // ❌ We do not add CSP for static or API
-    if is_static(uri) { return next.run(req).await; }
+    if is_static(uri) {
+        return next.run(req).await;
+    }
     // tracing::info!(">> security_headers called for {}", req.uri());
     let config = &app_state.oidc_client.config;
     let is_prod = config.is_prod;
     let trust_data_list = &config.trust_data_list;
     let trust_connect_list = &config.trust_connect_list;
 
-    let nonce = leptos::nonce::Nonce::new();//use_nonce().unwrap();
+    let nonce = leptos::nonce::Nonce::new(); //use_nonce().unwrap();
     req.extensions_mut().insert(nonce.clone());
     let mut res = next.run(req).await;
 
@@ -552,9 +552,12 @@ fn is_static(uri: String) -> bool {
         || uri.starts_with("/login")
         || uri.starts_with("/logout")
         || uri.starts_with("/callback")
+        || uri.starts_with("/local")
         || uri.ends_with(".js")
+        || uri.ends_with(".json")
         || uri.ends_with(".css")
         || uri.ends_with(".wasm")
         || uri.ends_with(".map")
         || uri.ends_with(".ico")
+        || uri.ends_with(".tfl")
 }

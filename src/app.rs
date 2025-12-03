@@ -1,6 +1,7 @@
 use crate::auth::Auth;
 use crate::components::chat::Chat;
 use crate::components::chat_context::ChatContext;
+use crate::components::play::{I18nProvider, LanguageSelector};
 use crate::components::side_body::SideBody;
 use crate::components::side_top::SideTop;
 use crate::components::sidebar::SideBar;
@@ -9,10 +10,10 @@ use crate::server_fn::*;
 use leptos::IntoView;
 use leptos::prelude::*;
 use leptos_meta::{Link, MetaTags, Stylesheet, Title, provide_meta_context};
+use leptos_router::components::ParentRoute;
 use leptos_router::components::{Route, Router, Routes};
+use leptos_router::nested_router::Outlet;
 use leptos_router::*;
-//use leptos_use::use_locale;
-//use unic_langid::langid_slice;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();
@@ -36,78 +37,57 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
         </html>
     }
 }
-/// Auth init is root for all role base auth
-/// rest is only with use_context::<RwSignal<Auth>>() like in RootPage
 #[component]
 pub fn App() -> impl IntoView {
-    let initial_auth_resource = Resource::new(|| (), |_| async { get_auth().await });
     let chat_context = ChatContext::new();
-    //let locale = use_locale(langid_slice!["de", "en"]);
-    //let language = locale.get().language;
-    //chat_context.locale.set(language.to_string());
     provide_context(chat_context);
-    //leptos::logging::log("lang:{:?}", language);
+
+    view! {
+        <I18nProvider>
+            <Router>
+                <main>
+                    <Routes fallback=|| view! { <NotFoundPage /> }>
+                        <ParentRoute path=path!("") view=AuthWrapper>
+                            <Route path=path!("") view=RootPage />
+                            <Route path=path!("profile") view=ProfilePage />
+                            <Route path=path!("play") view=PlayPage />
+                        </ParentRoute>
+                    </Routes>
+                </main>
+            </Router>
+        </I18nProvider>
+    }
+}
+
+#[component]
+pub fn AuthWrapper() -> impl IntoView {
+    let initial_auth_resource = Resource::new(|| (), |_| async { get_auth().await });
+
     view! {
         <Transition fallback=|| {
             view! { <p>"Checking Auth Status..."</p> }
         }>
             {move || {
                 match initial_auth_resource.get() {
-                    None => ().into_any(),
+                    Some(Ok(auth_state)) => {
+                        let auth_signal = RwSignal::new(auth_state.clone());
+                        provide_context(auth_signal);
+                        view! { <Outlet /> }.into_any()
+                    }
                     Some(Err(e)) => {
-
                         view! {
-                            <h1>"Error loading initial authentication status."</h1>
+                            <h1>"Authentication Error"</h1>
                             <p>{format!("{:?}", e)}</p>
                         }
                             .into_any()
                     }
-                    Some(Ok(auth_state)) => {
-                        let auth_signal = RwSignal::new(auth_state.clone());
-                        provide_context(auth_signal);
-                        view! {
-                            <Router>
-                                <main>
-                                    <Routes fallback=|| view! { <NotFoundPage /> }>
-                                        <Route path=path!("/") view=move || { RootPage } />
-                                        <Route path=path!("/profile") view=ProfilePage />
-                                    </Routes>
-                                </main>
-                            </Router>
-                        }
-                            .into_any()
-                    }
+                    None => ().into_any(),
                 }
             }}
         </Transition>
     }
 }
-#[component]
-pub fn App2() -> impl IntoView {
-    let initial_auth_resource = Resource::new(|| (), |_| async { get_auth().await });
-    let auth_signal = RwSignal::new(Auth::Unauthenticated);
-    provide_context(auth_signal);
-    Effect::new(move |_| {
-        if let Some(Ok(auth)) = initial_auth_resource.get() {
-            auth_signal.set(auth);
-        }
-    });
 
-    view! {
-        <Suspense fallback=move || {
-            view! { <p>"Loading authentication status..."</p> }
-        }>
-            <Router>
-                <main>
-                    <Routes fallback=|| view! { <NotFoundPage /> }>
-                        <Route path=path!("/") view=move || { RootPage } />
-                        <Route path=path!("/profile") view=ProfilePage />
-                    </Routes>
-                </main>
-            </Router>
-        </Suspense>
-    }
-}
 #[component]
 fn RootPage() -> impl IntoView {
     // 1. Retrieve the Auth state from context.
@@ -134,7 +114,35 @@ fn RootPage() -> impl IntoView {
                     .into_any()
             } else {
                 // User is authenticated and is NOT a guest (e.g., a user or admin)
-                view! { <SideBar top=SideTop() side_body=SideBody() content=Chat() /> }
+                view! {
+                    <SideBar top=SideTop() side_body= view! {
+                        <SideBody is_admin=auth.is_authenticated_admin()/>
+                    }>
+                        <Chat />
+                    </SideBar>
+                }
+                    .into_any()
+            }
+        }}
+    }
+}
+
+#[component]
+fn PlayPage() -> impl IntoView {
+    let auth_signal = use_context::<RwSignal<Auth>>()
+        .expect("Auth context not found. Did you set up the provider?");
+
+    view! {
+        {move || {
+            let auth = auth_signal.get();
+            if !auth.is_authenticated() {
+                view! { <LoginPage /> }.into_any()
+            } else {
+                view! {
+                    <SideBar top=SideTop() side_body=view! {<SideBody is_admin=auth.is_authenticated_admin()/>}>
+                        <LanguageSelector />
+                    </SideBar>
+                }
                     .into_any()
             }
         }}
@@ -170,11 +178,23 @@ fn LoginPage() -> impl IntoView {
 }
 #[component]
 fn ProfilePage() -> impl IntoView {
+    let auth_signal = use_context::<RwSignal<Auth>>()
+        .expect("Auth context not found. Did you set up the provider?");
+
     view! {
-        <div class="centered  bg_oidc">
-            <UserRolesDisplay />
-            <LogoutButton />
-        </div>
+        {move || {
+            let auth = auth_signal.get();
+            if !auth.is_authenticated() {
+                view! { <LoginPage /> }.into_any()
+            } else {
+                view! {
+                    <SideBar top=SideTop() side_body= view! {<SideBody is_admin=auth.is_authenticated_admin()/>}>
+                        <UserRolesDisplay user=auth.user() />
+                    </SideBar>
+                }
+                    .into_any()
+            }
+        }}
     }
 }
 #[component]

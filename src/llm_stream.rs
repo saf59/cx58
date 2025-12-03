@@ -171,7 +171,7 @@ pub async fn chat_stream_handler(
                         };
 
                         let text = String::from_utf8_lossy(&bytes_chunk);
-                        tracing::info!("{:?}",text);
+                        //tracing::info!("{:?}",text);
                         let chunks = assembler.push_sse_line(&text);
 
                         for chunk in chunks {

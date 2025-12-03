@@ -1,17 +1,11 @@
-use leptos::prelude::{signal, ClassAttribute, ElementChild, Get, OnAttribute, Set};
-use leptos::{component, view, IntoView};
 use crate::app::LogoutButton;
+use leptos::prelude::*;
 
 #[component]
-pub fn SideBar<Top,SideBody,Content>(
-    top: Top,
-    side_body: SideBody,
-    content: Content,
-) -> impl IntoView
+pub fn SideBar<Top, SideBody>(top: Top, side_body: SideBody, children: Children) -> impl IntoView
 where
     Top: IntoView + 'static,
     SideBody: IntoView + 'static,
-    Content: IntoView + 'static,
 {
     let (is_collapsed, set_is_collapsed) = signal(true);
     let (is_pinned, set_is_pinned) = signal(false);
@@ -44,7 +38,7 @@ where
             </div>
             <div class="sb-content">
                 <button class="sb-fakepin" />
-                {content.into_view()}
+                {children()}
             </div>
         </div>
         <div class="sb-hoverStrip" on:mouseenter=move |_| set_is_collapsed.set(false)></div>

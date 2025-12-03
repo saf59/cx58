@@ -19,10 +19,17 @@ impl Auth {
     pub fn is_authenticated(&self) -> bool {
         matches!(self, Auth::Authenticated(_))
     }
+    pub fn user(&self) -> Option<AuthenticatedUser> {
+        if let Auth::Authenticated(user) = self {
+            Some(user.clone())
+        } else {
+            None
+        }
+    }
     pub fn is_authenticated_guest(&self) -> bool {
         if let Auth::Authenticated(user) = self {
             //tracing::info!("is guest: {:?}",&user.roles);
-            user.roles.is_empty() || !user.has_any_role(&[Role::User,Role::Admin])
+            user.roles.is_empty() || !user.has_any_role(&[Role::User, Role::Admin])
         } else {
             false
         }
