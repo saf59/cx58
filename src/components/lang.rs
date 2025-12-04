@@ -1,4 +1,3 @@
-// src/lib.rs
 use leptos::prelude::*;
 use leptos_fluent::{I18n, Language, leptos_fluent, move_tr};
 
@@ -36,6 +35,37 @@ pub fn LanguageSelector() -> impl IntoView {
         </p>
     }
 }
+#[component]
+pub fn LanguageSwitcher() -> impl IntoView {
+    let i18n = expect_context::<I18n>();
+    view! {
+        <div class="lang">
+            <select class="lang-list" name="languages"
+            on:change:target=move |event| {
+                let selected: String = event.target().value();
+                let find =i18n.languages.iter().find(|lang| lang.id.to_string() == selected);
+                if let Some(lang) = find {
+                    i18n.language.set(lang);
+                }
+            }
+            >
+            {move || {
+                let selected = i18n.language.get();
+                i18n.languages.iter().map(|lang| render_id(lang, selected)).collect::<Vec<_>>()
+            }}
+            </select>
+        </div>
+    }
+}
+
+fn render_id(lang: &'static Language, selected: &'static Language) -> impl IntoView {
+    view! {
+            <option selected=move || lang == selected
+                class="lang-item"
+                value={lang}
+                >{move || lang.id.to_string()}</option>
+    }
+}
 
 fn render_language(lang: &'static Language) -> impl IntoView {
     let i18n = expect_context::<I18n>();
@@ -49,7 +79,7 @@ fn render_language(lang: &'static Language) -> impl IntoView {
                 id=lang
                 value=lang
                 name="language"
-                checked=i18n.language.get() == lang
+                checked=move ||i18n.language.get() == lang
                 on:click=move |_| i18n.language.set(lang)
                 type="radio"
             />

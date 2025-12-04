@@ -1,6 +1,4 @@
 use crate::components::chat_context::ChatContext;
-use leptos::attr::href;
-use leptos::html::A;
 use leptos::prelude::*;
 use leptos::{IntoView, component, view};
 

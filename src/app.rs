@@ -1,7 +1,7 @@
 use crate::auth::Auth;
 use crate::components::chat::Chat;
 use crate::components::chat_context::ChatContext;
-use crate::components::play::{I18nProvider, LanguageSelector};
+use crate::components::lang::{I18nProvider, LanguageSelector};
 use crate::components::side_body::SideBody;
 use crate::components::side_top::SideTop;
 use crate::components::sidebar::SideBar;

@@ -1,4 +1,4 @@
-use crate::app::LogoutButton;
+use crate::{app::LogoutButton, components::lang::LanguageSwitcher};
 use leptos::prelude::*;
 
 #[component]
@@ -43,5 +43,6 @@ where
         </div>
         <div class="sb-hoverStrip" on:mouseenter=move |_| set_is_collapsed.set(false)></div>
         <LogoutButton />
+        <LanguageSwitcher />
     }
 }
