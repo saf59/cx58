@@ -2,6 +2,7 @@ use crate::components::chat_context::ChatContext;
 use leptos::prelude::*;
 use leptos::reactive::spawn_local;
 use leptos::*;
+use leptos_fluent::move_tr;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use wasm_bindgen::JsCast;
@@ -176,7 +177,7 @@ pub fn Chat() -> impl IntoView {
                                 }
                             }
                         }
-                        placeholder="Ask me anything..."
+                        placeholder= move || {move_tr!("ask-me-anything")}
                         class="input-zone"
                         prop:disabled=is_loading
                     />

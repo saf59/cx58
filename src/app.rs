@@ -1,7 +1,7 @@
 use crate::auth::Auth;
 use crate::components::chat::Chat;
 use crate::components::chat_context::ChatContext;
-use crate::components::lang::{I18nProvider, LanguageSelector};
+use crate::components::lang::{I18nProvider, LanguageSelector, LanguageSwitcher};
 use crate::components::side_body::SideBody;
 use crate::components::side_top::SideTop;
 use crate::components::sidebar::SideBar;
@@ -9,6 +9,7 @@ use crate::components::user_info::UserRolesDisplay;
 use crate::server_fn::*;
 use leptos::IntoView;
 use leptos::prelude::*;
+use leptos_fluent::move_tr;
 use leptos_meta::{Link, MetaTags, Stylesheet, Title, provide_meta_context};
 use leptos_router::components::ParentRoute;
 use leptos_router::components::{Route, Router, Routes};
@@ -154,14 +155,14 @@ fn PlayPage() -> impl IntoView {
 fn PublicLandingPage() -> impl IntoView {
     view! {
         <div class="centered  bg_oidc">
-            <h1>"Welcome! You are authenticated!"</h1>
+            <h1>{move_tr!("welcome-authenticated")}</h1>
             <p>
-                <span>"This is the public"</span>
+                <span>{move_tr!("this-is-the-public")}</span>
                 <span class="cx58">"Construct-X/5.8"</span>
-                <span>"home page."</span>
+                <span>{move_tr!("home-page")}</span>
             </p>
-            <p>"Unfortunately, you do not have access to any objects."</p>
-            <p>"Please contact the administrator to gain access!"</p>
+            <p>{move_tr!("no-access")}</p>
+            <p>{move_tr!("no-access-message")}</p>
             <LogoutButton />
         </div>
     }
@@ -170,9 +171,10 @@ fn PublicLandingPage() -> impl IntoView {
 fn LoginPage() -> impl IntoView {
     view! {
         <div class="centered bg_oidc">
-            <h3>"Welcome  to CX58!"</h3>
-            <h3>You are unauthenticated!</h3>
+            <h3>{move_tr!("welcome-cx58")}</h3>
+            <h3>{move_tr!("you-are-unauthenticated")}</h3>
             <LoginButton />
+            <LanguageSwitcher/>
         </div>
     }
 }
@@ -203,7 +205,7 @@ pub fn LoginButton() -> impl IntoView {
         // it is axum route - not leptos
         <a href="/login" class="sign" rel="external">
             <i class="fa fa-sign-in"></i>
-            <span>Log In</span>
+            <span>{move_tr!("log-in")}</span>
         </a>
     }
 }
@@ -233,7 +235,7 @@ fn NotFoundPage() -> impl IntoView {
         resp.set_status(reqwest::StatusCode::NOT_FOUND);
     }
     view! {
-        <h1>"404 - Page Not Found"</h1>
-        <p>"The requested page was not found."</p>
+        <h1>{move_tr!("p404")}</h1>
+        <p>{move_tr!("page-not-found")}</p>
     }
 }
