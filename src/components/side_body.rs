@@ -7,12 +7,7 @@ use leptos_fluent::{I18n, move_tr};
 pub fn SideBody(is_admin: bool) -> impl IntoView {
     let ctx = use_context::<ChatContext>().expect("ChatContext must be provided");
     let i18n = expect_context::<I18n>();
-    let faq_questions = //move || {
-        vec!["tell-me-story", "say-10"]
-            .iter()
-            .map(|q| i18n.tr(q))
-            .collect::<Vec<String>>();
-    //};
+    let faq_questions = vec!["tell-me-story", "say-10"];
     let (faq_toggled, set_faq_toggled) = signal(true);
 
     view! {
@@ -29,14 +24,12 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
         <div class="faq-buttons" class:none=move || faq_toggled.get()>
             {faq_questions
                 .into_iter()
-                .map(|question| {
-                    let question = question.to_string();
+                .map(|key| {
+                    let question = move || i18n.tr(key);
                     view! {
-                        <a on:click=move |_| {
-                            ctx.insert_text.set(Some(question.clone()));
-                        }>
+                        <a on:click=move |_| ctx.insert_text.set(Some(question()))>
                             <i class="fas fa-question"></i>
-                            <span>{question.clone()}</span>
+                            <span>{question}</span>
                         </a>
                     }
                 })

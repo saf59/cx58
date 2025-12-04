@@ -19,3 +19,6 @@ home = Startseite
 play = Spielen
 profile = Profil
 users = Benutzer
+
+tell-me-story = Tell me DE story
+say-10 = Say DE 10
