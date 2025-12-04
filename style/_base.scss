@@ -1,37 +1,43 @@
 html {
-  width: 100%;
-  height: 100%;
+    width: 100%;
+    height: 100%;
 }
 
 body {
-  font-family: system-ui, -apple-system, sans-serif;
-  text-align: center;
-  width: 100%;
-  height: 100%;
-  min-height: 100vh;
-  margin: 0;
-  padding: 0;
-  align-items: center;
+    font-family:
+        system-ui,
+        -apple-system,
+        sans-serif;
+    text-align: center;
+    width: 100%;
+    height: 100%;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    align-items: center;
 }
 
 .none {
-  display: none;
+    display: none;
 }
 
 .centered {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  width: 100vw;
-  height: 100vh;
-  padding: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100vw;
+    height: 100vh;
+    padding: 10px;
 }
 .cx58 {
-  color: var(--cx58-color);
-  margin: 10px;
-  font-size: 1.1em;
+    color: var(--cx58-color);
+    margin: 10px;
+    font-size: 1.1em;
+}
+.cx58-color {
+    color: var(--cx58-color);
 }
 .bg_oidc {
-  background-color: var(--bg-oidc);
+    background-color: var(--bg-oidc);
 }

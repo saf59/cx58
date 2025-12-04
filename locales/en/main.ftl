@@ -2,7 +2,8 @@
 select-a-language = Select a language:
 language-selected-is = The selected language is { $lang }.
 
-welcome-cx58 = Welcome  to CX58!
+logo = CX-5.8
+welcome-cx58 = Welcome  to CX-5.8!
 you-are-unauthenticated = You are unauthenticated!
 welcome-authenticated = Welcome! You are authenticated!
 log-in = Log In
@@ -13,3 +14,16 @@ home-page = home page.
 no-access = Unfortunately, you do not have access to any objects.
 no-access-message = Please contact the administrator to gain access!
 ask-me-anything = Ask me anything...
+new-chat = New chat
+faq = FAQ
+objects = Objects
+home = Home
+play = Play
+profile = Profile
+users = Users
+start = Start
+stop = Stop
+
+# questions
+tell-me-story = Tell me story
+say-10 = Say 10

@@ -1,18 +1,31 @@
-.tooltip .tooltiptext {
-  visibility: hidden;
-  width: 120px;
-  background-color: var(--tooltip-bgcolor);
-  color: var(--accent-color);
-  text-align: center;
-  border-radius: 6px;
-  padding: 10px 0;
-  /* Position the tooltip */
-  position: absolute;
-  z-index: 1;
-  white-space: nowrap;
-  margin-left: 5px;
+.input-submit[data-descr],
+.tooltip[data-descr] {
+    cursor: help;
 }
 
-.tooltip:hover .tooltiptext {
-  visibility: visible;
+.input-submit[data-descr]:hover::after,
+.tooltip[data-descr]:hover::after {
+    content: attr(data-descr);
+    position: absolute;
+    background-color: var(--cx58-color);
+    z-index: 1;
+    border-width: 1px;
+    border-style: solid;
+    color: #fff;
+    border-color: var(--text-color);
+    border-image: initial;
+    border-radius: 5px;
+    padding: 5px;
+    font-family:
+        system-ui,
+        -apple-system,
+        sans-serif;
+    font-weight: normal;
+}
+
+.input-submit[data-descr]:hover::after {
+    top: -25px;
+}
+.tooltip[data-descr]:hover::after {
+    top: 30px;
 }

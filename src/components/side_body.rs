@@ -1,23 +1,30 @@
 use crate::components::chat_context::ChatContext;
 use leptos::prelude::*;
 use leptos::{IntoView, component, view};
+use leptos_fluent::{I18n, move_tr};
 
 #[component]
 pub fn SideBody(is_admin: bool) -> impl IntoView {
     let ctx = use_context::<ChatContext>().expect("ChatContext must be provided");
-    let faq_questions = vec!["Tell me story", "Say 10"];
+    let i18n = expect_context::<I18n>();
+    let faq_questions = //move || {
+        vec!["tell-me-story", "say-10"]
+            .iter()
+            .map(|q| i18n.tr(q))
+            .collect::<Vec<String>>();
+    //};
     let (faq_toggled, set_faq_toggled) = signal(true);
 
     view! {
         <a on:click=move |_| ctx.clear_history.set(true)>
             <i class="fas fa-edit"></i>
-            <span>New chat</span>
+            <span>{move || move_tr!("new-chat")}</span>
         </a>
         <a on:click=move |_| {
             set_faq_toggled.try_update(|value| *value = !*value);
         }>
             <i class="fas fa-book"></i>
-            <span>FAQ</span>
+            <span>{move || move_tr!("faq")}</span>
         </a>
         <div class="faq-buttons" class:none=move || faq_toggled.get()>
             {faq_questions
@@ -37,17 +44,17 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
         </div>
         <a href="#">
             <i class="fas fa-building"></i>
-            <span>Objects</span>
+            <span>{move || move_tr!("objects")}</span>
         </a>
 
         <hr />
         <a href="/">
             <i class="fas fa-home"></i>
-            <span>Home</span>
+            <span>{move || move_tr!("home")}</span>
         </a>
         <a href="/play">
             <i class="fas fa-gear"></i>
-            <span>Play</span>
+            <span>{move || move_tr!("play")}</span>
         </a>
         <hr />
 
@@ -55,11 +62,11 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
             view! {
                 <a href="/profile">
                     <i class="fas fa-user"></i>
-                    <span>Profile</span>
+                    <span>{move || move_tr!("profile")}</span>
                 </a>
                 <a href="#">
                     <i class="fas fa-users"></i>
-                    <span>Users</span>
+                    <span>{move || move_tr!("users")}</span>
                 </a>
             }
                 .into_any()

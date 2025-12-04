@@ -20,9 +20,7 @@ where
                 }
             >
                 <header class="sb-sideHeader">
-                    <button class="tooltip sb-pin" on:click=move |_| set_is_pinned.set(true)>
-                        <span class="tooltiptext">Pin sidebar</span>
-                    </button>
+                    <button class="tooltip sb-pin" on:click=move |_| set_is_pinned.set(true) data-descr="Pin sidebar"/>
                     <div class="sb-side-top">{top.into_view()}</div>
                     <button
                         class="tooltip sb-unpin"
@@ -30,9 +28,7 @@ where
                             set_is_pinned.set(false);
                             set_is_collapsed.set(true)
                         }
-                    >
-                        <span class="tooltiptext">Hide sidebar</span>
-                    </button>
+                        data-descr="Hide sidebar"/>
                 </header>
                 <div class="sb-sidebar-body">{side_body.into_view()}</div>
             </div>

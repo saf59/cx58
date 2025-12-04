@@ -177,7 +177,7 @@ pub fn Chat() -> impl IntoView {
                                 }
                             }
                         }
-                        placeholder= move || {move_tr!("ask-me-anything")}
+                        placeholder= {move_tr!("ask-me-anything")}
                         class="input-zone"
                         prop:disabled=is_loading
                     />
@@ -187,12 +187,14 @@ pub fn Chat() -> impl IntoView {
                         class="input-submit"
                         class=(["fa", "fa-stop-circle"], move || is_loading.get())
                         class=(["none"], move || !is_loading.get())
+                        data-descr={move_tr!("stop")}
                     />
                     <button
                         type="submit"
                         class="input-submit"
                         class=(["fa", "fa-arrow-up"], move || !is_loading.get())
                         class:none=move || is_loading.get()
+                        data-descr={move_tr!("start")}
                     />
                 </form>
             </div>
