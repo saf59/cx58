@@ -5,7 +5,6 @@
         color: var(--4-color);
         box-sizing: border-box;
         transition: all 0.5s ease;
-        height: 30px;
         line-height: 30px;
         cursor: pointer;
     }
@@ -23,23 +22,21 @@
         align-content: center;
     }
 
-    a span {
-        // letter-spacing: 1px;
-    }
-
     .faq-buttons {
         padding-left: 10px;
         transition: all 0.5s ease;
-
+        display: flex;
+        flex-direction: column;
         a {
-            height: 30px;
-            line-height: 30px;
+            align-items: baseline;
         }
-
         a.active,
         a:hover {
             color: var(--d-color);
             background: var(--6-color);
+        }
+        .faq-question {
+            text-align: left;
         }
     }
 }

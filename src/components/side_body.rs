@@ -32,7 +32,7 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
                     view! {
                         <a on:click=move |_| ctx.insert_text.set(Some(question()))>
                             <i class="fas fa-question"></i>
-                            <span>{question.clone()}</span>
+                            <span class="faq-question">{question.clone()}</span>
                         </a>
                     }
                 })
