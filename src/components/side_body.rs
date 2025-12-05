@@ -12,7 +12,8 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
         .map(|i| format!("q-{}", i))
         .collect::<Vec<String>>();
     let (faq_toggled, set_faq_toggled) = signal(true);
-
+    let (obj_toggled, set_obj_toggled) = signal(true);
+    //let show_objects = move || obj_toggled.get();
     view! {
         <a on:click=move |_| ctx.clear_history.set(true)>
             <i class="fas fa-edit"></i>
@@ -24,7 +25,7 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
             <i class="fas fa-book"></i>
             <span>{move || move_tr!("faq")}</span>
         </a>
-        <div class="faq-buttons" class:none=move || faq_toggled.get()>
+        <div class="faq-area" class:none=move || faq_toggled.get()>
             {faq_questions
                 .into_iter()
                 .map(|key| {
@@ -38,11 +39,13 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
                 })
                 .collect_view()}
         </div>
-        <a href="#">
+        <a on:click=move |_| { set_obj_toggled.try_update(|value| *value = !*value);}>
             <i class="fas fa-building"></i>
             <span>{move || move_tr!("objects")}</span>
         </a>
-
+        <Show when= move || obj_toggled.get() fallback=|| view! { <Objects/> } >
+            view!{}
+        </Show>
         <hr />
         <a href="/">
             <i class="fas fa-home"></i>
@@ -69,5 +72,31 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
         } else {
             ().into_any()
         }}
+    }
+}
+#[component]
+fn Objects() -> impl IntoView {
+    view! {
+        <div class="obj-area">
+        <details>
+            <summary>
+                <span class="node-content">Obj 1</span>
+            </summary>
+            <div class="leaf">
+                <span class="node-content">Building 2.1</span>
+            </div>
+            <details>
+                <summary>
+                    <span class="node-content">Building 2.2</span>
+                </summary>
+                <div class="leaf">
+                    <span class="node-content">Room 2.2.1</span>
+                </div>
+                <div class="leaf">
+                    <span class="node-content">Room 2.2.2</span>
+                </div>
+            </details>
+        </details>
+        </div>
     }
 }
