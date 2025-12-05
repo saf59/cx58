@@ -24,6 +24,6 @@ users = Users
 start = Start
 stop = Stop
 
-# questions
-tell-me-story = Tell me story
-say-10 = Say 10
+# FAQ
+q-1 = Tell me story
+q-2 = Say 10
