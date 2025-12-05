@@ -1,7 +1,7 @@
 # locales/de/main.ftl
-select-a-language = Wählen Sie eine Sprache:
-language-selected-is = Die ausgewählte Sprache ist { $lang }.
-welcome-cx58 = Willkommen bei CX58!
+
+logo = CX-5.8
+welcome-cx58 = Willkommen bei CX-5.8!
 you-are-unauthenticated = Sie sind nicht authentifiziert!
 welcome-authenticated = Willkommen! Sie sind authentifiziert!
 log-in = Anmelden
@@ -11,14 +11,21 @@ this-is-the-public = Dies ist die öffentliche
 home-page = Startseite.
 no-access = Leider haben Sie keinen Zugriff auf Objekte.
 no-access-message = Bitte kontaktieren Sie den Administrator, um Zugriff zu erhalten!
-ask-me-anything = Fragen Sie mich etwas...
+ask-me-anything = Frag mich alles...
 new-chat = Neuer Chat
 faq = FAQ
 objects = Objekte
 home = Startseite
-play = Spielen
+play = In Arbeit
 profile = Profil
 users = Benutzer
+start = Start
+stop = Stopp
+
 # FAQ
-q-1 = Tell me DE story
-q-2 = Say DE 10
+q-1 = Erzähl mir eine Geschichte
+q-2 = Sag 10
+
+# Under construction
+select-a-language = Wählen Sie eine Sprache:
+language-selected-is = Die ausgewählte Sprache ist { $lang }.

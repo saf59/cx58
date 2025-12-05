@@ -1,6 +1,4 @@
 # locales/en/main.ftl
-select-a-language = Select a language:
-language-selected-is = The selected language is { $lang }.
 
 logo = CX-5.8
 welcome-cx58 = Welcome  to CX-5.8!
@@ -18,7 +16,7 @@ new-chat = New chat
 faq = FAQ
 objects = Objects
 home = Home
-play = Play
+play = Under construction
 profile = Profile
 users = Users
 start = Start
@@ -27,3 +25,7 @@ stop = Stop
 # FAQ
 q-1 = Tell me story
 q-2 = Say 10
+
+# Under construction
+select-a-language = Select a language:
+language-selected-is = The selected language is { $lang }.
