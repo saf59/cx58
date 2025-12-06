@@ -1,0 +1,92 @@
+.tree details {
+    margin-left: 20px;
+    position: relative;
+    padding-left: 0px;
+    text-align: left;
+}
+
+.tree details::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+}
+
+details i {
+    color: #666;
+}
+
+.tree summary {
+    cursor: pointer;
+    padding: 0 2px;
+    margin-bottom: 2px;
+    list-style: none;
+    position: relative;
+    user-select: none;
+}
+
+.tree summary::-webkit-details-marker {
+    display: none;
+}
+
+.tree summary::before {
+    content: "▶";
+    display: inline-block;
+    transition: transform 0.2s;
+    color: #666;
+}
+
+.tree details[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+.tree summary:hover {
+    border-radius: 4px;
+}
+
+.node-content {
+    display: inline-block;
+    padding: 2px 8px;
+    //background: #e3f2fd;
+    border-radius: 4px;
+    font: menu;
+    cursor: pointer;
+    color: var(--text-color);
+}
+.leaf .node-content:hover,
+.node-content:hover {
+    color: var(--2-color);
+    background: #e3f2fd;
+}
+.node-content .fas {
+    margin-right: 4px;
+}
+
+.leaf {
+    margin: 0 0 2px 12px;
+    padding: 0px 5px 0px 18px;
+    position: relative;
+}
+
+.leaf::before {
+    content: "•";
+    position: absolute;
+    left: 14px;
+    color: #666;
+}
+
+.leaf .node-content {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+}
+
+.tree details details::after {
+    content: "";
+    position: absolute;
+    top: 20px;
+    left: 0;
+    width: 20px;
+}

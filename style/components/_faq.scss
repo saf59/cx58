@@ -1,0 +1,33 @@
+.faq-area {
+    margin-top: 2px;
+}
+.faq {
+    display: flex;
+    align-items: start;
+    padding: 0 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 0 0 2px 15px;
+}
+
+.faq i {
+    padding-block: 2px;
+    color: #666;
+}
+
+.faq-item {
+    padding: 2px 8px;
+    color: var(--text-color);
+    border-radius: 4px;
+    font: menu;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+}
+
+.faq-item:hover {
+    color: var(--2-color);
+    background: #e3f2fd;
+}
