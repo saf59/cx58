@@ -2,6 +2,7 @@ use crate::components::chat_context::ChatContext;
 use leptos::prelude::*;
 use leptos::{IntoView, component, view};
 use leptos_fluent::{I18n, move_tr};
+use web_sys::MouseEvent;
 
 #[component]
 pub fn SideBody(is_admin: bool) -> impl IntoView {
@@ -19,6 +20,7 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
             <i class="fas fa-edit"></i>
             <span>{move || move_tr!("new-chat")}</span>
         </a>
+
         <a on:click=move |_| {
             set_faq_toggled.try_update(|value| *value = !*value);
         }>
@@ -31,22 +33,26 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
                 .map(|key| {
                     let question = move || i18n.tr(&key);
                     view! {
-                        <a on:click=move |_| ctx.insert_text.set(Some(question()))>
+                        <div class="faq" on:click=move |_| ctx.insert_text.set(Some(question()))>
                             <i class="fas fa-question"></i>
-                            <span class="faq-question">{question.clone()}</span>
-                        </a>
+                            <span class="faq-item">{question.clone()}</span>
+                        </div>
                     }
                 })
                 .collect_view()}
         </div>
+
         <a on:click=move |_| { set_obj_toggled.try_update(|value| *value = !*value);}>
             <i class="fas fa-building"></i>
             <span>{move || move_tr!("objects")}</span>
         </a>
+
         <Show when= move || obj_toggled.get() fallback=|| view! { <Objects/> } >
-            view!{}
+            {().into_view()}
         </Show>
+
         <hr />
+
         <a href="/">
             <i class="fas fa-home"></i>
             <span>{move || move_tr!("home")}</span>
@@ -76,24 +82,42 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
 }
 #[component]
 fn Objects() -> impl IntoView {
+    let ctx = use_context::<ChatContext>().expect("ChatContext must be provided");
     view! {
-        <div class="obj-area">
+        <div class="obj-area tree">
         <details>
             <summary>
-                <span class="node-content">Obj 1</span>
+                    <span class="node-content"><i class="fas fa-building"></i >Object 1</span>
             </summary>
             <div class="leaf">
-                <span class="node-content">Building 2.1</span>
+                <span class="node-content"><i class="fas fa-image"></i >"2025-12-12 16:00:01"</span>
+            </div>
+            <div class="leaf">
+                <span class="node-content"><i class="fas fa-video"></i >"2025-12-12 17:00:01"</span>
+            </div>
+        </details>
+
+        <details>
+            <summary>
+                <span class="node-content"><i class="fas fa-building"></i >Object 2</span>
+            </summary>
+            <div class="leaf">
+                <span class="node-content"><i class="fas fa-image"></i >"2025-12-12 16:00:01"</span>
             </div>
             <details>
                 <summary>
-                    <span class="node-content">Building 2.2</span>
+                    <span class="node-content" on:click=move |e:MouseEvent| {
+                        leptos::logging::log!("Clicked on Room 123");
+                        ctx.insert_text.set(Some("Room 123".to_string()));
+                        e.stop_propagation();
+                        e.prevent_default();
+                    }><i class="fas fa-building"></i >Room 123</span>
                 </summary>
                 <div class="leaf">
-                    <span class="node-content">Room 2.2.1</span>
+                    <span class="node-content"><i class="fas fa-image"></i >"2025-12-12 16:00:01"</span>
                 </div>
                 <div class="leaf">
-                    <span class="node-content">Room 2.2.2</span>
+                    <span class="node-content"><i class="fas fa-image"></i >{"2025-12-12 16:00:01"}</span>
                 </div>
             </details>
         </details>
