@@ -12,7 +12,7 @@ pub fn I18nProvider(children: Children) -> impl IntoView {
         initial_language_from_navigator: true,
         initial_language_from_navigator_to_cookie: true,
         initial_language_from_accept_language_header: true,
-        check_translations: true,
+        //check_translations: true,
         cookie_name: "lf-lang",
     }
 }

@@ -8,7 +8,7 @@ use web_sys::MouseEvent;
 pub fn SideBody(is_admin: bool) -> impl IntoView {
     let ctx = use_context::<ChatContext>().expect("ChatContext must be provided");
     let i18n = expect_context::<I18n>();
-    let num_questions = 2;
+    let num_questions = 7;
     let faq_questions = (1..=num_questions)
         .map(|i| format!("q-{}", i))
         .collect::<Vec<String>>();
