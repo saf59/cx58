@@ -23,8 +23,13 @@ start = Start
 stop = Stopp
 
 # FAQ
-q-1 = Erzähl mir eine Geschichte
-q-2 = Sag 10
+q-1 = Meine Objekte anzeigen
+q-2 = Letzte Änderungen anzeigen
+q-3 = Letzte Änderungen anzeigen für
+q-4 = Datei anzeigen
+q-5 = Dateibeschreibung anzeigen
+q-6 = Letzte Änderungen beschreiben
+q-7 = Änderungen beschreiben für
 
 # Under construction
 select-a-language = Wählen Sie eine Sprache:

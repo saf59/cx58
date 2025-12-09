@@ -23,8 +23,13 @@ start = Start
 stop = Stop
 
 # FAQ
-q-1 = Tell me story
-q-2 = Say 10
+q-1 = Show my objects
+q-2 = Show latest changes
+q-3 = Show latest changes for
+q-4 = Show file
+q-5 = Show file description
+q-6 = Describe latest changes
+q-7 = Describe changes for
 
 # Under construction
 select-a-language = Select a language:
