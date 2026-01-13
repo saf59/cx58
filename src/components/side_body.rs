@@ -1,4 +1,7 @@
+use crate::auth::Auth;
 use crate::components::chat_context::ChatContext;
+use crate::components::show_tree::DetailsTreeRendererWithContext;
+use crate::components::tree::TreeViewerResource;
 use leptos::prelude::*;
 use leptos::{IntoView, component, view};
 use leptos_fluent::{I18n, move_tr};
@@ -82,6 +85,44 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
 }
 #[component]
 fn Objects() -> impl IntoView {
+    let ctx = use_context::<ChatContext>().expect("ChatContext must be provided");
+    let auth_signal = use_context::<RwSignal<Auth>>().expect("Auth must be provided");
+
+    let email = auth_signal
+        .get_untracked()
+        .email()
+        .unwrap_or("mock".to_string());
+
+    view! {
+        <ErrorBoundary
+            fallback=|errors| view! {
+                <div class="error-boundary">
+                    <h3>"Error occurred:"</h3>
+                    <pre>{move || format!("{:#?}", errors.get())}</pre>
+                </div>
+            }
+        >
+            <TreeViewerResource
+                user_id=email
+                with_leafs=false
+                renderer=move |tree| {
+                    tracing::info!("Rendering tree with {} nodes", tree.len());
+                    view! {
+                        <DetailsTreeRendererWithContext
+                            tree=tree
+                            on_node_click=move |name| {
+                                tracing::info!("Node clicked: {}", name);
+                                ctx.insert_text.set(Some(name));
+                            }
+                        />
+                    }
+                }
+            />
+        </ErrorBoundary>
+    }
+}
+#[component]
+fn Objects1() -> impl IntoView {
     let ctx = use_context::<ChatContext>().expect("ChatContext must be provided");
     view! {
         <div class="obj-area tree">

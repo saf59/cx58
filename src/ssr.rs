@@ -37,6 +37,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::Mutex;
+use tokio::task::id;
 #[allow(unused_imports)]
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -260,7 +261,7 @@ pub async fn leptos_main_handler(
 pub async fn login_handler(State(state): State<AppState>, jar: CookieJar) -> impl IntoResponse {
     let (auth_url, csrf_token, nonce, pkce_verifier) = state.oidc_client.authorize_url();
 
-    let session_id = Uuid::new_v4().to_string();
+    let session_id = Uuid::now_v7().to_string();
 
     state.sessions.lock().await.insert(
         session_id.clone(),
@@ -275,6 +276,7 @@ pub async fn login_handler(State(state): State<AppState>, jar: CookieJar) -> imp
             roles: HashSet::new(),
             id_token_expires_at: None,
             is_refreshing: Mutex::new(false).into(),
+            email: None,
         },
     );
 
@@ -391,8 +393,10 @@ pub async fn callback_handler(
 
                 if let Ok(claims_json) = serde_json::to_value(claims) {
                     session.roles = extract_roles_from_claims(&claims_json);
+                    //println!("Claims json: {:#?}", claims_json);
                     // Name is also extracted here
                     session.name = Some(extract_name_from_claims(&claims_json));
+                    session.email = extract_email_from_claims(&claims_json);
                     roles_extracted = !session.roles.is_empty();
                 }
                 session.id_token = Some(id_token.to_string());
@@ -402,7 +406,11 @@ pub async fn callback_handler(
             if !roles_extracted {
                 let access_token = token_response.access_token();
                 if let Some(access_token_claims) = extract_claims_from_access_token(access_token) {
+                    //println!("Access Token Claims: {:#?}", access_token_claims);
                     session.roles = extract_roles_from_claims(&access_token_claims);
+                    if session.email.is_none() {
+                        session.email = extract_email_from_claims(&access_token_claims);
+                    }
                 }
             }
 

@@ -7,6 +7,7 @@ async fn main() {
         routing::{get, post},
     }; //post
     use gmr::stop::stop_handler;
+    use gmr::proxy_tree::proxy_tree_handler;
     use gmr::{app::*, llm_stream::*, ssr::*, state::AppState};
     use leptos_axum::file_and_error_handler;
     use leptos_axum::{LeptosRoutes, generate_route_list};
@@ -29,6 +30,7 @@ async fn main() {
             post(leptos_server_fn_handler).get(leptos_server_fn_handler),
         )
         .route("/api/stop", post(stop_handler))
+        .route("/api/proxy/tree/{user_id}", get(proxy_tree_handler))
         .route("/api/chat_stream", axum::routing::post(chat_stream_handler))
         .leptos_routes_with_handler(leptos_routes.clone(), leptos_main_handler)
         .layer(middleware::from_fn_with_state(
@@ -51,7 +53,6 @@ async fn main() {
     );
     //info!("{:#?}", &leptos_routes);
     axum::serve(listener, app.into_make_service())
-        .with_graceful_shutdown(shutdown_signal())
         .await
         .unwrap();
 }
@@ -61,32 +62,4 @@ pub fn main() {
     // no client-side main function
     // unless we want this to work with e.g., Trunk for pure client-side testing
     // see lib.rs for hydration function instead
-}
-#[cfg(feature = "ssr")]
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to install Ctrl+C handler");
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("Failed to install SIGTERM handler")
-            .recv()
-            .await;
-    };
-
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c => {
-            log::info!("Received Ctrl+C, shutting down...");
-        },
-        _ = terminate => {
-            log::info!("Received SIGTERM, shutting down...");
-        },
-    }
 }

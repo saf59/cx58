@@ -50,7 +50,7 @@ pub struct Message {
 impl Message {
     fn new(role: MessageRole, content: String) -> Self {
         Self {
-            id: uuid::Uuid::new_v4().to_string(),
+            id: uuid::Uuid::now_v7().to_string(),
             role,
             content,
         }
@@ -64,7 +64,7 @@ pub fn Chat() -> impl IntoView {
     let (is_loading, set_is_loading) = signal(false);
     let chat_history_ref = NodeRef::new();
     let form_ref = NodeRef::<html::Form>::new();
-    let session_id = uuid::Uuid::new_v4().to_string();
+    let session_id = uuid::Uuid::now_v7().to_string();
 
     //  Subscribe to context
     if let Some(ctx) = use_context::<ChatContext>() {

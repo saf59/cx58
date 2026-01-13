@@ -13,6 +13,7 @@ pub enum Auth {
 pub struct AuthenticatedUser {
     pub subject: String,
     pub name: String,
+    pub email: Option<String>,
     pub roles: HashSet<Role>,
 }
 impl Auth {
@@ -22,6 +23,14 @@ impl Auth {
     pub fn user(&self) -> Option<AuthenticatedUser> {
         if let Auth::Authenticated(user) = self {
             Some(user.clone())
+        } else {
+            None
+        }
+    }
+    pub fn email(&self) -> Option<String> {
+        if let Auth::Authenticated(user) = self
+        && user.email.is_some() {
+            user.email.clone()
         } else {
             None
         }

@@ -1,15 +1,18 @@
 use crate::auth::*;
 use crate::state::AppState;
 use axum::{
+    Error,
     extract::FromRequestParts,
     http::request::Parts,
     response::{IntoResponse, Redirect, Response},
-    Error,
 };
 use axum_extra::extract::CookieJar;
 use leptos::serde_json;
 use oauth2::{CsrfToken, PkceCodeVerifier, RefreshToken, TokenResponse};
-use openidconnect::{core::{CoreIdToken, CoreIdTokenClaims}, Nonce};
+use openidconnect::{
+    Nonce,
+    core::{CoreIdToken, CoreIdTokenClaims},
+};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -30,6 +33,7 @@ pub struct SessionData {
     pub roles: HashSet<Role>,
     pub id_token_expires_at: Option<Instant>,
     pub is_refreshing: Arc<Mutex<bool>>,
+    pub email: Option<String>,
 }
 const REFRESH_THRESHOLD: Duration = Duration::from_secs(5 * 60);
 
@@ -44,6 +48,10 @@ fn extract_auth_user(
         Ok(AuthenticatedUser {
             subject: claims.subject().to_string(),
             name: extract_name_from_claims(&claims_json), // UPDATED
+            email: claims
+                .email()
+                .map(|e| e.to_string())
+                .or_else(|| session.email.clone()),
             roles: session.roles.clone(),
         })
     } else {
@@ -52,6 +60,10 @@ fn extract_auth_user(
         Ok(AuthenticatedUser {
             subject: claims.subject().to_string(),
             name: claims.subject().to_string(),
+            email: claims
+                .email()
+                .map(|e| e.to_string())
+                .or_else(|| session.email.clone()),
             roles: session.roles.clone(),
         })
     }
@@ -66,10 +78,7 @@ async fn save_session_data_in_store(
     map_guard.insert(session_id, data);
 }
 
-pub async fn get_and_refresh_session(
-    state: &AppState,
-    session_id: &str,
-) -> Option<SessionData> {
+pub async fn get_and_refresh_session(state: &AppState, session_id: &str) -> Option<SessionData> {
     let session_data = {
         let sessions = state.sessions.lock().await;
         sessions.get(session_id).cloned()?
@@ -77,15 +86,20 @@ pub async fn get_and_refresh_session(
 
     let now = Instant::now();
 
-    if session_data.id_token_expires_at.is_some_and(|exp_at| now >= exp_at) {
+    if session_data
+        .id_token_expires_at
+        .is_some_and(|exp_at| now >= exp_at)
+    {
         return None;
     }
 
     let needs_refresh = session_data.id_token_expires_at.is_some_and(|exp_at| {
-        exp_at.checked_sub(REFRESH_THRESHOLD).is_some_and(|future_time| {
-            //trace_time("Refresh time at",&Some(future_time));
-            future_time <= now
-        })
+        exp_at
+            .checked_sub(REFRESH_THRESHOLD)
+            .is_some_and(|future_time| {
+                //trace_time("Refresh time at",&Some(future_time));
+                future_time <= now
+            })
     });
 
     if needs_refresh && session_data.refresh_token.is_some() {
@@ -101,13 +115,14 @@ pub async fn get_and_refresh_session(
             let http_client_clone = state.async_http_client.clone();
 
             tokio::spawn(async move {
-                tracing::info!("Background refresh started for session: {}", session_id_clone);
+                tracing::info!(
+                    "Background refresh started for session: {}",
+                    session_id_clone
+                );
 
-                match perform_token_refresh(
-                    refresh_token,
-                    &oidc_client_clone,
-                    &http_client_clone
-                ).await {
+                match perform_token_refresh(refresh_token, &oidc_client_clone, &http_client_clone)
+                    .await
+                {
                     Ok((new_id_token, new_refresh_token, new_expires_at)) => {
                         let updated_session = {
                             let mut guard = session_store_clone.lock().await;
@@ -126,9 +141,14 @@ pub async fn get_and_refresh_session(
                         };
 
                         if let Some(data) = updated_session {
-                            save_session_data_in_store(&session_store_clone, session_id_clone, data).await;
+                            save_session_data_in_store(
+                                &session_store_clone,
+                                session_id_clone,
+                                data,
+                            )
+                            .await;
                         }
-                    },
+                    }
                     Err(_e) => {
                         //tracing::error!("Token refresh failed for session {}: {:?}", session_id_clone, e);
                         let guard = session_store_clone.lock().await;
@@ -143,12 +163,17 @@ pub async fn get_and_refresh_session(
     Some(session_data)
 }
 
-pub fn trace_time(text:&str,id_token_expires_at: &Option<Instant>) {
+pub fn trace_time(text: &str, id_token_expires_at: &Option<Instant>) {
     if let Some(expiry_instant) = id_token_expires_at {
         let duration_left = expiry_instant.saturating_duration_since(Instant::now());
         if let Ok(chrono_duration) = chrono::Duration::from_std(duration_left) {
             let local_expiry = chrono::Local::now() + chrono_duration;
-            tracing::info!("{} (Local): {}",text,local_expiry.format("%Y-%m-%d %H:%M:%S")                       ); }
+            tracing::info!(
+                "{} (Local): {}",
+                text,
+                local_expiry.format("%Y-%m-%d %H:%M:%S")
+            );
+        }
     }
 }
 
@@ -173,8 +198,7 @@ where
         // 1st
         {
             let sessions = state.sessions.lock().await;
-            let Some(local_session) = sessions.get(&session_id)
-            else {
+            let Some(local_session) = sessions.get(&session_id) else {
                 return Err(Redirect::to("/login").into_response());
             };
             session = local_session.clone();
@@ -189,19 +213,17 @@ where
                 Ok(t) => t,
                 Err(_) => return Err(Redirect::to("/login").into_response()),
             };
-
             return match id_token.claims(&verifier, &session.nonce) {
-                Ok(claims) => {
-                    Ok(extract_auth_user(&session, claims).unwrap())
-                }
+                Ok(claims) => Ok(extract_auth_user(&session, claims).unwrap()),
                 Err(_) => {
                     if let Some(refresh_token) = &session.refresh_token
-                        && let Ok(new_tokens) = state.oidc_client
-                        .exchange_refresh_token(
-                            &RefreshToken::new(refresh_token.clone()),
-                            http_client,
-                        )
-                        .await
+                        && let Ok(new_tokens) = state
+                            .oidc_client
+                            .exchange_refresh_token(
+                                &RefreshToken::new(refresh_token.clone()),
+                                http_client,
+                            )
+                            .await
                     {
                         let mut sessions = state.sessions.lock().await;
                         let Some(session) = sessions.get_mut(&session_id) else {
@@ -226,10 +248,16 @@ where
                             session.roles = roles.clone();
                             session.subject = Some(subject.clone());
                             session.name = Some(name.clone());
+                            let email = claims
+                                .email()
+                                .map(|e| e.to_string())
+                                .or_else(|| session.email.clone());
+
                             info!("from session.id_token");
                             return Ok(AuthenticatedUser {
                                 subject: subject.clone(),
                                 name: name.clone(),
+                                email: email.clone(),
                                 roles: roles.clone(),
                             });
                         }
@@ -254,6 +282,7 @@ impl TryFrom<&SessionData> for Auth {
             let user = AuthenticatedUser {
                 subject: subject.clone(),
                 name: name.clone(),
+                email: data.email.clone(),
                 roles: data.roles.clone(),
             };
             Ok(Auth::Authenticated(user))
@@ -274,7 +303,7 @@ pub async fn perform_token_refresh(
     let refresh_token = RefreshToken::new(current_refresh_token);
 
     let token_response = oidc_client
-        .exchange_refresh_token(&refresh_token,http_client)
+        .exchange_refresh_token(&refresh_token, http_client)
         .await
         .map_err(|e| format!("Refresh token request failed: {:?}", e))?;
 
@@ -284,9 +313,10 @@ pub async fn perform_token_refresh(
         .ok_or("Missing ID Token after refresh")?;
 
     let claims = id_token
-        .claims(&oidc_client.id_token_verifier(), |_nonce: Option<&openidconnect::Nonce>| -> Result<(), String> {
-            Ok(())
-        },)
+        .claims(
+            &oidc_client.id_token_verifier(),
+            |_nonce: Option<&openidconnect::Nonce>| -> Result<(), String> { Ok(()) },
+        )
         .map_err(|e| format!("ID Token validation failed after refresh: {:?}", e))?;
 
     let exp_timestamp = claims.expiration().timestamp() as u64;
@@ -375,4 +405,13 @@ pub fn extract_name_from_claims(claims: &serde_json::Value) -> String {
         (None, Some(last)) => last.to_string(),
         (None, None) => email.unwrap_or("User").to_string(), // Fallback to email or "User"
     }
+}
+pub fn extract_email_from_claims(claims: &serde_json::Value) -> Option<String> {
+    // Попробуем извлечь email из разных полей, которые могут его содержать
+    claims
+        .get("email")
+        .and_then(|v| v.as_str())
+        .or_else(|| claims.get("preferred_username").and_then(|v| v.as_str()))
+        .or_else(|| claims.get("upn").and_then(|v| v.as_str()))
+        .map(|s| s.to_string())
 }

@@ -46,7 +46,7 @@ pub async fn chat_stream_handler(
     let max_duration = Duration::from_secs(chat_config.max_duration_sec);
     let max_tokens: usize = chat_config.max_chat_tokens;
     let mut token_counter: usize = 0;
-    let agent_url = chat_config.agent_api_url.clone();
+    let agent_url = format!("{}/api/agent/chat", &chat_config.agent_api_url);
     let model_name = chat_config.agent_model.clone();
 
     #[derive(Debug, Serialize)]
