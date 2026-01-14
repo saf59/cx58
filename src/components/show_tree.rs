@@ -1,4 +1,6 @@
-﻿use leptos::*;
+﻿#![allow(unused_variables)]
+#![allow(dead_code)]
+use leptos::*;
 use leptos::ev::MouseEvent;
 use leptos::prelude::{ClassAttribute, IntoAny, OnAttribute};
 use crate::components::tree::{NodeType, Tree};

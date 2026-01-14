@@ -1,3 +1,5 @@
+#![allow(unused_variables)]
+#![allow(dead_code)]
 use leptos::prelude::{ClassAttribute, Get, IntoAny, StyleAttribute, Suspense};
 use leptos::prelude::{ElementChild, LocalResource};
 use leptos::*;
