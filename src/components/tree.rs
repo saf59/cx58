@@ -265,14 +265,14 @@ where
     });
     view! {
         <div class="tree-viewer-resource">
-            <Suspense fallback=move || view! { <p>"Loading tree data..."</p> }>
+            <Suspense fallback=move || view! { <p>"Loading..."</p> }>
                 {move || {
                     tree_resource.get().map(|result| {
                         match result {
                             Ok(tree) => renderer(tree).into_any(),
-                            Err(e) => view! {
+                            Err(_e) => view! {
                                 <div class="error">
-                                    <p>"✗ Error loading tree: " {e}</p>
+                                    <p>"✗ Error loading tree!"</p>
                                 </div>
                             }.into_any(),
                         }
