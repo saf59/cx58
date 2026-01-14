@@ -37,7 +37,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::Mutex;
-use tokio::task::id;
 #[allow(unused_imports)]
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -389,11 +388,8 @@ pub async fn callback_handler(
                     .unwrap_or(Duration::ZERO); // Если время уже прошло -> 0
                 session.id_token_expires_at = Some(Instant::now() + duration_until_expiry);
 
-                //trace_time("Session ID Token expires at",&session.id_token_expires_at);
-
                 if let Ok(claims_json) = serde_json::to_value(claims) {
                     session.roles = extract_roles_from_claims(&claims_json);
-                    //println!("Claims json: {:#?}", claims_json);
                     // Name is also extracted here
                     session.name = Some(extract_name_from_claims(&claims_json));
                     session.email = extract_email_from_claims(&claims_json);
@@ -406,7 +402,6 @@ pub async fn callback_handler(
             if !roles_extracted {
                 let access_token = token_response.access_token();
                 if let Some(access_token_claims) = extract_claims_from_access_token(access_token) {
-                    //println!("Access Token Claims: {:#?}", access_token_claims);
                     session.roles = extract_roles_from_claims(&access_token_claims);
                     if session.email.is_none() {
                         session.email = extract_email_from_claims(&access_token_claims);

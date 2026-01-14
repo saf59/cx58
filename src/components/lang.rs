@@ -42,8 +42,9 @@ pub fn LanguageSwitcher() -> impl IntoView {
     view! {
         <div class="lang">
             <select class="lang-list" name="languages"
-            on:change:target=move |event| {
-                let selected: String = event.target().value();
+            on:change=move |event| {
+                let selected = event_target_value(&event);
+                //let selected: String = event.target().value();
                 let find =i18n.languages.iter().find(|lang| lang.id == selected);
                 if let Some(lang) = find {
                     i18n.language.set(lang);
