@@ -24,9 +24,9 @@ pub async fn proxy_tree_handler(
         .unwrap_or(false);
 
     let url = if with_leafs {
-        format!("{}/api/agent/tree/{}?with_leafs=true", agent_api_url, user_id)
+        format!("{}/agent/tree/{}?with_leafs=true", agent_api_url, user_id)
     } else {
-        format!("{}/api/agent/tree/{}", agent_api_url, user_id)
+        format!("{}/agent/tree/{}", agent_api_url, user_id)
     };
 
     // Forward request to backend
