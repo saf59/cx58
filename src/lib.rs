@@ -18,6 +18,8 @@ pub mod stop;
 #[cfg(feature = "ssr")]
 pub mod proxy_tree;
 
+pub mod events;
+
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn hydrate() {

@@ -58,6 +58,7 @@ pub struct TreeNode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tree {
     pub id: Uuid,
+    pub parent_id: Option<Uuid>,
     pub node_type: NodeType,
     pub name: Option<String>,
     pub data: NodeData,
@@ -68,6 +69,12 @@ pub struct Tree {
     pub own: bool,
     pub children: Vec<Tree>,
 }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeInfo {
+    pub id: Uuid,
+    pub parent_id: Option<Uuid>,
+    pub name: Option<String>,
+}
 
 impl Tree {
     pub fn node_type_str(&self) -> &str {
@@ -75,6 +82,13 @@ impl Tree {
             NodeType::Root => "Root",
             NodeType::Branch => "Branch",
             NodeType::ImageLeaf => "ImageLeaf",
+        }
+    }
+    pub fn node_info(&self) -> NodeInfo {
+        NodeInfo {
+            id: self.id,
+            parent_id: self.parent_id,
+            name: self.name.clone(),
         }
     }
 }
@@ -146,6 +160,7 @@ pub fn build_tree(nodes: Vec<TreeNode>) -> Vec<Tree> {
 
         Tree {
             id: node.id,
+            parent_id: node.parent_id.clone(),
             node_type: node.node_type,
             name: node.name.clone(),
             data: parsed_data,
