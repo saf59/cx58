@@ -1,4 +1,5 @@
 use crate::chunk_assembler::*;
+use crate::events::*;
 use crate::state::{AppState, ChatSession};
 use async_stream::stream;
 use axum::{
@@ -13,18 +14,23 @@ use tokio::sync::watch;
 #[allow(unused_imports)]
 use tracing::{error, info, warn};
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct PromptRequest {
-    pub prompt: String,
-    pub session_id: String,
+    pub message: String,
+    pub user_id: String,
+    pub chat_id: String,
+    pub language: String,
+    pub object_id: Option<String>,
+    pub prev_leaf: Option<String>,
+    pub next_leaf: Option<String>,
 }
 
 pub async fn chat_stream_handler(
     State(state): State<AppState>,
     axum::Json(req): axum::Json<PromptRequest>,
 ) -> Result<impl IntoResponse, Response> {
-    info!("Received streaming request for prompt: {}", req.prompt);
-    let session_id = req.session_id;
+    info!("Received streaming request for prompt: {}", &req.message);
+    let session_id = req.chat_id.clone();
 
     let chat_session = {
         let mut guard = state.chat_sessions.lock().await;
@@ -47,53 +53,9 @@ pub async fn chat_stream_handler(
     let max_tokens: usize = chat_config.max_chat_tokens;
     let mut token_counter: usize = 0;
     let agent_url = format!("{}/agent/chat", &chat_config.agent_api_url);
-    let model_name = chat_config.agent_model.clone();
 
-    #[derive(Debug, Serialize)]
-    struct AgentRequest {
-        model: String,
-        prompt: String,
-        stream: bool,
-        format: serde_json::Value,
-    }
-    let format = serde_json::from_str(
-        r#"{
-            "type": "object",
-            "properties": {
-                "text": {
-                    "type": "string"
-                },
-                "objects": {
-                    "type": "array",
-                    "items": {
-                        "type": "array",
-                        "item": {
-                            "type": "object",
-                            "properties": {
-                                "id": {
-                                    "type": "string"
-                                },
-                                "url": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "required": [
-                "text"
-            ]
-    }"#,
-    )
-    .unwrap();
-
-    let request_body = AgentRequest {
-        model: model_name,
-        prompt: req.prompt.clone(),
-        stream: true,
-        format,
-    };
+    info!("Agent URL: {}", agent_url);
+    info!("Request payload: {:#?}", req);
 
     #[derive(Debug)]
     enum FinishReason {
@@ -106,6 +68,7 @@ pub async fn chat_stream_handler(
 
     let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
+        .timeout(Duration::from_secs(300))
         .build()
         .unwrap();
 
@@ -113,24 +76,31 @@ pub async fn chat_stream_handler(
         let mut stop_flag = chat_session.cancel_rx.clone();
         let mut retries = 0;
         let max_retries = 3;
-        //tracing::info!("{:#?}",&request_body);
+
         loop {
-            let mut llm_req = client.post(&agent_url).json(&request_body);
-            if let Some(ref agent_api_key) = chat_config.agent_api_key {
-                llm_req = llm_req.header("Authorization", format!("Basic {}", agent_api_key));
-            }
+            info!("Sending request to agent (attempt {})", retries + 1);
+
+            let llm_req = client.post(&agent_url).json(&req);
+
             let response_result = llm_req.send().await;
+            info!("Response received from agent: {:?}", response_result.as_ref().map(|r| r.status()));
 
             let mut byte_stream = match response_result {
-                Ok(res) if res.status().is_success() => res.bytes_stream(),
+                Ok(res) if res.status().is_success() => {
+                    info!("Agent response status: {}", res.status());
+                    info!("Agent response headers: {:#?}", res.headers());
+                    res.bytes_stream()
+                },
                 Ok(res) => {
-                    tracing::error!("{:#?}",res);
+                    tracing::error!("Agent error response: {:#?}", res);
+                    let status = res.status();
                     let text = res.text().await.unwrap_or_default();
-                    yield Ok(Event::default().event("error").data(format!("LLM error: {}", text)));
+                    tracing::error!("Agent error body: {}", text);
+                    yield Ok(Event::default().event("error").data(format!("LLM error [{}]: {}", status, text)));
                     break;
                 }
                 Err(e) => {
-                    tracing::warn!("{:#?}",e);
+                    tracing::warn!("Transport error: {:#?}", e);
                     yield Ok(Event::default().event("error").data(format!("Transport error: {}", e)));
                     if retries < max_retries {
                         retries += 1;
@@ -150,71 +120,159 @@ pub async fn chat_stream_handler(
             }
 
             let mut assembler = ChunkAssembler::new();
+            let mut buffer = String::new();
+            let mut chunk_count = 0;
 
             let finish_reason = 'outer: loop {
                 tokio::select! {
                     _ = stop_flag.changed() => {
+                        info!("Stream stopped by user");
                         break 'outer FinishReason::Stopped;
                     }
                     _ = tokio::time::sleep_until((start_at + max_duration).into()) => {
+                        info!("Stream timeout");
                         break 'outer FinishReason::Timeout;
                     }
                     maybe_chunk = byte_stream.next() => {
                         let bytes_chunk = match maybe_chunk {
-                            Some(Ok(b)) => b,
+                            Some(Ok(b)) => {
+                                chunk_count += 1;
+                                if chunk_count % 10 == 0 {
+                                    info!("Received {} chunks so far", chunk_count);
+                                }
+                                b
+                            },
                             Some(Err(e)) => {
-                                tracing::warn!("{:#?}",e);
+                                tracing::warn!("Stream error: {:#?}", e);
                                 yield Err(std::io::Error::other(e.to_string()));
                                 break 'outer FinishReason::TransportError;
                             }
-                            None => break 'outer FinishReason::Complete,
+                            None => {
+                                info!("Stream ended normally after {} chunks", chunk_count);
+                                break 'outer FinishReason::Complete;
+                            }
                         };
 
                         let text = String::from_utf8_lossy(&bytes_chunk);
-                        //tracing::info!("{:?}",text);
-                        let chunks = assembler.push_sse_line(&text);
+                        tracing::debug!("Raw chunk: {:?}", text);
+                        buffer.push_str(&text);
 
-                        for chunk in chunks {
-                            match chunk {
-                                // Стриминг текста - отправляем сразу
-                                UiChunk::Text(text) => {
-                                    token_counter += text.split_whitespace().count();
-                                    {
-                                        let mut cache_guard = chat_session.cache.lock().await;
-                                        cache_guard.push(text.clone());
+                        // Parse SSE lines
+                        while let Some(line_end) = buffer.find("\n\n") {
+                            let sse_block = buffer[..line_end].to_string();
+                            buffer = buffer[line_end + 2..].to_string();
+
+                            tracing::debug!("SSE block: {:?}", sse_block);
+
+                            // Extract data: from SSE
+                            for line in sse_block.lines() {
+                                if let Some(data) = line.strip_prefix("data: ") {
+                                    tracing::debug!("SSE data: {:?}", data);
+
+                                    match serde_json::from_str::<StreamEvent>(data) {
+                                        Ok(event) => {
+                                            info!("Parsed StreamEvent: {:?}", event);
+                                            match event {
+                                                StreamEvent::TextChunk { chunk, .. } => {
+                                                    tracing::debug!("Processing TextChunk: {:?}", chunk);
+
+                                                    token_counter += chunk.split_whitespace().count();
+                                                    {
+                                                        let mut cache_guard = chat_session.cache.lock().await;
+                                                        cache_guard.push(chunk.clone());
+                                                    }
+                                                    yield Ok(Event::default().data(chunk));
+
+                                                    if token_counter >= max_tokens {
+                                                        break 'outer FinishReason::MaxTokens;
+                                                    }
+                                                }
+                                                StreamEvent::Started { .. } => {
+                                                    yield Ok(Event::default().event("started").data(data.to_string()));
+                                                }
+                                                StreamEvent::CoordinatorThinking { message, .. } => {
+                                                    yield Ok(Event::default().event("coordinator_thinking").data(message));
+                                                }
+                                                StreamEvent::ObjectChunk { data: obj_data, .. } => {
+                                                    let data_str = serde_json::to_string(&obj_data).unwrap_or_default();
+                                                    yield Ok(Event::default().event("object_chunk").data(data_str));
+                                                }
+                                                StreamEvent::DocumentChunk { data: doc_data, .. } => {
+                                                    let data_str = serde_json::to_string(&doc_data).unwrap_or_default();
+                                                    yield Ok(Event::default().event("document_chunk").data(data_str));
+                                                }
+                                                StreamEvent::DescriptionChunk { data: desc_data, .. } => {
+                                                    let data_str = serde_json::to_string(&desc_data).unwrap_or_default();
+                                                    yield Ok(Event::default().event("description_chunk").data(data_str));
+                                                }
+                                                StreamEvent::ComparisonChunk { data: comp_data, .. } => {
+                                                    let data_str = serde_json::to_string(&comp_data).unwrap_or_default();
+                                                    yield Ok(Event::default().event("comparison_chunk").data(data_str));
+                                                }
+                                                StreamEvent::Completed { final_result, .. } => {
+                                                    info!("Stream completed");
+                                                    yield Ok(Event::default().event("completed").data(final_result));
+                                                    break 'outer FinishReason::Complete;
+                                                }
+                                                StreamEvent::Error { error, .. } => {
+                                                    tracing::error!("Agent error: {}", error);
+                                                    yield Ok(Event::default().event("error").data(error));
+                                                    break 'outer FinishReason::TransportError;
+                                                }
+                                                StreamEvent::Cancelled { reason, .. } => {
+                                                    info!("Stream cancelled: {}", reason);
+                                                    yield Ok(Event::default().event("cancelled").data(reason));
+                                                    break 'outer FinishReason::Stopped;
+                                                }
+                                            }
+                                        }
+                                        Err(parse_err) => {
+                                            // If not StreamEvent, process as legacy format
+                                            tracing::debug!("Not a StreamEvent ({}), using legacy parsing", parse_err);
+                                            let chunks = assembler.push_sse_line(data);
+                                            for chunk in chunks {
+                                                match chunk {
+                                                    UiChunk::Text(text) => {
+                                                        token_counter += text.split_whitespace().count();
+                                                        {
+                                                            let mut cache_guard = chat_session.cache.lock().await;
+                                                            cache_guard.push(text.clone());
+                                                        }
+                                                        yield Ok(Event::default().data(text));
+
+                                                        if token_counter >= max_tokens {
+                                                            break 'outer FinishReason::MaxTokens;
+                                                        }
+                                                    }
+                                                    UiChunk::Markdown(md) => {
+                                                        token_counter += md.split_whitespace().count();
+                                                        {
+                                                            let mut cache_guard = chat_session.cache.lock().await;
+                                                            cache_guard.push(md.clone());
+                                                        }
+                                                        yield Ok(Event::default().data(md));
+
+                                                        if token_counter >= max_tokens {
+                                                            break 'outer FinishReason::MaxTokens;
+                                                        }
+                                                    }
+                                                    UiChunk::Json(val) => {
+                                                        let data_str = serde_json::to_string(&val).unwrap_or_default();
+                                                        yield Ok(Event::default().event("json").data(data_str));
+                                                        break 'outer FinishReason::Complete;
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
-                                    yield Ok(Event::default().data(text));
-
-                                    if token_counter >= max_tokens {
-                                        break 'outer FinishReason::MaxTokens;
-                                    }
-                                }
-
-                                // Markdown тоже стримим
-                                UiChunk::Markdown(md) => {
-                                    token_counter += md.split_whitespace().count();
-                                    {
-                                        let mut cache_guard = chat_session.cache.lock().await;
-                                        cache_guard.push(md.clone());
-                                    }
-                                    yield Ok(Event::default().data(md));
-
-                                    if token_counter >= max_tokens {
-                                        break 'outer FinishReason::MaxTokens;
-                                    }
-                                }
-
-                                // Финальный JSON - отправляем с событием "json"
-                                UiChunk::Json(val) => {
-                                    let data_str = serde_json::to_string(&val).unwrap_or_default();
-                                    yield Ok(Event::default().event("json").data(data_str));
-                                    break 'outer FinishReason::Complete;
                                 }
                             }
                         }
                     }
                 }
             };
+
+            info!("Stream finished with reason: {:?}", finish_reason);
 
             match finish_reason {
                 FinishReason::Complete => {

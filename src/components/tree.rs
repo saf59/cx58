@@ -18,7 +18,7 @@ pub enum NodeType {
     ImageLeaf,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ImageData {
     pub hash: Option<String>,
     pub mime_type: Option<String>,
@@ -29,12 +29,12 @@ pub struct ImageData {
     pub url: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BranchData {
     pub title: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum NodeData {
     Branch(BranchData),
@@ -55,7 +55,7 @@ pub struct TreeNode {
     pub own: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Tree {
     pub id: Uuid,
     pub parent_id: Option<Uuid>,
@@ -160,7 +160,7 @@ pub fn build_tree(nodes: Vec<TreeNode>) -> Vec<Tree> {
 
         Tree {
             id: node.id,
-            parent_id: node.parent_id.clone(),
+            parent_id: node.parent_id,
             node_type: node.node_type,
             name: node.name.clone(),
             data: parsed_data,
@@ -244,7 +244,7 @@ pub async fn fetch_tree_data(user_id: &str, with_leafs: bool) -> Result<Vec<Tree
     // Deserialize to Vec<TreeNode>
     let nodes: Vec<TreeNode> = serde_wasm_bindgen::from_value(json)
         .map_err(|e| {
-            leptos::logging::error!("Deserialize error: {:?}", e);
+            logging::error!("Deserialize error: {:?}", e);
             format!("Failed to deserialize: {:?}", e)
         })?;
 
@@ -282,18 +282,25 @@ where
     });
     view! {
         <div class="tree-viewer-resource">
-            <Suspense fallback=move || view! { <p>"Loading..."</p> }>
+            <Suspense fallback=move || {
+                view! { <p>"Loading..."</p> }
+            }>
                 {move || {
-                    tree_resource.get().map(|result| {
-                        match result {
-                            Ok(tree) => renderer(tree).into_any(),
-                            Err(_e) => view! {
-                                <div class="error">
-                                    <p>"✗ Error loading tree!"</p>
-                                </div>
-                            }.into_any(),
-                        }
-                    })
+                    tree_resource
+                        .get()
+                        .map(|result| {
+                            match result {
+                                Ok(tree) => renderer(tree).into_any(),
+                                Err(_e) => {
+                                    view! {
+                                        <div class="error">
+                                            <p>"✗ Error loading tree!"</p>
+                                        </div>
+                                    }
+                                        .into_any()
+                                }
+                            }
+                        })
                 }}
             </Suspense>
         </div>
@@ -312,14 +319,17 @@ pub fn SimpleTreeRenderer(tree: Vec<Tree>) -> impl IntoView {
             <h3>"Simple Tree View"</h3>
             <p>"Total root nodes: " {tree.len()}</p>
             <ul>
-                {tree.into_iter().map(|node| {
-                    view! {
-                        <li>
-                            {node.name.unwrap_or_else(|| "(unnamed)".to_string())}
-                            " (" {node.children.len()} " children)"
-                        </li>
-                    }
-                }).collect::<Vec<_>>()}
+                {tree
+                    .into_iter()
+                    .map(|node| {
+                        view! {
+                            <li>
+                                {node.name.unwrap_or_else(|| "(unnamed)".to_string())} " ("
+                                {node.children.len()} " children)"
+                            </li>
+                        }
+                    })
+                    .collect::<Vec<_>>()}
             </ul>
         </div>
     }
@@ -331,9 +341,12 @@ pub fn HierarchicalTreeRenderer(tree: Vec<Tree>) -> impl IntoView {
     view! {
         <div class="hierarchical-tree">
             <h3>"Hierarchical Tree View"</h3>
-            {tree.into_iter().map(|node| {
-                view! { <TreeNodeView node=node depth=0 /> }
-            }).collect::<Vec<_>>()}
+            {tree
+                .into_iter()
+                .map(|node| {
+                    view! { <TreeNodeView node=node depth=0 /> }
+                })
+                .collect::<Vec<_>>()}
         </div>
     }
 }
@@ -351,21 +364,27 @@ fn TreeNodeView(node: Tree, depth: usize) -> impl IntoView {
     let children = node.children.clone();
 
     view! {
-        <div class="tree-node" style={indent_style}>
+        <div class="tree-node" style=indent_style>
             <div class="node-header">
                 <span class="icon">{icon}</span>
-                <span class="name">{node.name.clone().unwrap_or_else(|| "(unnamed)".to_string())}</span>
+                <span class="name">
+                    {node.name.clone().unwrap_or_else(|| "(unnamed)".to_string())}
+                </span>
                 <span class="meta">" [" {node.node_type_str()} ", depth: " {node.depth} "]"</span>
             </div>
-            {has_children.then(|| {
-                view! {
-                    <div class="children">
-                        {children.into_iter().map(|child| {
-                            view! { <TreeNodeView node=child depth={depth + 1} /> }
-                        }).collect::<Vec<_>>()}
-                    </div>
-                }
-            })}
+            {has_children
+                .then(|| {
+                    view! {
+                        <div class="children">
+                            {children
+                                .into_iter()
+                                .map(|child| {
+                                    view! { <TreeNodeView node=child depth=depth + 1 /> }
+                                })
+                                .collect::<Vec<_>>()}
+                        </div>
+                    }
+                })}
         </div>
     }
 }
@@ -377,16 +396,21 @@ pub fn CardTreeRenderer(tree: Vec<Tree>) -> impl IntoView {
         <div class="card-tree">
             <h3>"Card View"</h3>
             <div class="card-grid">
-                {tree.into_iter().map(|node| {
-                    view! {
-                        <div class="card">
-                            <h4>{node.name.clone().unwrap_or_else(|| "(unnamed)".to_string())}</h4>
-                            <p>"Type: " {node.node_type_str()}</p>
-                            <p>"Children: " {node.children.len()}</p>
-                            <p>"Updated: " {node.updated_at}</p>
-                        </div>
-                    }
-                }).collect::<Vec<_>>()}
+                {tree
+                    .into_iter()
+                    .map(|node| {
+                        view! {
+                            <div class="card">
+                                <h4>
+                                    {node.name.clone().unwrap_or_else(|| "(unnamed)".to_string())}
+                                </h4>
+                                <p>"Type: " {node.node_type_str()}</p>
+                                <p>"Children: " {node.children.len()}</p>
+                                <p>"Updated: " {node.updated_at}</p>
+                            </div>
+                        }
+                    })
+                    .collect::<Vec<_>>()}
             </div>
         </div>
     }
@@ -439,12 +463,14 @@ pub fn ExampleCustom() -> impl IntoView {
         <TreeViewerResource
             user_id="shpirkov@gmail.com".to_string()
             with_leafs=false
-            renderer=|tree| view! {
-                <div class="custom-view">
-                    <h3>"My Custom View"</h3>
-                    <p>"Found " {tree.len()} " root nodes"</p>
-                    <pre>{format!("{:#?}", tree)}</pre>
-                </div>
+            renderer=|tree| {
+                view! {
+                    <div class="custom-view">
+                        <h3>"My Custom View"</h3>
+                        <p>"Found " {tree.len()} " root nodes"</p>
+                        <pre>{format!("{:#?}", tree)}</pre>
+                    </div>
+                }
             }
         />
     }

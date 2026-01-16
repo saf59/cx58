@@ -116,9 +116,10 @@ fn RootPage() -> impl IntoView {
             } else {
                 // User is authenticated and is NOT a guest (e.g., a user or admin)
                 view! {
-                    <SideBar top=SideTop() side_body= view! {
-                        <SideBody is_admin=auth.is_authenticated_admin()/>
-                    }>
+                    <SideBar
+                        top=SideTop()
+                        side_body=view! { <SideBody is_admin=auth.is_authenticated_admin() /> }
+                    >
                         <Chat />
                     </SideBar>
                 }
@@ -140,7 +141,10 @@ fn PlayPage() -> impl IntoView {
                 view! { <LoginPage /> }.into_any()
             } else {
                 view! {
-                    <SideBar top=SideTop() side_body=view! {<SideBody is_admin=auth.is_authenticated_admin()/>}>
+                    <SideBar
+                        top=SideTop()
+                        side_body=view! { <SideBody is_admin=auth.is_authenticated_admin() /> }
+                    >
                         <LanguageSelector />
                     </SideBar>
                 }
@@ -174,7 +178,7 @@ fn LoginPage() -> impl IntoView {
             <h3>{move_tr!("welcome-cx58")}</h3>
             <h3>{move_tr!("you-are-unauthenticated")}</h3>
             <LoginButton />
-            <LanguageSwitcher/>
+            <LanguageSwitcher />
         </div>
     }
 }
@@ -190,7 +194,10 @@ fn ProfilePage() -> impl IntoView {
                 view! { <LoginPage /> }.into_any()
             } else {
                 view! {
-                    <SideBar top=SideTop() side_body= view! {<SideBody is_admin=auth.is_authenticated_admin()/>}>
+                    <SideBar
+                        top=SideTop()
+                        side_body=view! { <SideBody is_admin=auth.is_authenticated_admin() /> }
+                    >
                         <UserRolesDisplay user=auth.user() />
                     </SideBar>
                 }

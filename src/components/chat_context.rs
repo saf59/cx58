@@ -20,4 +20,5 @@ impl ChatContext {
             next_leaf: RwSignal::new(None),
         }
     }
+
 }

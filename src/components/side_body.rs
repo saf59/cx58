@@ -5,7 +5,6 @@ use crate::components::tree::TreeViewerResource;
 use leptos::prelude::*;
 use leptos::{IntoView, component, view};
 use leptos_fluent::{I18n, move_tr};
-use web_sys::MouseEvent;
 
 #[component]
 pub fn SideBody(is_admin: bool) -> impl IntoView {
@@ -45,12 +44,14 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
                 .collect_view()}
         </div>
 
-        <a on:click=move |_| { set_obj_toggled.try_update(|value| *value = !*value);}>
+        <a on:click=move |_| {
+            set_obj_toggled.try_update(|value| *value = !*value);
+        }>
             <i class="fas fa-building"></i>
             <span>{move || move_tr!("objects")}</span>
         </a>
 
-        <Show when= move || obj_toggled.get() fallback=|| view! { <Objects/> } >
+        <Show when=move || obj_toggled.get() fallback=|| view! { <Objects /> }>
             {().into_view()}
         </Show>
 
@@ -94,14 +95,14 @@ fn Objects() -> impl IntoView {
         .unwrap_or("mock".to_string());
 
     view! {
-        <ErrorBoundary
-            fallback=|errors| view! {
+        <ErrorBoundary fallback=|errors| {
+            view! {
                 <div class="error-boundary">
                     <h3>"Error occurred:"</h3>
                     <pre>{move || format!("{:#?}", errors.get())}</pre>
                 </div>
             }
-        >
+        }>
             <TreeViewerResource
                 user_id=email
                 with_leafs=false
@@ -110,58 +111,15 @@ fn Objects() -> impl IntoView {
                     view! {
                         <DetailsTreeRendererWithContext
                             tree=tree
-                            on_node_click=move |name| {
-                                tracing::info!("Node clicked: {}", name);
-                                ctx.insert_text.set(Some(name));
+                            on_node_click=move |node_info| {
+                                tracing::info!("Node clicked: {:?}", node_info.name);
+                                ctx.insert_text
+                                    .set(Some(node_info.name.unwrap_or("(unnamed)".to_string())));
                             }
                         />
                     }
                 }
             />
         </ErrorBoundary>
-    }
-}
-#[component]
-fn Objects1() -> impl IntoView {
-    let ctx = use_context::<ChatContext>().expect("ChatContext must be provided");
-    view! {
-        <div class="obj-area tree">
-        <details>
-            <summary>
-                    <span class="node-content"><i class="fas fa-building"></i >Object 1</span>
-            </summary>
-            <div class="leaf">
-                <span class="node-content"><i class="fas fa-image"></i >"2025-12-12 16:00:01"</span>
-            </div>
-            <div class="leaf">
-                <span class="node-content"><i class="fas fa-video"></i >"2025-12-12 17:00:01"</span>
-            </div>
-        </details>
-
-        <details>
-            <summary>
-                <span class="node-content"><i class="fas fa-building"></i >Object 2</span>
-            </summary>
-            <div class="leaf">
-                <span class="node-content"><i class="fas fa-image"></i >"2025-12-12 16:00:01"</span>
-            </div>
-            <details>
-                <summary>
-                    <span class="node-content" on:click=move |e:MouseEvent| {
-                        leptos::logging::log!("Clicked on Room 123");
-                        ctx.insert_text.set(Some("Room 123".to_string()));
-                        e.stop_propagation();
-                        e.prevent_default();
-                    }><i class="fas fa-building"></i >Room 123</span>
-                </summary>
-                <div class="leaf">
-                    <span class="node-content"><i class="fas fa-image"></i >"2025-12-12 16:00:01"</span>
-                </div>
-                <div class="leaf">
-                    <span class="node-content"><i class="fas fa-image"></i >{"2025-12-12 16:00:01"}</span>
-                </div>
-            </details>
-        </details>
-        </div>
     }
 }

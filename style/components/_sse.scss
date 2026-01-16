@@ -1,0 +1,163 @@
+/* Chat State Indicator */
+.chat-state {
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 8px;
+    margin: 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.chat-state.hidden {
+    display: none;
+}
+
+.chat-state i {
+    font-size: 16px;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.8;
+    }
+}
+
+/* Description Content */
+.description-content {
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #4a90e2;
+}
+
+.description-content h4 {
+    margin: 0 0 12px 0;
+    color: #2c3e50;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.description-content > p {
+    margin: 0 0 16px 0;
+    color: #34495e;
+    line-height: 1.6;
+}
+
+.description-field {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.description-field:last-child {
+    margin-bottom: 0;
+}
+
+.description-field h5 {
+    margin: 0 0 8px 0;
+    color: #4a90e2;
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.description-field p {
+    margin: 0;
+    color: #555;
+    line-height: 1.5;
+}
+
+/* Comparison Content */
+.comparison-content {
+    padding: 16px;
+    background: #f0f4f8;
+    border-radius: 8px;
+    border-left: 4px solid #27ae60;
+}
+
+.comparison-content h4 {
+    margin: 0 0 12px 0;
+    color: #2c3e50;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.comparison-field {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.comparison-field:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.comparison-field:last-child {
+    margin-bottom: 0;
+}
+
+.comparison-field h5 {
+    margin: 0 0 8px 0;
+    color: #27ae60;
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.comparison-field p {
+    margin: 0;
+    color: #555;
+    line-height: 1.5;
+}
+
+/* Message containers for different content types */
+.message.bot {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .description-content,
+    .comparison-content {
+        padding: 12px;
+    }
+
+    .description-field,
+    .comparison-field {
+        padding: 10px;
+    }
+
+    .description-content h4,
+    .comparison-content h4 {
+        font-size: 16px;
+    }
+
+    .description-field h5,
+    .comparison-field h5 {
+        font-size: 13px;
+    }
+}

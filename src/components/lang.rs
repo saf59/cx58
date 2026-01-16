@@ -41,20 +41,21 @@ pub fn LanguageSwitcher() -> impl IntoView {
     let i18n = expect_context::<I18n>();
     view! {
         <div class="lang">
-            <select class="lang-list" name="languages"
-            on:change=move |event| {
-                let selected = event_target_value(&event);
-                //let selected: String = event.target().value();
-                let find =i18n.languages.iter().find(|lang| lang.id == selected);
-                if let Some(lang) = find {
-                    i18n.language.set(lang);
+            <select
+                class="lang-list"
+                name="languages"
+                on:change=move |event| {
+                    let selected = event_target_value(&event);
+                    let find = i18n.languages.iter().find(|lang| lang.id == selected);
+                    if let Some(lang) = find {
+                        i18n.language.set(lang);
+                    }
                 }
-            }
             >
-            {move || {
-                let selected = i18n.language.get();
-                i18n.languages.iter().map(|lang| render_id(lang, selected)).collect::<Vec<_>>()
-            }}
+                {move || {
+                    let selected = i18n.language.get();
+                    i18n.languages.iter().map(|lang| render_id(lang, selected)).collect::<Vec<_>>()
+                }}
             </select>
         </div>
     }
@@ -62,10 +63,9 @@ pub fn LanguageSwitcher() -> impl IntoView {
 
 fn render_id(lang: &'static Language, selected: &'static Language) -> impl IntoView {
     view! {
-            <option selected=move || lang == selected
-                class="lang-item"
-                value={lang}
-                >{move || lang.id.to_string()}</option>
+        <option selected=move || lang == selected class="lang-item" value=lang>
+            {move || lang.id.to_string()}
+        </option>
     }
 }
 
@@ -81,7 +81,7 @@ fn render_language(lang: &'static Language) -> impl IntoView {
                 id=lang
                 value=lang
                 name="language"
-                checked=move ||i18n.language.get() == lang
+                checked=move || i18n.language.get() == lang
                 on:click=move |_| i18n.language.set(lang)
                 type="radio"
             />
