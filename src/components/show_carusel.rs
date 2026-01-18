@@ -110,187 +110,187 @@ pub fn CarouselRenderer(tree: Vec<Tree>) -> impl IntoView {
                 <style>
                     {r#"
                     .carousel-container {
-                      width: 100%;
-                      max-width: 1200px;
-                      margin: 0 auto;
-                      padding: 1rem;
+                     width: 100%;
+                     max-width: 1200px;
+                     margin: 0 auto;
+                     padding: 1rem;
                     }
                     
                     .node-info {
-                      margin-bottom: 1.5rem;
-                      padding: 1rem;
-                      background: #f8f9fa;
-                      border-radius: 8px;
+                     margin-bottom: 1.5rem;
+                     padding: 1rem;
+                     background: #f8f9fa;
+                     border-radius: 8px;
                     }
                     
                     .node-info h2 {
-                      margin: 0 0 0.5rem 0;
-                      color: #333;
+                     margin: 0 0 0.5rem 0;
+                     color: #333;
                     }
                     
                     .node-meta {
-                      display: flex;
-                      gap: 1.5rem;
-                      color: #666;
-                      font-size: 0.9rem;
+                     display: flex;
+                     gap: 1.5rem;
+                     color: #666;
+                     font-size: 0.9rem;
                     }
                     
                     .meta-item {
-                      display: flex;
-                      align-items: center;
-                      gap: 0.3rem;
+                     display: flex;
+                     align-items: center;
+                     gap: 0.3rem;
                     }
                     
                     .no-images {
-                      text-align: center;
-                      padding: 3rem;
-                      color: #999;
+                     text-align: center;
+                     padding: 3rem;
+                     color: #999;
                     }
                     
                     /* Carousel with Scroll Snap */
                     .carousel-wrapper {
-                      position: relative;
-                      overflow: hidden;
-                      border-radius: 8px;
+                     position: relative;
+                     overflow: hidden;
+                     border-radius: 8px;
                     }
                     
                     .carousel {
-                      display: grid;
-                      grid-auto-flow: column;
-                      grid-auto-columns: 50%; /* 2 images visible */
-                      gap: 1rem;
-                      overflow-x: auto;
-                      scroll-snap-type: x mandatory;
-                      scroll-behavior: smooth;
-                      padding: 1rem;
-                      scrollbar-width: thin;
-                      scrollbar-color: #888 #f1f1f1;
+                     display: grid;
+                     grid-auto-flow: column;
+                     grid-auto-columns: 50%; /* 2 images visible */
+                     gap: 1rem;
+                     overflow-x: auto;
+                     scroll-snap-type: x mandatory;
+                     scroll-behavior: smooth;
+                     padding: 1rem;
+                     scrollbar-width: thin;
+                     scrollbar-color: #888 #f1f1f1;
                     }
                     
                     .carousel::-webkit-scrollbar {
-                      height: 8px;
+                     height: 8px;
                     }
                     
                     .carousel::-webkit-scrollbar-track {
-                      background: #f1f1f1;
-                      border-radius: 4px;
+                     background: #f1f1f1;
+                     border-radius: 4px;
                     }
                     
                     .carousel::-webkit-scrollbar-thumb {
-                      background: #888;
-                      border-radius: 4px;
+                     background: #888;
+                     border-radius: 4px;
                     }
                     
                     .carousel::-webkit-scrollbar-thumb:hover {
-                      background: #555;
+                     background: #555;
                     }
                     
                     .carousel-item {
-                      scroll-snap-align: start;
-                      position: relative;
+                     scroll-snap-align: start;
+                     position: relative;
                     }
                     
                     .thumbnail-link {
-                      display: block;
-                      position: relative;
-                      overflow: hidden;
-                      border-radius: 8px;
-                      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                      transition: transform 0.2s, box-shadow 0.2s;
-                      text-decoration: none;
+                     display: block;
+                     position: relative;
+                     overflow: hidden;
+                     border-radius: 8px;
+                     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                     transition: transform 0.2s, box-shadow 0.2s;
+                     text-decoration: none;
                     }
                     
                     .thumbnail-link:hover {
-                      transform: translateY(-4px);
-                      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+                     transform: translateY(-4px);
+                     box-shadow: 0 4px 16px rgba(0,0,0,0.2);
                     }
                     
                     .thumbnail {
-                      width: 100%;
-                      height: 300px;
-                      object-fit: cover;
-                      display: block;
+                     width: 100%;
+                     height: 300px;
+                     object-fit: cover;
+                     display: block;
                     }
                     
                     .image-label {
-                      position: absolute;
-                      bottom: 0;
-                      left: 0;
-                      right: 0;
-                      background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
-                      color: white;
-                      padding: 1rem 0.75rem 0.75rem;
-                      font-size: 0.9rem;
+                     position: absolute;
+                     bottom: 0;
+                     left: 0;
+                     right: 0;
+                     background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+                     color: white;
+                     padding: 1rem 0.75rem 0.75rem;
+                     font-size: 0.9rem;
                     }
                     
                     /* CSS Popup */
                     .popup {
-                      display: none;
-                      position: fixed;
-                      top: 0;
-                      left: 0;
-                      width: 100%;
-                      height: 100%;
-                      background: rgba(0, 0, 0, 0.9);
-                      z-index: 9999;
-                      align-items: center;
-                      justify-content: center;
-                      animation: fadeIn 0.3s;
+                     display: none;
+                     position: fixed;
+                     top: 0;
+                     left: 0;
+                     width: 100%;
+                     height: 100%;
+                     background: rgba(0, 0, 0, 0.9);
+                     z-index: 9999;
+                     align-items: center;
+                     justify-content: center;
+                     animation: fadeIn 0.3s;
                     }
                     
                     .popup:target {
-                      display: flex;
+                     display: flex;
                     }
                     
                     @keyframes fadeIn {
-                      from { opacity: 0; }
-                      to { opacity: 1; }
+                     from { opacity: 0; }
+                     to { opacity: 1; }
                     }
                     
                     .popup-content {
-                      position: relative;
-                      max-width: 90%;
-                      max-height: 90%;
-                      animation: zoomIn 0.3s;
+                     position: relative;
+                     max-width: 90%;
+                     max-height: 90%;
+                     animation: zoomIn 0.3s;
                     }
                     
                     @keyframes zoomIn {
-                      from { transform: scale(0.8); }
-                      to { transform: scale(1); }
+                     from { transform: scale(0.8); }
+                     to { transform: scale(1); }
                     }
                     
                     .popup-close {
-                      position: absolute;
-                      top: -40px;
-                      right: 0;
-                      color: white;
-                      font-size: 40px;
-                      font-weight: bold;
-                      text-decoration: none;
-                      line-height: 1;
-                      transition: color 0.2s;
+                     position: absolute;
+                     top: -40px;
+                     right: 0;
+                     color: white;
+                     font-size: 40px;
+                     font-weight: bold;
+                     text-decoration: none;
+                     line-height: 1;
+                     transition: color 0.2s;
                     }
                     
                     .popup-close:hover {
-                      color: #ff4444;
+                     color: #ff4444;
                     }
                     
                     .popup-image {
-                      max-width: 100%;
-                      max-height: 90vh;
-                      object-fit: contain;
-                      border-radius: 4px;
+                     max-width: 100%;
+                     max-height: 90vh;
+                     object-fit: contain;
+                     border-radius: 4px;
                     }
                     
                     /* Responsive adjustments */
                     @media (max-width: 768px) {
-                      .carousel {
-                          grid-auto-columns: 100%; /* 1 image on mobile */
-                      }
-                      
-                      .thumbnail {
-                          height: 250px;
-                      }
+                     .carousel {
+                         grid-auto-columns: 100%; /* 1 image on mobile */
+                     }
+                     
+                     .thumbnail {
+                         height: 250px;
+                     }
                     }
                     "#}
                 </style>

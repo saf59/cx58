@@ -182,6 +182,25 @@ pub async fn logout_handler(State(state): State<AppState>, jar: CookieJar) -> im
         if let Some(session) = sessions.remove(&session_id)
             && let Some(id_token) = session.id_token
         {
+            let mut chat_sessions = state.chat_sessions.lock().await;
+            // Cancel active requests
+            if let Some(chat_session) = chat_sessions.get_mut(&session_id) {
+                let _ = chat_session.cancel_tx.send(true);
+
+                if let Some(request_id) = &chat_session.current_request_id.read().await.clone() {
+                    let cancel_url = format!(
+                        "{}/agent/chat/cancel/{}",
+                        state.oidc_client.config.chat_config.agent_api_url,
+                        request_id
+                    );
+
+                    let client = state.async_http_client.clone();
+                    tokio::spawn(async move {
+                        let _ = client.delete(&cancel_url).send().await;
+                    });
+                }
+            }
+
             let issuer_url = match std::env::var("OIDC_ISSUER_URL") {
                 Ok(url) => url,
                 Err(_) => {

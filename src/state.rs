@@ -17,6 +17,7 @@ pub struct ChatSession {
     pub cancel_tx: watch::Sender<bool>,
     pub cancel_rx: watch::Receiver<bool>,
     pub cache: tokio::sync::Mutex<Vec<String>>,
+    pub current_request_id: tokio::sync::RwLock<Option<String>>,
 }
 
 impl AppState {

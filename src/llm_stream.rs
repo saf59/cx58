@@ -1,4 +1,5 @@
 use crate::chunk_assembler::*;
+use crate::chunk_assembler::*;
 use crate::events::*;
 use crate::state::{AppState, ChatSession};
 use async_stream::stream;
@@ -10,6 +11,7 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use http::StatusCode;
 use tokio::sync::watch;
 #[allow(unused_imports)]
 use tracing::{error, info, warn};
@@ -30,7 +32,14 @@ pub async fn chat_stream_handler(
     axum::Json(req): axum::Json<PromptRequest>,
 ) -> Result<impl IntoResponse, Response> {
     info!("Received streaming request for prompt: {}", &req.message);
-    let session_id = req.chat_id.clone();
+    let session_id = match cookies.get("chat_session") {
+        Some(cookie) => cookie.value().to_string(),
+        None => {
+            tracing::warn!("No session_id in cookie");
+            return (StatusCode::UNAUTHORIZED, "No session");
+        }
+    };
+
 
     let chat_session = {
         let mut guard = state.chat_sessions.lock().await;
@@ -42,6 +51,7 @@ pub async fn chat_stream_handler(
                     cancel_tx: tx,
                     cancel_rx: rx,
                     cache: tokio::sync::Mutex::new(Vec::new()),
+                    current_request_id: None.into(),
                 })
             })
             .clone()
@@ -154,7 +164,7 @@ pub async fn chat_stream_handler(
                         };
 
                         let text = String::from_utf8_lossy(&bytes_chunk);
-                        tracing::debug!("Raw chunk: {:?}", text);
+                        //tracing::debug!("Raw chunk: {:?}", text);
                         buffer.push_str(&text);
 
                         // Parse SSE lines
@@ -162,19 +172,40 @@ pub async fn chat_stream_handler(
                             let sse_block = buffer[..line_end].to_string();
                             buffer = buffer[line_end + 2..].to_string();
 
-                            tracing::debug!("SSE block: {:?}", sse_block);
+                            //tracing::debug!("SSE block: {:?}", sse_block);
 
                             // Extract data: from SSE
                             for line in sse_block.lines() {
                                 if let Some(data) = line.strip_prefix("data: ") {
-                                    tracing::debug!("SSE data: {:?}", data);
+                                    //tracing::debug!("SSE data: {:?}", data);
 
                                     match serde_json::from_str::<StreamEvent>(data) {
                                         Ok(event) => {
                                             info!("Parsed StreamEvent: {:?}", event);
+                                            let request_id = match &event {
+                                                            StreamEvent::Started { request_id, .. }
+                                                            | StreamEvent::TextChunk { request_id, .. }
+                                                            | StreamEvent::CoordinatorThinking { request_id, .. }
+                                                            | StreamEvent::ObjectChunk { request_id, .. }
+                                                            | StreamEvent::DocumentChunk { request_id, .. }
+                                                            | StreamEvent::DescriptionChunk { request_id, .. }
+                                                            | StreamEvent::ComparisonChunk { request_id, .. }
+                                                            | StreamEvent::Completed { request_id, .. }
+                                                            | StreamEvent::Error { request_id, .. }
+                                                            | StreamEvent::Cancelled { request_id, .. } => request_id,
+                                                        };
+                                            tracing::debug!("Step request: {:?}", request_id);
+                                            {
+                                                    let mut sessions = state.chat_sessions.lock().await;
+                                                    if let Some(session) = sessions.get_mut(&session_id) {
+                                                         let mut req_id = session.current_request_id.write().await;
+                                                        *req_id = Some(request_id.clone());
+                                                    }
+                                            }
+
                                             match event {
                                                 StreamEvent::TextChunk { chunk, .. } => {
-                                                    tracing::debug!("Processing TextChunk: {:?}", chunk);
+                                                    //tracing::debug!("Processing TextChunk: {:?}", chunk);
 
                                                     token_counter += chunk.split_whitespace().count();
                                                     {
@@ -187,8 +218,9 @@ pub async fn chat_stream_handler(
                                                         break 'outer FinishReason::MaxTokens;
                                                     }
                                                 }
-                                                StreamEvent::Started { .. } => {
-                                                    yield Ok(Event::default().event("started").data(data.to_string()));
+                                                StreamEvent::Started { request_id, .. } => {
+                                                    tracing::debug!("Started request: {:?}", request_id);
+                                                    yield Ok(Event::default().event("started").data(data));
                                                 }
                                                 StreamEvent::CoordinatorThinking { message, .. } => {
                                                     yield Ok(Event::default().event("coordinator_thinking").data(message));
@@ -220,7 +252,7 @@ pub async fn chat_stream_handler(
                                                     break 'outer FinishReason::TransportError;
                                                 }
                                                 StreamEvent::Cancelled { reason, .. } => {
-                                                    info!("Stream cancelled: {}", reason);
+                                                    warn!("Stream cancelled: {}", reason);
                                                     yield Ok(Event::default().event("cancelled").data(reason));
                                                     break 'outer FinishReason::Stopped;
                                                 }
@@ -228,7 +260,7 @@ pub async fn chat_stream_handler(
                                         }
                                         Err(parse_err) => {
                                             // If not StreamEvent, process as legacy format
-                                            tracing::debug!("Not a StreamEvent ({}), using legacy parsing", parse_err);
+                                            //tracing::debug!("Not a StreamEvent ({}), using legacy parsing", parse_err);
                                             let chunks = assembler.push_sse_line(data);
                                             for chunk in chunks {
                                                 match chunk {

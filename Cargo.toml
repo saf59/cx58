@@ -36,7 +36,6 @@ http = "1.4"
 chrono = { version = "0.4",optional = true }
 tokio-util = { version = "0.7", features = ["io"], optional = true }
 serde_json = "1.0"
-futures-util = { version = "0.3",features = ["sink"] }
 wasm-bindgen-futures = { version = "0.4"}
 js-sys = "0.3"
 web-sys = { version = "0.3", features = [
@@ -54,18 +53,22 @@ web-sys = { version = "0.3", features = [
     "FormData",
     "EventSource",
     "MessageEvent",
+    "Navigator",
+    "Headers",
+    "Request",
+    "RequestInit",
+    "RequestMode",
+    "RequestCredentials",
+    "Response",
+    "Blob",
+    "BlobPropertyBag",
+    "BeforeUnloadEvent",
 ] }
 async-stream = "0.3"
 futures = "0.3"
-bytes = "1.11"
-reqwest-wasm = "0.11"
-regex = "1.12"
 gloo-timers = "0.3"
 leptos-fluent = {version = "0.3.1", features = ["yaml"]}
-fluent-templates = "0.13"
-unic-langid = "0.9"
 serde-wasm-bindgen = "0.6.5"
-#leptos-use = { version = "0.16.3", features = ["axum"] }
 
 [dev-dependencies]
 tokio = { version = "1.48", features = ["rt-multi-thread", "macros"] }
@@ -73,7 +76,6 @@ tokio = { version = "1.48", features = ["rt-multi-thread", "macros"] }
 [features]
 hydrate = [
     "leptos/hydrate",
-#    "leptos-fluent/hydrate",
     "dep:console_error_panic_hook",
     "dep:wasm-bindgen",
 ]
@@ -81,11 +83,8 @@ ssr = [
     "dep:axum",
     "dep:tokio",
     "dep:leptos_axum",
-#    "dep:tokio-stream",
     "dep:tokio-util",
     "dep:chrono",
-#    "dep:futures",
-#    "dep:reqwest",
     "dep:oauth2",
     "dep:openidconnect",
     "leptos/ssr",
@@ -93,7 +92,6 @@ ssr = [
     "leptos_router/ssr",
     "leptos-fluent/ssr",
     "leptos-fluent/axum",
-#    "leptos-use/ssr",
 ]
 
 #[target.wasm32-unknown-unknown]

@@ -5,15 +5,20 @@ use leptos::*;
 use leptos_fluent::{move_tr, I18n};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+#[cfg(feature = "hydrate")]
 use wasm_bindgen::JsCast;
+#[cfg(feature = "hydrate")]
 use wasm_bindgen_futures::JsFuture;
+
+#[cfg(feature = "hydrate")]
 use web_sys::{
     HtmlDivElement, ReadableStreamDefaultReader, RequestInit, Response, ScrollBehavior,
     ScrollIntoViewOptions,
 };
 use crate::auth::Auth;
+
 use crate::components::show_carusel::CarouselRenderer;
-use crate::components::show_tree::{DetailsTreeRenderer, DetailsTreeRendererWithContext};
+use crate::components::show_tree::DetailsTreeRendererWithContext;
 use crate::components::tree::{Tree, TreeNode, build_tree};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -91,35 +96,56 @@ pub fn Chat() -> impl IntoView {
     let ctx = use_context::<ChatContext>().expect("ChatContext not provided");
 
     // Subscribe to context
-        Effect::new(move |_| {
+    Effect::new(move |_| {
             if ctx.clear_history.get() {
                 set_history.set(Vec::new());
                 set_chat_state.set(String::new());
                 ctx.clear_history.set(false);
             }
-        });
+    });
 
-        Effect::new(move |_| {
+    Effect::new(move |_| {
             if let Some(text) = ctx.insert_text.get() {
                 set_input.set(text);
                 ctx.insert_text.set(None);
             }
-        });
+    });
+    // Browser close handler
+    Effect::new(move |_| {
+        #[cfg(feature = "hydrate")] {
+            if let Some(window) = web_sys::window() {
+                let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move |_event: web_sys::BeforeUnloadEvent| {
+                    if let Some(navigator) = web_sys::window().map(|w| w.navigator()) {
+                        let _ = send_beacon_stop(&navigator);
+                    }
+                }) as Box<dyn FnMut(_)>);
+
+                let _ = window.add_event_listener_with_callback(
+                    "beforeunload",
+                    closure.as_ref().unchecked_ref()
+                );
+
+                closure.forget();
+            }
+        }
+    });
 
     // Autoscroll when history changes
     Effect::new(move |_| {
-        history.track();
-        let history_ref: Option<HtmlDivElement> = chat_history_ref.get();
-        if let Some(el) = history_ref {
-            let scroll_options = ScrollIntoViewOptions::new();
-            scroll_options.set_behavior(ScrollBehavior::Smooth);
-            let history_el: HtmlDivElement = el.clone();
-            let _ = gloo_timers::callback::Timeout::new(50, move || {
-                if let Some(last) = history_el.last_element_child() {
-                    last.scroll_into_view_with_scroll_into_view_options(&scroll_options);
-                }
-            })
-                .forget();
+        #[cfg(feature = "hydrate")] {
+            history.track();
+            let history_ref: Option<HtmlDivElement> = chat_history_ref.get();
+            if let Some(el) = history_ref {
+                let scroll_options = ScrollIntoViewOptions::new();
+                scroll_options.set_behavior(ScrollBehavior::Smooth);
+                let history_el: HtmlDivElement = el.clone();
+                let _ = gloo_timers::callback::Timeout::new(50, move || {
+                    if let Some(last) = history_el.last_element_child() {
+                        last.scroll_into_view_with_scroll_into_view_options(&scroll_options);
+                    }
+                })
+                    .forget();
+            }
         }
     });
     let owner = Owner::current();
@@ -144,7 +170,7 @@ pub fn Chat() -> impl IntoView {
                 let owner_clone = owner_ref.clone();
 
                 spawn_local(async move {
-                    if cfg!(target_arch = "wasm32") {
+                    #[cfg(feature = "hydrate")] {
                         let _ = owner_clone.with(move || async move {
                             if let Err(e) = handle_stream(
                                 prompt,
@@ -174,12 +200,13 @@ pub fn Chat() -> impl IntoView {
     };
 
     // Stop handler
-    let on_stop = {
-        let chat_id = chat_id.clone();
-        move |_| {
-            let chat_id = chat_id.clone();
+    let on_stop = move |_| {
+        #[cfg(feature = "hydrate")]
+        {
             spawn_local(async move {
-                let _ = send_stop_request(&chat_id).await;
+                if let Err(e) = send_stop_request().await {
+                    tracing::error!("Failed to stop: {}", e);
+                }
             });
         }
     };
@@ -321,6 +348,8 @@ fn MessageRenderer(message: Message) -> impl IntoView {
 }
 
 // Helpers
+#[allow(clippy::too_many_arguments)]
+#[cfg(feature = "hydrate")]
 async fn handle_stream(
     prompt: String,
     chat_id: String,
@@ -409,7 +438,7 @@ async fn handle_stream(
 
     process_stream(reader, set_history, set_is_loading, set_chat_state).await
 }
-
+#[cfg(feature = "hydrate")]
 async fn process_stream(
     reader: ReadableStreamDefaultReader,
     set_history: WriteSignal<Vec<Message>>,
@@ -599,30 +628,49 @@ fn capitalize(s: &str) -> String {
     }
 }
 
-async fn send_stop_request(chat_id: &str) -> Result<(), String> {
+// Stop request - session_id extracted from cookie on server
+#[cfg(feature = "hydrate")]
+async fn send_stop_request() -> Result<(), String> {
+    tracing::info!("send_stop_request called!");
     let window = web_sys::window().ok_or("No window")?;
-    let origin = window
-        .location()
-        .origin()
-        .map_err(|_| "No origin".to_string())?;
+    let origin = window.location().origin().map_err(|_| "No origin")?;
 
     let url = format!("{}/api/stop", origin);
-    let payload = json!({ "chat_id": chat_id }).to_string();
+    let payload = json!({}).to_string();
 
     let headers = web_sys::Headers::new().map_err(|_| "Headers error")?;
-    headers
-        .append("Content-Type", "application/json")
+    headers.append("Content-Type", "application/json")
         .map_err(|_| "Header append error")?;
 
-    let opts = RequestInit::new();
+    let opts = web_sys::RequestInit::new();
     opts.set_method("POST");
     opts.set_headers(&headers);
     opts.set_body(&wasm_bindgen::JsValue::from_str(&payload));
+    opts.set_credentials(web_sys::RequestCredentials::SameOrigin);
 
-    let request = window.fetch_with_str_and_init(&url, &opts);
-    JsFuture::from(request)
+    let request = web_sys::Request::new_with_str_and_init(&url, &opts)
+        .map_err(|e| format!("Request error: {:?}", e))?;
+
+    let resp_value = JsFuture::from(window.fetch_with_request(&request))
         .await
-        .map_err(|e| format!("Stop request error: {:?}", e))?;
+        .map_err(|e| format!("Stop error: {:?}", e))?;
+
+    let resp: web_sys::Response = resp_value.dyn_into()
+        .map_err(|_| "Response cast error")?;
+
+    if !resp.ok() {
+        return Err(format!("Stop failed: {}", resp.status()));
+    }
 
     Ok(())
 }
+
+// SendBeacon for beforeunload - cookies sent automatically
+#[cfg(feature = "hydrate")]
+fn send_beacon_stop(navigator: &web_sys::Navigator) -> Result<bool, wasm_bindgen::JsValue> {
+    let url = "/api/stop";
+    tracing::info!("Stop beacon called!");
+    let success = navigator.send_beacon_with_opt_str(url, None)?;
+    Ok(success)
+}
+
