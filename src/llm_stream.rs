@@ -2,6 +2,7 @@ use crate::chunk_assembler::*;
 use crate::chunk_assembler::*;
 use crate::events::*;
 use crate::state::{AppState, ChatSession};
+use crate::auth::SESSION_ID;
 use async_stream::stream;
 use axum::{
     extract::State,
@@ -11,8 +12,10 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use axum_extra::extract::CookieJar;
 use http::StatusCode;
 use tokio::sync::watch;
+use tower_cookies::Cookies;
 #[allow(unused_imports)]
 use tracing::{error, info, warn};
 
@@ -29,17 +32,17 @@ pub struct PromptRequest {
 
 pub async fn chat_stream_handler(
     State(state): State<AppState>,
+    jar: CookieJar,
     axum::Json(req): axum::Json<PromptRequest>,
 ) -> Result<impl IntoResponse, Response> {
     info!("Received streaming request for prompt: {}", &req.message);
-    let session_id = match cookies.get("chat_session") {
+    let session_id = match jar.get(SESSION_ID) {
         Some(cookie) => cookie.value().to_string(),
         None => {
-            tracing::warn!("No session_id in cookie");
-            return (StatusCode::UNAUTHORIZED, "No session");
+            tracing::error!("No session_id in cookie");
+            return Err((StatusCode::UNAUTHORIZED, "No session to stop").into_response());
         }
     };
-
 
     let chat_session = {
         let mut guard = state.chat_sessions.lock().await;

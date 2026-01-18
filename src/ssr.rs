@@ -186,18 +186,10 @@ pub async fn logout_handler(State(state): State<AppState>, jar: CookieJar) -> im
             // Cancel active requests
             if let Some(chat_session) = chat_sessions.get_mut(&session_id) {
                 let _ = chat_session.cancel_tx.send(true);
-
                 if let Some(request_id) = &chat_session.current_request_id.read().await.clone() {
-                    let cancel_url = format!(
-                        "{}/agent/chat/cancel/{}",
-                        state.oidc_client.config.chat_config.agent_api_url,
-                        request_id
-                    );
-
                     let client = state.async_http_client.clone();
-                    tokio::spawn(async move {
-                        let _ = client.delete(&cancel_url).send().await;
-                    });
+                    let agent_api_url = state.oidc_client.config.chat_config.agent_api_url.clone();
+                    crate::stop::cancel_agent_request(request_id, agent_api_url, client);
                 }
             }
 
