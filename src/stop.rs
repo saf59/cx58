@@ -6,6 +6,7 @@ use axum::{
 };
 use axum_extra::extract::CookieJar;
 use reqwest::{Client, StatusCode};
+use std::time::Duration;
 
 // Stop handler - extracts session_id from cookie
 pub async fn stop_handler(
@@ -57,7 +58,7 @@ pub fn cancel_agent_request(request_id: &String, agent_api_url: String, client: 
     let request_id = request_id.clone();
 
     tokio::spawn(async move {
-        match client.delete(&cancel_url).send().await {
+        match client.delete(&cancel_url).timeout(Duration::from_secs(2)).send().await {
             Ok(resp) if resp.status().is_success() => {
                 tracing::info!("Agent request {} cancelled", request_id);
             }

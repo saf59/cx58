@@ -65,8 +65,8 @@ pub async fn chat_stream_handler(
     let mut token_counter: usize = 0;
     let agent_url = format!("{}/agent/chat", &chat_config.agent_api_url);
 
-    info!("Agent URL: {}", agent_url);
-    info!("Request payload: {:#?}", req);
+    //info!("Agent URL: {}", agent_url);
+    //info!("Request payload: {:#?}", req);
 
     #[derive(Debug)]
     enum FinishReason {
@@ -98,8 +98,8 @@ pub async fn chat_stream_handler(
 
             let mut byte_stream = match response_result {
                 Ok(res) if res.status().is_success() => {
-                    info!("Agent response status: {}", res.status());
-                    info!("Agent response headers: {:#?}", res.headers());
+                    //info!("Agent response status: {}", res.status());
+                    //info!("Agent response headers: {:#?}", res.headers());
                     res.bytes_stream()
                 },
                 Ok(res) => {
@@ -195,7 +195,7 @@ pub async fn chat_stream_handler(
                                                             | StreamEvent::Error { request_id, .. }
                                                             | StreamEvent::Cancelled { request_id, .. } => request_id,
                                                         };
-                                            tracing::debug!("Step request: {:?}", request_id);
+
                                             {
                                                     let mut sessions = state.chat_sessions.lock().await;
                                                     if let Some(session) = sessions.get_mut(&session_id) {
@@ -206,7 +206,6 @@ pub async fn chat_stream_handler(
 
                                             match event {
                                                 StreamEvent::TextChunk { chunk, .. } => {
-                                                    //tracing::debug!("Processing TextChunk: {:?}", chunk);
 
                                                     token_counter += chunk.split_whitespace().count();
                                                     {
@@ -259,9 +258,9 @@ pub async fn chat_stream_handler(
                                                 }
                                             }
                                         }
-                                        Err(_parse_err) => {
+                                        Err(parse_err) => {
                                             // If not StreamEvent, process as legacy format
-                                            //tracing::debug!("Not a StreamEvent ({}), using legacy parsing", parse_err);
+                                            tracing::debug!("Not a StreamEvent ({}), using legacy parsing", parse_err);
                                             let chunks = assembler.push_sse_line(data);
                                             for chunk in chunks {
                                                 match chunk {

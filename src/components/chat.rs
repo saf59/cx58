@@ -388,9 +388,9 @@ async fn handle_stream(
     opts.set_method("POST");
     opts.set_headers(&headers);
 
-    let parent = { move || context.parent.get()};
-    let prev_leaf = { move || context.prev_leaf.get()};
-    let next_leaf = { move || context.next_leaf.get()};
+    let parent = context.parent.get_untracked();
+    let prev_leaf = context.prev_leaf.get_untracked();
+    let next_leaf = context.next_leaf.get_untracked();
 
     let mut body_map = serde_json::Map::new();
     body_map.insert("message".to_string(), json!(prompt));

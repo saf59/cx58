@@ -28,7 +28,7 @@ pub fn NodeInfoDisplay(
                                 }
                                 title="Delete"
                             >
-                                <i class="fas fa-times" style="color: red;"></i>
+                                <i class="fas fa-times"></i>
                             </button>
                             <i class=icon_class></i>
                             <span class="node-name">

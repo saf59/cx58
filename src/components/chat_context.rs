@@ -39,6 +39,7 @@ impl ChatContext {
         self.parent.set(Some(node_info));
     }
 
+    #[allow(dead_code)]
     pub fn set_leaf(&self, node_info: NodeInfo) {
         if self.prev_leaf.get().is_none() {
             self.prev_leaf.set(Some(node_info));
