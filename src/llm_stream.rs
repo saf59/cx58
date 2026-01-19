@@ -1,5 +1,4 @@
 use crate::chunk_assembler::*;
-use crate::chunk_assembler::*;
 use crate::events::*;
 use crate::state::{AppState, ChatSession};
 use crate::auth::SESSION_ID;
@@ -15,7 +14,6 @@ use std::time::{Duration, Instant};
 use axum_extra::extract::CookieJar;
 use http::StatusCode;
 use tokio::sync::watch;
-use tower_cookies::Cookies;
 #[allow(unused_imports)]
 use tracing::{error, info, warn};
 
@@ -261,7 +259,7 @@ pub async fn chat_stream_handler(
                                                 }
                                             }
                                         }
-                                        Err(parse_err) => {
+                                        Err(_parse_err) => {
                                             // If not StreamEvent, process as legacy format
                                             //tracing::debug!("Not a StreamEvent ({}), using legacy parsing", parse_err);
                                             let chunks = assembler.push_sse_line(data);

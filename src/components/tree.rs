@@ -74,6 +74,7 @@ pub struct NodeInfo {
     pub id: Uuid,
     pub parent_id: Option<Uuid>,
     pub name: Option<String>,
+    pub node_type: NodeType,
 }
 
 impl Tree {
@@ -89,6 +90,7 @@ impl Tree {
             id: self.id,
             parent_id: self.parent_id,
             name: self.name.clone(),
+            node_type: self.node_type,
         }
     }
 }
@@ -283,7 +285,7 @@ where
     view! {
         <div class="tree-viewer-resource">
             <Suspense fallback=move || {
-                view! { <p>"Loading..."</p> }
+                view! { <i class="tree-loader" /> }
             }>
                 {move || {
                     tree_resource

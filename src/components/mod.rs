@@ -9,3 +9,4 @@ pub(crate) mod user_info;
 pub(crate) mod tree;
 pub(crate) mod show_tree;
 pub(crate) mod show_carusel;
+pub(crate) mod node_info_display;

@@ -16,10 +16,10 @@ use web_sys::{
     ScrollIntoViewOptions,
 };
 use crate::auth::Auth;
-
+use crate::components::node_info_display::NodeInfoDisplay;
 use crate::components::show_carusel::CarouselRenderer;
 use crate::components::show_tree::DetailsTreeRendererWithContext;
-use crate::components::tree::{Tree, TreeNode, build_tree};
+use crate::components::tree::{Tree, TreeNode, build_tree, NodeInfo};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum MessageRole {
@@ -94,6 +94,9 @@ pub fn Chat() -> impl IntoView {
     let auth_signal = use_context::<RwSignal<Auth>>().expect("Auth must be provided");
     let user_id = auth_signal.get_untracked().email().unwrap_or("mock".to_string());
     let ctx = use_context::<ChatContext>().expect("ChatContext not provided");
+    let delete_node_info = Callback::new(move |node_info: NodeInfo| {
+        ctx.delete_node_info(node_info)
+    });
 
     // Subscribe to context
     Effect::new(move |_| {
@@ -249,7 +252,14 @@ pub fn Chat() -> impl IntoView {
                         class="input-zone"
                         prop:disabled=is_loading
                     />
-                    <div></div>
+                    <div class="node-info-section">
+                        <NodeInfoDisplay node_signal=ctx.parent on_node_click=delete_node_info />
+                        <div class="node-info-leafs" >
+                            <NodeInfoDisplay node_signal=ctx.prev_leaf on_node_click=delete_node_info />
+                            <NodeInfoDisplay node_signal=ctx.next_leaf on_node_click=delete_node_info />
+                        </div>
+                    </div>
+
                     <button
                         type="button"
                         on:click=on_stop

@@ -98,7 +98,39 @@
             background-color: transparent;
         }
     }
+    .node-info-section {
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+        font: menu;
+
+        .node-info-leafs {
+            margin-left: 10px;
+            flex-direction: column;
+        }
+        .delete-btn {
+            margin: 0;
+            padding: 0;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+        }
+        i {
+            margin-right: 4px;
+        }
+
+    }
 }
+.tree-loader {
+    width: 10px;
+    height: 10px;
+    top: 5px;
+    left: 28px;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    animation: l5 1s infinite linear alternate;
+}
+
 /* HTML: <div class="loader"></div> */
 .loader {
     width: 10px;

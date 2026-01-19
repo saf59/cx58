@@ -1,12 +1,11 @@
-use crate::state::AppState;
 use crate::auth::SESSION_ID;
+use crate::state::AppState;
 use axum::{
     extract::State,
     response::IntoResponse,
 };
 use axum_extra::extract::CookieJar;
 use reqwest::{Client, StatusCode};
-use tower_cookies::Cookies;
 
 // Stop handler - extracts session_id from cookie
 pub async fn stop_handler(
