@@ -285,11 +285,11 @@ pub fn CarouselRenderer(tree: Vec<Tree>) -> impl IntoView {
                     /* Responsive adjustments */
                     @media (max-width: 768px) {
                     .carousel {
-                        grid-auto-columns: 100%; /* 1 image on mobile */
+                       grid-auto-columns: 100%; /* 1 image on mobile */
                     }
                     
                     .thumbnail {
-                        height: 250px;
+                       height: 250px;
                     }
                     }
                     "#}

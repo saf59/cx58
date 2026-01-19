@@ -254,9 +254,15 @@ pub fn Chat() -> impl IntoView {
                     />
                     <div class="node-info-section">
                         <NodeInfoDisplay node_signal=ctx.parent on_node_click=delete_node_info />
-                        <div class="node-info-leafs" >
-                            <NodeInfoDisplay node_signal=ctx.prev_leaf on_node_click=delete_node_info />
-                            <NodeInfoDisplay node_signal=ctx.next_leaf on_node_click=delete_node_info />
+                        <div class="node-info-leafs">
+                            <NodeInfoDisplay
+                                node_signal=ctx.prev_leaf
+                                on_node_click=delete_node_info
+                            />
+                            <NodeInfoDisplay
+                                node_signal=ctx.next_leaf
+                                on_node_click=delete_node_info
+                            />
                         </div>
                     </div>
 
@@ -382,9 +388,9 @@ async fn handle_stream(
     opts.set_method("POST");
     opts.set_headers(&headers);
 
-    let parent = context.parent.get();
-    let prev_leaf = context.prev_leaf.get();
-    let next_leaf = context.next_leaf.get();
+    let parent = { move || context.parent.get()};
+    let prev_leaf = { move || context.prev_leaf.get()};
+    let next_leaf = { move || context.next_leaf.get()};
 
     let mut body_map = serde_json::Map::new();
     body_map.insert("message".to_string(), json!(prompt));
