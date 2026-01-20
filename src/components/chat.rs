@@ -1,25 +1,25 @@
+use crate::auth::Auth;
 use crate::components::chat_context::ChatContext;
+use crate::components::node_info_display::NodeInfoDisplay;
+use crate::components::show_carusel::CarouselRenderer;
+use crate::components::show_tree::DetailsTreeRendererWithContext;
+use crate::components::tree::{NodeInfo, Tree};
 use leptos::prelude::*;
-use leptos::reactive::spawn_local;
 use leptos::*;
-use leptos_fluent::{move_tr, I18n};
+#[cfg(not(feature = "ssr"))]
+use leptos::reactive::spawn_local;
+use leptos_fluent::{I18n, move_tr};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-#[cfg(feature = "hydrate")]
-use wasm_bindgen::JsCast;
-#[cfg(feature = "hydrate")]
-use wasm_bindgen_futures::JsFuture;
 
-#[cfg(feature = "hydrate")]
+#[cfg(not(feature = "ssr"))]
+use wasm_bindgen::JsCast;
+#[cfg(not(feature = "ssr"))]
+use wasm_bindgen_futures::JsFuture;
+#[cfg(not(feature = "ssr"))]
 use web_sys::{
     HtmlDivElement, ReadableStreamDefaultReader, RequestInit, Response, ScrollBehavior,
     ScrollIntoViewOptions,
 };
-use crate::auth::Auth;
-use crate::components::node_info_display::NodeInfoDisplay;
-use crate::components::show_carusel::CarouselRenderer;
-use crate::components::show_tree::DetailsTreeRendererWithContext;
-use crate::components::tree::{Tree, TreeNode, build_tree, NodeInfo};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum MessageRole {
@@ -90,50 +90,59 @@ pub fn Chat() -> impl IntoView {
     let chat_history_ref = NodeRef::new();
     let form_ref = NodeRef::<html::Form>::new();
     let chat_id = uuid::Uuid::now_v7().to_string();
+    #[allow(unused)]
     let i18n = expect_context::<I18n>();
     let auth_signal = use_context::<RwSignal<Auth>>().expect("Auth must be provided");
-    let user_id = auth_signal.get_untracked().email().unwrap_or("mock".to_string());
+    #[allow(unused)]
+    let user_id = auth_signal
+        .get_untracked()
+        .email()
+        .unwrap_or("mock".to_string());
     let ctx = use_context::<ChatContext>().expect("ChatContext not provided");
-    let delete_node_info = Callback::new(move |node_info: NodeInfo| {
-        ctx.delete_node_info(node_info)
-    });
+    let delete_node_info =
+        Callback::new(move |node_info: NodeInfo| ctx.delete_node_info(node_info));
 
     // Subscribe to context
     Effect::new(move |_| {
-            if ctx.clear_history.get() {
-                set_history.set(Vec::new());
-                set_chat_state.set(String::new());
-                ctx.clear_history.set(false);
-            }
+        if ctx.clear_history.get() {
+            set_history.set(Vec::new());
+            set_chat_state.set(String::new());
+            ctx.clear_history.set(false);
+        }
     });
 
     Effect::new(move |_| {
-            if let Some(text) = ctx.insert_text.get() {
-                set_input.set(text);
-                ctx.insert_text.set(None);
-            }
+        if let Some(text) = ctx.insert_text.get() {
+            set_input.set(text);
+            ctx.insert_text.set(None);
+        }
     });
+
     // Browser close handler
-    Effect::new(move |_| {
-        #[cfg(feature = "hydrate")] {
+    #[cfg(not(feature = "ssr"))]
+    {
+        Effect::new(move |_| {
             if let Some(window) = web_sys::window() {
-                let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move |_event: web_sys::BeforeUnloadEvent| {
-                    let _ = send_stop_beacon();
-                }) as Box<dyn FnMut(_)>);
+                let closure = wasm_bindgen::closure::Closure::wrap(Box::new(
+                    move |_event: web_sys::BeforeUnloadEvent| {
+                        let _ = send_stop_beacon();
+                    },
+                )
+                    as Box<dyn FnMut(_)>);
 
                 let _ = window.add_event_listener_with_callback(
                     "beforeunload",
-                    closure.as_ref().unchecked_ref()
+                    closure.as_ref().unchecked_ref(),
                 );
 
                 closure.forget();
             }
-        }
-    });
-
+        });
+    }
     // Autoscroll when history changes
-    Effect::new(move |_| {
-        #[cfg(feature = "hydrate")] {
+    #[cfg(not(feature = "ssr"))]
+    {
+        Effect::new(move |_| {
             history.track();
             let history_ref: Option<HtmlDivElement> = chat_history_ref.get();
             if let Some(el) = history_ref {
@@ -145,13 +154,15 @@ pub fn Chat() -> impl IntoView {
                         last.scroll_into_view_with_scroll_into_view_options(&scroll_options);
                     }
                 })
-                    .forget();
+                .forget();
             }
-        }
-    });
+        });
+    }
+    #[allow(unused)]
     let owner = Owner::current();
     // Submit handler
     let on_submit = {
+        #[allow(unused)]
         let chat_id = chat_id.clone();
         move |ev: ev::SubmitEvent| {
             ev.prevent_default();
@@ -164,45 +175,48 @@ pub fn Chat() -> impl IntoView {
                 h.push(Message::new_text(MessageRole::User, prompt.clone()));
             });
             set_input.set(String::new());
-            if let Some(owner_ref) = owner.as_ref() {
-                let chat_id = chat_id.clone();
-                let language = i18n.language.get().id.to_string();
-                let user_id = user_id.clone();
-                let owner_clone = owner_ref.clone();
+            #[cfg(not(feature = "ssr"))]
+            {
+                if let Some(owner_ref) = owner.as_ref() {
+                    let chat_id = chat_id.clone();
+                    let language = i18n.language.get().id.to_string();
+                    let user_id = user_id.clone();
+                    let owner_clone = owner_ref.clone();
 
-                spawn_local(async move {
-                    #[cfg(feature = "hydrate")] {
-                        let _ = owner_clone.with(move || async move {
-                            if let Err(e) = handle_stream(
-                                prompt,
-                                chat_id,
-                                set_history,
-                                set_is_loading,
-                                set_chat_state,
-                                language,
-                                user_id,
-                                ctx
-                            )
+                    spawn_local(async move {
+                        let _ = owner_clone
+                            .with(move || async move {
+                                if let Err(e) = handle_stream(
+                                    prompt,
+                                    chat_id,
+                                    set_history,
+                                    set_is_loading,
+                                    set_chat_state,
+                                    language,
+                                    user_id,
+                                    ctx,
+                                )
                                 .await
-                            {
-                                set_history.update(|h| {
-                                    h.push(Message::new_text(
-                                        MessageRole::Error,
-                                        format!("⚠ Connection error: {}", e),
-                                    ));
-                                });
-                                set_is_loading.set(false);
-                            }
-                        }).await;
-                    }
-                });
+                                {
+                                    set_history.update(|h| {
+                                        h.push(Message::new_text(
+                                            MessageRole::Error,
+                                            format!("⚠ Connection error: {}", e),
+                                        ));
+                                    });
+                                    set_is_loading.set(false);
+                                }
+                            })
+                            .await;
+                    });
+                }
             }
         }
     };
 
     // Stop handler
     let on_stop = move |_| {
-        #[cfg(feature = "hydrate")]
+        #[cfg(not(feature = "ssr"))]
         {
             spawn_local(async move {
                 if let Err(e) = send_stop_beacon() {
@@ -291,79 +305,73 @@ fn MessageRenderer(message: Message) -> impl IntoView {
     let ctx = use_context::<ChatContext>().expect("Context lost");
 
     match message.content {
-        MessageContent::Text(text) => {
-            view! { <div class=css_class inner_html=text /> }.into_any()
+        MessageContent::Text(text) => view! { <div class=css_class inner_html=text /> }.into_any(),
+        MessageContent::ObjectTree(tree) => view! {
+            <div class=css_class>
+                <DetailsTreeRendererWithContext
+                    tree=tree
+                    on_node_click=move |node_info| {
+                        tracing::info!("Node clicked: {:?}", node_info.name);
+                        ctx.insert_text
+                            .set(Some(node_info.name.unwrap_or("(unnamed)".to_string())));
+                    }
+                />
+            </div>
         }
-        MessageContent::ObjectTree(tree) => {
-            view! {
-                <div class=css_class>
-                    <DetailsTreeRendererWithContext
-                        tree=tree
-                        on_node_click=move |node_info| {
-                            tracing::info!("Node clicked: {:?}", node_info.name);
-                            ctx.insert_text
-                                .set(Some(node_info.name.unwrap_or("(unnamed)".to_string())));
-                        }
-                    />
+        .into_any(),
+        MessageContent::DocumentTree(tree) => view! {
+            <div class=css_class>
+                <CarouselRenderer tree=tree />
+            </div>
+        }
+        .into_any(),
+        MessageContent::Description(data) => view! {
+            <div class=css_class>
+                <div class="description-content">
+                    <h4>"Description"</h4>
+                    <p>{data.description}</p>
+                    {data
+                        .fields
+                        .into_iter()
+                        .map(|(key, value)| {
+                            view! {
+                                <div class="description-field">
+                                    <h5>{key}</h5>
+                                    <p>{value}</p>
+                                </div>
+                            }
+                        })
+                        .collect_view()}
                 </div>
-            }.into_any()
+            </div>
         }
-        MessageContent::DocumentTree(tree) => {
-            view! {
-                <div class=css_class>
-                    <CarouselRenderer tree=tree />
+        .into_any(),
+        MessageContent::Comparison(data) => view! {
+            <div class=css_class>
+                <div class="comparison-content">
+                    <h4>"Comparison"</h4>
+                    {data
+                        .fields
+                        .into_iter()
+                        .map(|(key, value)| {
+                            view! {
+                                <div class="comparison-field">
+                                    <h5>{key}</h5>
+                                    <p>{value}</p>
+                                </div>
+                            }
+                        })
+                        .collect_view()}
                 </div>
-            }.into_any()
+            </div>
         }
-        MessageContent::Description(data) => {
-            view! {
-                <div class=css_class>
-                    <div class="description-content">
-                        <h4>"Description"</h4>
-                        <p>{data.description}</p>
-                        {data
-                            .fields
-                            .into_iter()
-                            .map(|(key, value)| {
-                                view! {
-                                    <div class="description-field">
-                                        <h5>{key}</h5>
-                                        <p>{value}</p>
-                                    </div>
-                                }
-                            })
-                            .collect_view()}
-                    </div>
-                </div>
-            }.into_any()
-        }
-        MessageContent::Comparison(data) => {
-            view! {
-                <div class=css_class>
-                    <div class="comparison-content">
-                        <h4>"Comparison"</h4>
-                        {data
-                            .fields
-                            .into_iter()
-                            .map(|(key, value)| {
-                                view! {
-                                    <div class="comparison-field">
-                                        <h5>{key}</h5>
-                                        <p>{value}</p>
-                                    </div>
-                                }
-                            })
-                            .collect_view()}
-                    </div>
-                </div>
-            }.into_any()
-        }
+        .into_any(),
     }
 }
 
 // Helpers
 #[allow(clippy::too_many_arguments)]
-#[cfg(feature = "hydrate")]
+#[cfg(not(feature = "ssr"))]
 async fn handle_stream(
     prompt: String,
     chat_id: String,
@@ -372,8 +380,9 @@ async fn handle_stream(
     set_chat_state: WriteSignal<String>,
     language: String,
     email: String,
-    context: ChatContext
+    context: ChatContext,
 ) -> Result<(), String> {
+    use serde_json::json;
 
     let window = web_sys::window().ok_or("No window")?;
 
@@ -452,7 +461,7 @@ async fn handle_stream(
 
     process_stream(reader, set_history, set_is_loading, set_chat_state).await
 }
-#[cfg(feature = "hydrate")]
+#[cfg(not(feature = "ssr"))]
 async fn process_stream(
     reader: ReadableStreamDefaultReader,
     set_history: WriteSignal<Vec<Message>>,
@@ -500,7 +509,13 @@ async fn process_stream(
             }
 
             if let Some(data) = line.strip_prefix("data: ") {
-                process_sse_event(&current_event, data, set_history, set_is_loading, set_chat_state);
+                process_sse_event(
+                    &current_event,
+                    data,
+                    set_history,
+                    set_is_loading,
+                    set_chat_state,
+                );
                 current_event = None;
             }
         }
@@ -511,6 +526,7 @@ async fn process_stream(
     Ok(())
 }
 
+#[cfg(not(feature = "ssr"))]
 fn process_sse_event(
     event: &Option<String>,
     data: &str,
@@ -518,6 +534,8 @@ fn process_sse_event(
     set_is_loading: WriteSignal<bool>,
     set_chat_state: WriteSignal<String>,
 ) {
+    use crate::components::tree::{TreeNode, build_tree};
+
     match event.as_deref() {
         None | Some("chunk") | Some("replay") => {
             if !data.is_empty() {
@@ -535,7 +553,10 @@ fn process_sse_event(
             if let Ok(nodes) = serde_json::from_str::<Vec<TreeNode>>(data) {
                 let tree = build_tree(nodes);
                 set_history.update(|h| {
-                    h.push(Message::new(MessageRole::Llm, MessageContent::ObjectTree(tree)));
+                    h.push(Message::new(
+                        MessageRole::Llm,
+                        MessageContent::ObjectTree(tree),
+                    ));
                 });
             }
         }
@@ -544,7 +565,10 @@ fn process_sse_event(
             if let Ok(nodes) = serde_json::from_str::<Vec<TreeNode>>(data) {
                 let tree = build_tree(nodes);
                 set_history.update(|h| {
-                    h.push(Message::new(MessageRole::Llm, MessageContent::DocumentTree(tree)));
+                    h.push(Message::new(
+                        MessageRole::Llm,
+                        MessageContent::DocumentTree(tree),
+                    ));
                 });
             }
         }
@@ -552,7 +576,8 @@ fn process_sse_event(
         Some("description_chunk") => {
             if let Ok(json_data) = serde_json::from_str::<serde_json::Value>(data) {
                 let mut fields = Vec::new();
-                let description = json_data.get("description")
+                let description = json_data
+                    .get("description")
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
@@ -560,16 +585,20 @@ fn process_sse_event(
                 if let Some(obj) = json_data.as_object() {
                     for (key, value) in obj.iter() {
                         if key != "description"
-                            && let Some(val_str) = value.as_str() {
-                                fields.push((capitalize(key), val_str.to_string()));
-                            }
+                            && let Some(val_str) = value.as_str()
+                        {
+                            fields.push((capitalize(key), val_str.to_string()));
+                        }
                     }
                 }
 
                 set_history.update(|h| {
                     h.push(Message::new(
                         MessageRole::Llm,
-                        MessageContent::Description(DescriptionData { description, fields }),
+                        MessageContent::Description(DescriptionData {
+                            description,
+                            fields,
+                        }),
                     ));
                 });
             }
@@ -605,7 +634,7 @@ fn process_sse_event(
             set_history.update(|h| {
                 h.push(Message::new_text(
                     MessageRole::System,
-                    format!("<i>ℹ Chat stopped: {}</i>", data),
+                    format!("<i>ℹ Request stopped: {}</i>", data),
                 ));
             });
             set_is_loading.set(false);
@@ -623,17 +652,18 @@ fn process_sse_event(
         _ => {}
     }
 }
-
+#[cfg(not(feature = "ssr"))]
 fn append_or_create_text_message(history: &mut Vec<Message>, content: String) {
     if let Some(last) = history.last_mut()
         && last.role == MessageRole::Llm
-            && let MessageContent::Text(ref mut text) = last.content {
-                text.push_str(&content);
-                return;
+        && let MessageContent::Text(ref mut text) = last.content
+    {
+        text.push_str(&content);
+        return;
     }
     history.push(Message::new_text(MessageRole::Llm, content));
 }
-
+#[cfg(not(feature = "ssr"))]
 fn capitalize(s: &str) -> String {
     let mut chars = s.chars();
     match chars.next() {
@@ -643,7 +673,7 @@ fn capitalize(s: &str) -> String {
 }
 
 // Stop request - session_id extracted from cookie on server
-#[cfg(feature = "hydrate")]
+#[cfg(not(feature = "ssr"))]
 fn send_stop_beacon() -> Result<bool, String> {
     tracing::info!("Stop beacon called!");
 
