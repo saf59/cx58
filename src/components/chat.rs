@@ -118,9 +118,7 @@ pub fn Chat() -> impl IntoView {
         #[cfg(feature = "hydrate")] {
             if let Some(window) = web_sys::window() {
                 let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move |_event: web_sys::BeforeUnloadEvent| {
-                    if let Some(navigator) = web_sys::window().map(|w| w.navigator()) {
-                        let _ = send_beacon_stop(&navigator);
-                    }
+                    let _ = send_stop_beacon();
                 }) as Box<dyn FnMut(_)>);
 
                 let _ = window.add_event_listener_with_callback(
@@ -207,7 +205,7 @@ pub fn Chat() -> impl IntoView {
         #[cfg(feature = "hydrate")]
         {
             spawn_local(async move {
-                if let Err(e) = send_stop_request().await {
+                if let Err(e) = send_stop_beacon() {
                     tracing::error!("Failed to stop: {}", e);
                 }
             });
@@ -646,47 +644,12 @@ fn capitalize(s: &str) -> String {
 
 // Stop request - session_id extracted from cookie on server
 #[cfg(feature = "hydrate")]
-async fn send_stop_request() -> Result<(), String> {
-    tracing::info!("send_stop_request called!");
-    let window = web_sys::window().ok_or("No window")?;
-    let origin = window.location().origin().map_err(|_| "No origin")?;
-
-    let url = format!("{}/api/stop", origin);
-    let payload = json!({}).to_string();
-
-    let headers = web_sys::Headers::new().map_err(|_| "Headers error")?;
-    headers.append("Content-Type", "application/json")
-        .map_err(|_| "Header append error")?;
-
-    let opts = web_sys::RequestInit::new();
-    opts.set_method("POST");
-    opts.set_headers(&headers);
-    opts.set_body(&wasm_bindgen::JsValue::from_str(&payload));
-    opts.set_credentials(web_sys::RequestCredentials::SameOrigin);
-
-    let request = web_sys::Request::new_with_str_and_init(&url, &opts)
-        .map_err(|e| format!("Request error: {:?}", e))?;
-
-    let resp_value = JsFuture::from(window.fetch_with_request(&request))
-        .await
-        .map_err(|e| format!("Stop error: {:?}", e))?;
-
-    let resp: web_sys::Response = resp_value.dyn_into()
-        .map_err(|_| "Response cast error")?;
-
-    if !resp.ok() {
-        return Err(format!("Stop failed: {}", resp.status()));
-    }
-
-    Ok(())
-}
-
-// SendBeacon for beforeunload - cookies sent automatically
-#[cfg(feature = "hydrate")]
-fn send_beacon_stop(navigator: &web_sys::Navigator) -> Result<bool, wasm_bindgen::JsValue> {
-    let url = "/api/stop";
+fn send_stop_beacon() -> Result<bool, String> {
     tracing::info!("Stop beacon called!");
-    let success = navigator.send_beacon_with_opt_str(url, None)?;
-    Ok(success)
-}
 
+    web_sys::window()
+        .ok_or("No window")?
+        .navigator()
+        .send_beacon_with_opt_str("/api/stop", None)
+        .map_err(|e| format!("Beacon error: {:?}", e))
+}
