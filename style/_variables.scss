@@ -1,4 +1,6 @@
 :root {
+    interpolate-size: allow-keywords;
+
     --1-color: #111111;
     --2-color: #222222;
     --3-color: #333333;
@@ -20,8 +22,8 @@
     --bg-oidc: #f6f4f0;
     --accent-color: --f-color;
     --gradient-color: --c-color;
-    --sidebar-width: 350px;
-    --content-width: calc(100dvw - --sidebar-width);
+    //--sidebar-width: 350px;
+    //--content-width: calc(100dvw - --sidebar-width);
     --sidebar-bcolor: --f0-color;
     --wrapper-bcolor: --f4-color;
     --border-color: --c-color;

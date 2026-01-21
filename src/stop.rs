@@ -27,8 +27,6 @@ pub async fn stop_handler(
     let mut sessions = state.chat_sessions.lock().await;
 
     if let Some(chat_session) = sessions.get_mut(&session_id) {
-        // Send local cancel signal
-        let _ = chat_session.cancel_tx.send(true);
 
         // Cancel on agent if active request exists
         if let Some(request_id) = &chat_session.current_request_id.read().await.clone() {

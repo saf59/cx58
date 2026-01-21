@@ -1,6 +1,7 @@
 use crate::chunk_assembler::*;
 use crate::events::*;
-use crate::state::{AppState, ChatSession};
+use crate::state::ChatSession;
+use crate::state::AppState;
 use crate::auth::SESSION_ID;
 use async_stream::stream;
 use axum::{
@@ -9,11 +10,10 @@ use axum::{
 };
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 use axum_extra::extract::CookieJar;
+use std::sync::Arc;
 use http::StatusCode;
-use tokio::sync::watch;
 #[allow(unused_imports)]
 use tracing::{error, info, warn};
 
@@ -41,32 +41,19 @@ pub async fn chat_stream_handler(
             return Err((StatusCode::UNAUTHORIZED, "No session to stop").into_response());
         }
     };
-
-    let chat_session = {
+    let _chat_session = {
         let mut guard = state.chat_sessions.lock().await;
         guard
             .entry(session_id.clone())
-            .or_insert_with(|| {
-                let (tx, rx) = watch::channel(false);
-                Arc::new(ChatSession {
-                    cancel_tx: tx,
-                    cancel_rx: rx,
-                    cache: tokio::sync::Mutex::new(Vec::new()),
-                    current_request_id: None.into(),
-                })
-            })
+            .or_insert_with(|| Arc::new(ChatSession { current_request_id: None.into() }))
             .clone()
     };
     let chat_config = state.oidc_client.config.chat_config.clone();
-
     let start_at = Instant::now();
     let max_duration = Duration::from_secs(chat_config.max_duration_sec);
     let max_tokens: usize = chat_config.max_chat_tokens;
     let mut token_counter: usize = 0;
     let agent_url = format!("{}/agent/chat", &chat_config.agent_api_url);
-
-    //info!("Agent URL: {}", agent_url);
-    //info!("Request payload: {:#?}", req);
 
     #[derive(Debug)]
     enum FinishReason {
@@ -84,7 +71,7 @@ pub async fn chat_stream_handler(
         .unwrap();
 
     let sse_stream = stream! {
-        let mut stop_flag = chat_session.cancel_rx.clone();
+        let mut local_cache: Vec<String> = Vec::new();
         let mut retries = 0;
         let max_retries = 3;
 
@@ -98,8 +85,6 @@ pub async fn chat_stream_handler(
 
             let mut byte_stream = match response_result {
                 Ok(res) if res.status().is_success() => {
-                    //info!("Agent response status: {}", res.status());
-                    //info!("Agent response headers: {:#?}", res.headers());
                     res.bytes_stream()
                 },
                 Ok(res) => {
@@ -124,8 +109,7 @@ pub async fn chat_stream_handler(
             };
 
             {
-                let cache_guard = chat_session.cache.lock().await;
-                for cached in cache_guard.iter() {
+                for cached in local_cache.iter() {
                     yield Ok(Event::default().event("replay").data(cached.clone()));
                 }
             }
@@ -136,10 +120,6 @@ pub async fn chat_stream_handler(
 
             let finish_reason = 'outer: loop {
                 tokio::select! {
-                    _ = stop_flag.changed() => {
-                        info!("Stream stopped by user");
-                        break 'outer FinishReason::Stopped;
-                    }
                     _ = tokio::time::sleep_until((start_at + max_duration).into()) => {
                         info!("Stream timeout");
                         break 'outer FinishReason::Timeout;
@@ -165,7 +145,6 @@ pub async fn chat_stream_handler(
                         };
 
                         let text = String::from_utf8_lossy(&bytes_chunk);
-                        //tracing::debug!("Raw chunk: {:?}", text);
                         buffer.push_str(&text);
 
                         // Parse SSE lines
@@ -173,12 +152,9 @@ pub async fn chat_stream_handler(
                             let sse_block = buffer[..line_end].to_string();
                             buffer = buffer[line_end + 2..].to_string();
 
-                            //tracing::debug!("SSE block: {:?}", sse_block);
-
                             // Extract data: from SSE
                             for line in sse_block.lines() {
                                 if let Some(data) = line.strip_prefix("data: ") {
-                                    //tracing::debug!("SSE data: {:?}", data);
 
                                     match serde_json::from_str::<StreamEvent>(data) {
                                         Ok(event) => {
@@ -208,10 +184,7 @@ pub async fn chat_stream_handler(
                                                 StreamEvent::TextChunk { chunk, .. } => {
 
                                                     token_counter += chunk.split_whitespace().count();
-                                                    {
-                                                        let mut cache_guard = chat_session.cache.lock().await;
-                                                        cache_guard.push(chunk.clone());
-                                                    }
+                                                    local_cache.push(chunk.clone());
                                                     yield Ok(Event::default().data(chunk));
 
                                                     if token_counter >= max_tokens {
@@ -266,10 +239,7 @@ pub async fn chat_stream_handler(
                                                 match chunk {
                                                     UiChunk::Text(text) => {
                                                         token_counter += text.split_whitespace().count();
-                                                        {
-                                                            let mut cache_guard = chat_session.cache.lock().await;
-                                                            cache_guard.push(text.clone());
-                                                        }
+                                                        local_cache.push(text.clone());
                                                         yield Ok(Event::default().data(text));
 
                                                         if token_counter >= max_tokens {
@@ -278,10 +248,7 @@ pub async fn chat_stream_handler(
                                                     }
                                                     UiChunk::Markdown(md) => {
                                                         token_counter += md.split_whitespace().count();
-                                                        {
-                                                            let mut cache_guard = chat_session.cache.lock().await;
-                                                            cache_guard.push(md.clone());
-                                                        }
+                                                        local_cache.push(md.clone());
                                                         yield Ok(Event::default().data(md));
 
                                                         if token_counter >= max_tokens {

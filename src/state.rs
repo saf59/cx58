@@ -4,7 +4,7 @@ use leptos::config::LeptosOptions;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tokio::sync::watch;
+//use tokio::sync::watch;
 #[derive(Clone)]
 pub struct AppState {
     pub leptos_options: Arc<LeptosOptions>,
@@ -14,9 +14,9 @@ pub struct AppState {
     pub chat_sessions: Arc<Mutex<HashMap<String, Arc<ChatSession>>>>
 }
 pub struct ChatSession {
-    pub cancel_tx: watch::Sender<bool>,
-    pub cancel_rx: watch::Receiver<bool>,
-    pub cache: tokio::sync::Mutex<Vec<String>>,
+    //pub cancel_tx: watch::Sender<bool>,
+    //pub cancel_rx: watch::Receiver<bool>,
+    //pub cache: tokio::sync::Mutex<Vec<String>>,
     pub current_request_id: tokio::sync::RwLock<Option<String>>,
 }
 
