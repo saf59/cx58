@@ -190,6 +190,9 @@
         .sb-unpin {
             visibility: hidden;
         }
+        .sb-sideHeader {
+            margin-right: auto;
+        }
     }
 
     /* Pinned sidebar */
@@ -207,6 +210,9 @@
             border-radius: 0;
             border: 0;
             margin-right: 0;
+        }
+        .sb-sideHeader {
+            margin-left: auto;
         }
     }
 }
