@@ -1,19 +1,20 @@
+use crate::auth::SESSION_ID;
 use crate::chunk_assembler::*;
 use crate::events::*;
-use crate::state::ChatSession;
+use crate::hmac::build_hmac;
 use crate::state::AppState;
-use crate::auth::SESSION_ID;
+use crate::state::ChatSession;
 use async_stream::stream;
 use axum::{
     extract::State,
     response::{IntoResponse, Response, Sse, sse::Event},
 };
-use futures::StreamExt;
-use serde::{Deserialize, Serialize};
-use std::time::{Duration, Instant};
 use axum_extra::extract::CookieJar;
-use std::sync::Arc;
+use futures::StreamExt;
 use http::StatusCode;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 #[allow(unused_imports)]
 use tracing::{error, info, warn};
 
@@ -45,7 +46,11 @@ pub async fn chat_stream_handler(
         let mut guard = state.chat_sessions.lock().await;
         guard
             .entry(session_id.clone())
-            .or_insert_with(|| Arc::new(ChatSession { current_request_id: None.into() }))
+            .or_insert_with(|| {
+                Arc::new(ChatSession {
+                    current_request_id: None.into(),
+                })
+            })
             .clone()
     };
     let chat_config = state.oidc_client.config.chat_config.clone();
@@ -54,6 +59,7 @@ pub async fn chat_stream_handler(
     let max_tokens: usize = chat_config.max_chat_tokens;
     let mut token_counter: usize = 0;
     let agent_url = format!("{}/agent/chat", &chat_config.agent_api_url);
+    let agent_secret = chat_config.agent_api_key.clone().unwrap_or_default();
 
     #[derive(Debug)]
     enum FinishReason {
@@ -78,7 +84,26 @@ pub async fn chat_stream_handler(
         loop {
             info!("Sending request to agent (attempt {})", retries + 1);
 
-            let llm_req = client.post(&agent_url).json(&req);
+            //let llm_req = client.post(&agent_url).json(&req);
+
+            let req_bytes = serde_json::to_vec(&req).unwrap_or_default();
+            let llm_req = match build_hmac(&agent_secret,&req_bytes) {
+                Ok ((timestamp,signature)) => {
+                    info!("Sending request with timestamp: {}", &timestamp);
+                    info!("Signature: {}", &signature);
+                    client.post(&agent_url)
+                        .header("X-Timestamp", timestamp.to_string())
+                        .header("X-Signature", signature)
+                        .header("Content-Type", "application/json")
+                        .json(&req)
+                }
+                Err(e) => {
+                        tracing::warn!("Transport error: {:#?}", e);
+                        break;
+                }
+            };
+
+
 
             let response_result = llm_req.send().await;
             info!("Response received from agent: {:?}", response_result.as_ref().map(|r| r.status()));

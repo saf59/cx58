@@ -19,6 +19,8 @@ pub mod stop;
 pub mod proxy_tree;
 
 pub mod events;
+#[cfg(feature = "ssr")]
+pub mod hmac;
 
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]
