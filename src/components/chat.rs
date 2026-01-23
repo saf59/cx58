@@ -546,7 +546,7 @@ fn process_sse_event(
         }
 
         Some("coordinator_thinking") => {
-            set_chat_state.set(format!("🤔 {}", data));
+            set_chat_state.set(format!("{}", data));
         }
 
         Some("object_chunk") => {
