@@ -406,15 +406,15 @@ async fn handle_stream(
     body_map.insert("language".to_string(), json!(language));
 
     if let Some(p) = parent {
-        body_map.insert("object_id".to_string(), json!(p));
+        body_map.insert("object_id".to_string(), json!(p.id));
     }
 
     if let Some(pl) = prev_leaf {
-        body_map.insert("prev_leaf".to_string(), json!(pl));
+        body_map.insert("prev_leaf".to_string(), json!(pl.id));
     }
 
     if let Some(nl) = next_leaf {
-        body_map.insert("next_leaf".to_string(), json!(nl));
+        body_map.insert("next_leaf".to_string(), json!(nl.id));
     }
 
     let body = serde_json::Value::Object(body_map).to_string();
