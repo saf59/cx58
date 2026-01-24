@@ -6,11 +6,12 @@ use crate::components::show_tree::DetailsTreeRendererWithContext;
 use crate::components::tree::{NodeInfo, Tree};
 use leptos::prelude::*;
 use leptos::*;
+use leptos::logging::log;
 #[cfg(not(feature = "ssr"))]
 use leptos::reactive::spawn_local;
 use leptos_fluent::{I18n, move_tr};
 use serde::{Deserialize, Serialize};
-
+use tracing::info;
 #[cfg(not(feature = "ssr"))]
 use wasm_bindgen::JsCast;
 #[cfg(not(feature = "ssr"))]
@@ -20,6 +21,7 @@ use web_sys::{
     HtmlDivElement, ReadableStreamDefaultReader, RequestInit, Response, ScrollBehavior,
     ScrollIntoViewOptions,
 };
+
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum MessageRole {
@@ -551,7 +553,9 @@ fn process_sse_event(
 
         Some("object_chunk") => {
             if let Ok(nodes) = serde_json::from_str::<Vec<TreeNode>>(data) {
+                log!("Received object_chunk with {} nodes", &nodes.len());
                 let tree = build_tree(nodes);
+                log!("Converted to tree with {} nodes", &tree.len());
                 set_history.update(|h| {
                     h.push(Message::new(
                         MessageRole::Llm,

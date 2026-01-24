@@ -285,7 +285,7 @@ where
     view! {
         <div class="tree-viewer-resource">
             <Suspense fallback=move || {
-                view! { <i class="tree-loader" /> }
+                view! { <i class="tree-loader"></i> }
             }>
                 {move || {
                     tree_resource
