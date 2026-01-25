@@ -34,8 +34,9 @@ pub struct BranchData {
     pub title: Option<String>,
 }
 
+// #[serde(tag = "type", rename_all = "snake_case")]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(untagged)]
 pub enum NodeData {
     Branch(BranchData),
     Image(ImageData),
@@ -69,6 +70,18 @@ pub struct Tree {
     pub own: bool,
     pub children: Vec<Tree>,
 }
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NodeWithLeaf {
+    pub id: Uuid,
+    pub parent_id: Option<Uuid>,
+    pub node_type: NodeType,
+    pub name: Option<String>,
+    pub data: NodeData,
+    pub path: String,
+    pub updated_at: String,
+    pub full_name: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeInfo {
     pub id: Uuid,

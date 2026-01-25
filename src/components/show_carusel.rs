@@ -1,30 +1,25 @@
 ﻿#![allow(unused_variables)]
 #![allow(dead_code)]
 use leptos::*;
+use leptos::logging::log;
 use leptos::prelude::ElementChild;
 use leptos::prelude::ClassAttribute;
 use leptos::prelude::GlobalAttributes;
 use leptos::prelude::IntoAny;
-use crate::components::tree::{NodeData, NodeType, Tree};
+use crate::components::tree::{NodeData, NodeType, NodeWithLeaf, Tree};
 
 /// Carousel renderer for a single Branch node with ImageLeaf children
 /// Displays node info and a 2-image-wide carousel with CSS popup
 #[component]
-pub fn CarouselRenderer(tree: Vec<Tree>) -> impl IntoView {
+pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
     // Expecting exactly one Branch node
-    let branch = tree.into_iter().next();
-    
-    match branch {
-        Some(node) => {
-            let node_name = node.name.clone().unwrap_or_else(|| "Unnamed".to_string());
-            let images: Vec<_> = node.children.into_iter()
-                .filter(|child| child.node_type == NodeType::ImageLeaf)
-                .collect();
-            
+    log!("CarouselRenderer with {} nodes", &data.len());
+    match data.split_first() {
+        Some((branch, images)) => {
             view! {
                 <div class="carousel-container">
                     <div class="node-info">
-                        <h2>{node_name}</h2>
+                        <h2>{branch.name.clone()}</h2>
                         <div class="node-meta">
                             <span class="meta-item">
                                 <i class="fas fa-images"></i>
@@ -35,7 +30,7 @@ pub fn CarouselRenderer(tree: Vec<Tree>) -> impl IntoView {
                             <span class="meta-item">
                                 <i class="fas fa-clock"></i>
                                 " "
-                                {node.updated_at}
+                                {branch.updated_at.clone()}
                             </span>
                         </div>
                     </div>
@@ -71,7 +66,7 @@ pub fn CarouselRenderer(tree: Vec<Tree>) -> impl IntoView {
                                                 _ => String::new(),
                                             };
                                             let img_name = img
-                                                .name
+                                                .name.clone()
                                                 .unwrap_or_else(|| format!("Image {}", idx + 1));
                                             let popup_id = format!("popup-{}", idx);
 
@@ -106,195 +101,7 @@ pub fn CarouselRenderer(tree: Vec<Tree>) -> impl IntoView {
                             .into_any()
                     }}
                 </div>
-
-                <style>
-                    {r#"
-                    .carousel-container {
-                    width: 100%;
-                    max-width: 1200px;
-                    margin: 0 auto;
-                    padding: 1rem;
-                    }
-                    
-                    .node-info {
-                    margin-bottom: 1.5rem;
-                    padding: 1rem;
-                    background: #f8f9fa;
-                    border-radius: 8px;
-                    }
-                    
-                    .node-info h2 {
-                    margin: 0 0 0.5rem 0;
-                    color: #333;
-                    }
-                    
-                    .node-meta {
-                    display: flex;
-                    gap: 1.5rem;
-                    color: #666;
-                    font-size: 0.9rem;
-                    }
-                    
-                    .meta-item {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.3rem;
-                    }
-                    
-                    .no-images {
-                    text-align: center;
-                    padding: 3rem;
-                    color: #999;
-                    }
-                    
-                    /* Carousel with Scroll Snap */
-                    .carousel-wrapper {
-                    position: relative;
-                    overflow: hidden;
-                    border-radius: 8px;
-                    }
-                    
-                    .carousel {
-                    display: grid;
-                    grid-auto-flow: column;
-                    grid-auto-columns: 50%; /* 2 images visible */
-                    gap: 1rem;
-                    overflow-x: auto;
-                    scroll-snap-type: x mandatory;
-                    scroll-behavior: smooth;
-                    padding: 1rem;
-                    scrollbar-width: thin;
-                    scrollbar-color: #888 #f1f1f1;
-                    }
-                    
-                    .carousel::-webkit-scrollbar {
-                    height: 8px;
-                    }
-                    
-                    .carousel::-webkit-scrollbar-track {
-                    background: #f1f1f1;
-                    border-radius: 4px;
-                    }
-                    
-                    .carousel::-webkit-scrollbar-thumb {
-                    background: #888;
-                    border-radius: 4px;
-                    }
-                    
-                    .carousel::-webkit-scrollbar-thumb:hover {
-                    background: #555;
-                    }
-                    
-                    .carousel-item {
-                    scroll-snap-align: start;
-                    position: relative;
-                    }
-                    
-                    .thumbnail-link {
-                    display: block;
-                    position: relative;
-                    overflow: hidden;
-                    border-radius: 8px;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                    transition: transform 0.2s, box-shadow 0.2s;
-                    text-decoration: none;
-                    }
-                    
-                    .thumbnail-link:hover {
-                    transform: translateY(-4px);
-                    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-                    }
-                    
-                    .thumbnail {
-                    width: 100%;
-                    height: 300px;
-                    object-fit: cover;
-                    display: block;
-                    }
-                    
-                    .image-label {
-                    position: absolute;
-                    bottom: 0;
-                    left: 0;
-                    right: 0;
-                    background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
-                    color: white;
-                    padding: 1rem 0.75rem 0.75rem;
-                    font-size: 0.9rem;
-                    }
-                    
-                    /* CSS Popup */
-                    .popup {
-                    display: none;
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background: rgba(0, 0, 0, 0.9);
-                    z-index: 9999;
-                    align-items: center;
-                    justify-content: center;
-                    animation: fadeIn 0.3s;
-                    }
-                    
-                    .popup:target {
-                    display: flex;
-                    }
-                    
-                    @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                    }
-                    
-                    .popup-content {
-                    position: relative;
-                    max-width: 90%;
-                    max-height: 90%;
-                    animation: zoomIn 0.3s;
-                    }
-                    
-                    @keyframes zoomIn {
-                    from { transform: scale(0.8); }
-                    to { transform: scale(1); }
-                    }
-                    
-                    .popup-close {
-                    position: absolute;
-                    top: -40px;
-                    right: 0;
-                    color: white;
-                    font-size: 40px;
-                    font-weight: bold;
-                    text-decoration: none;
-                    line-height: 1;
-                    transition: color 0.2s;
-                    }
-                    
-                    .popup-close:hover {
-                    color: #ff4444;
-                    }
-                    
-                    .popup-image {
-                    max-width: 100%;
-                    max-height: 90vh;
-                    object-fit: contain;
-                    border-radius: 4px;
-                    }
-                    
-                    /* Responsive adjustments */
-                    @media (max-width: 768px) {
-                    .carousel {
-                       grid-auto-columns: 100%; /* 1 image on mobile */
-                    }
-                    
-                    .thumbnail {
-                       height: 250px;
-                    }
-                    }
-                    "#}
-                </style>
-            }.into_any()
+                }.into_any()
         }
         None => {
             view! {
@@ -305,10 +112,3 @@ pub fn CarouselRenderer(tree: Vec<Tree>) -> impl IntoView {
         }
     }
 }
-
-// Usage example:
-// <TreeViewerResource
-//     user_id="user@example.com".to_string()
-//     with_leafs=true
-//     renderer=|tree| view! { <CarouselRenderer tree=tree /> }
-// />

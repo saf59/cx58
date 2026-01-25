@@ -3,7 +3,7 @@ use crate::components::chat_context::ChatContext;
 use crate::components::node_info_display::NodeInfoDisplay;
 use crate::components::show_carusel::CarouselRenderer;
 use crate::components::show_tree::DetailsTreeRendererWithContext;
-use crate::components::tree::{NodeInfo, Tree};
+use crate::components::tree::{NodeInfo, NodeWithLeaf, Tree};
 use leptos::prelude::*;
 use leptos::*;
 use leptos::logging::log;
@@ -46,7 +46,7 @@ impl MessageRole {
 pub enum MessageContent {
     Text(String),
     ObjectTree(Vec<Tree>),
-    DocumentTree(Vec<Tree>),
+    DocumentTree(Vec<NodeWithLeaf>),
     Description(DescriptionData),
     Comparison(ComparisonData),
 }
@@ -321,9 +321,9 @@ fn MessageRenderer(message: Message) -> impl IntoView {
             </div>
         }
         .into_any(),
-        MessageContent::DocumentTree(tree) => view! {
+        MessageContent::DocumentTree(data) => view! {
             <div class=css_class>
-                <CarouselRenderer tree=tree />
+                <CarouselRenderer data=data />
             </div>
         }
         .into_any(),
@@ -566,45 +566,57 @@ fn process_sse_event(
         }
 
         Some("document_chunk") => {
-            if let Ok(nodes) = serde_json::from_str::<Vec<TreeNode>>(data) {
-                let tree = build_tree(nodes);
+            log!("Document_chunk");
+            match serde_json::from_str::<Vec<NodeWithLeaf>>(data) {
+            Ok(nodes) => {
+                log!("Received document_chunk with {} nodes", &nodes.len());
                 set_history.update(|h| {
                     h.push(Message::new(
                         MessageRole::Llm,
-                        MessageContent::DocumentTree(tree),
+                        MessageContent::DocumentTree(nodes),
                     ));
                 });
+            }
+                Err(e) => {
+                    log!("Failed to parse document_chunk: {}", e);
+                    log!("{}",data);
+                }
             }
         }
 
         Some("description_chunk") => {
-            if let Ok(json_data) = serde_json::from_str::<serde_json::Value>(data) {
-                let mut fields = Vec::new();
-                let description = json_data
-                    .get("description")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
+            match serde_json::from_str::<serde_json::Value>(data) {
+                Ok(json_data) => {
+                    let mut fields = Vec::new();
+                    let description = json_data
+                        .get("description")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
 
-                if let Some(obj) = json_data.as_object() {
-                    for (key, value) in obj.iter() {
-                        if key != "description"
-                            && let Some(val_str) = value.as_str()
-                        {
-                            fields.push((capitalize(key), val_str.to_string()));
+                    if let Some(obj) = json_data.as_object() {
+                        for (key, value) in obj.iter() {
+                            if key != "description"
+                                && let Some(val_str) = value.as_str()
+                            {
+                                fields.push((capitalize(key), val_str.to_string()));
+                            }
                         }
                     }
-                }
 
-                set_history.update(|h| {
-                    h.push(Message::new(
-                        MessageRole::Llm,
-                        MessageContent::Description(DescriptionData {
-                            description,
-                            fields,
-                        }),
-                    ));
-                });
+                    set_history.update(|h| {
+                        h.push(Message::new(
+                            MessageRole::Llm,
+                            MessageContent::Description(DescriptionData {
+                                description,
+                                fields,
+                            }),
+                        ));
+                    });
+                },
+                Err(e) => {
+                    log!("Failed to parse description_chunk: {}", e);
+                }
             }
         }
 
