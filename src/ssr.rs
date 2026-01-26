@@ -494,7 +494,7 @@ pub async fn security_headers(
                 frame-ancestors 'none'; \
                 script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' 'nonce-{}'; \
                 style-src 'self' 'unsafe-inline' {trust_data_list} 'nonce-{}'; \
-                img-src 'self' data: blob:; \
+                img-src 'self' data: blob: {trust_data_list}; \
                 font-src 'self' data: {trust_data_list}; \
                 connect-src 'self' ws: wss: {trust_connect_list}",
             nonce, nonce

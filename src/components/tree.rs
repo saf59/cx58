@@ -38,8 +38,8 @@ pub struct BranchData {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum NodeData {
-    Branch(BranchData),
     Image(ImageData),
+    Branch(BranchData),
     Empty,
 }
 

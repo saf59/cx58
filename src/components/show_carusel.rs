@@ -14,8 +14,12 @@ use crate::components::tree::{NodeData, NodeType, NodeWithLeaf, Tree};
 pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
     // Expecting exactly one Branch node
     log!("CarouselRenderer with {} nodes", &data.len());
-    match data.split_first() {
-        Some((branch, images)) => {
+    let branches = data.iter().find(|n| n.node_type == NodeType::Branch);
+    match branches {
+        Some(branch) => {
+            let branch = branch.clone();
+            let mut images:Vec<NodeWithLeaf> = data.into_iter().filter(|n| n.node_type == NodeType::ImageLeaf).collect();
+            images.sort_by_key(|p| p.updated_at.clone());
             view! {
                 <div class="carousel-container">
                     <div class="node-info">
@@ -50,8 +54,10 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                         .into_iter()
                                         .enumerate()
                                         .map(|(idx, img)| {
+                                            log!("Data: {:?}", &img.data);
                                             let thumbnail = match &img.data {
                                                 NodeData::Image(img_data) => {
+                                                log!("ImageData: {:?}", &img_data);
                                                     img_data
                                                         .thumbnail_url
                                                         .clone()
@@ -69,11 +75,11 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                                 .name.clone()
                                                 .unwrap_or_else(|| format!("Image {}", idx + 1));
                                             let popup_id = format!("popup-{}", idx);
-
+                                            log!("thumbnail: {}, full_url: {}, img_name: {}, popup_id: {}", thumbnail, full_url, img_name, popup_id);
                                             view! {
                                                 <div class="carousel-item">
                                                     <a href=format!("#{}", popup_id) class="thumbnail-link">
-                                                        <img
+                                                        <img crossorigin="anonymous"
                                                             src=thumbnail
                                                             alt=img_name.clone()
                                                             class="thumbnail"
@@ -88,7 +94,7 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                                             <a href="#" class="popup-close">
                                                                 "×"
                                                             </a>
-                                                            <img src=full_url alt=img_name class="popup-image" />
+                                                            <img crossorigin="anonymous" src=full_url alt=img_name class="popup-image" />
                                                         </div>
                                                     </div>
                                                 </div>
