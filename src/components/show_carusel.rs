@@ -6,6 +6,7 @@ use leptos::prelude::ElementChild;
 use leptos::prelude::ClassAttribute;
 use leptos::prelude::GlobalAttributes;
 use leptos::prelude::IntoAny;
+use uuid::Uuid;
 use crate::components::tree::{NodeData, NodeType, NodeWithLeaf, Tree};
 
 /// Carousel renderer for a single Branch node with ImageLeaf children
@@ -74,7 +75,7 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                             let img_name = img
                                                 .name.clone()
                                                 .unwrap_or_else(|| format!("Image {}", idx + 1));
-                                            let popup_id = format!("popup-{}", idx);
+                                            let popup_id = format!("popup-{}", Uuid::now_v7());
                                             log!("thumbnail: {}, full_url: {}, img_name: {}, popup_id: {}", thumbnail, full_url, img_name, popup_id);
                                             view! {
                                                 <div class="carousel-item">
