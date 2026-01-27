@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 use leptos::*;
 use leptos::logging::log;
-use leptos::prelude::ElementChild;
+use leptos::prelude::{window, ElementChild, OnAttribute};
 use leptos::prelude::ClassAttribute;
 use leptos::prelude::GlobalAttributes;
 use leptos::prelude::IntoAny;
@@ -19,23 +19,18 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
     match branches {
         Some(branch) => {
             let branch = branch.clone();
-            let mut images:Vec<NodeWithLeaf> = data.into_iter().filter(|n| n.node_type == NodeType::ImageLeaf).collect();
-            images.sort_by_key(|p| p.updated_at.clone());
+            let mut images: Vec<NodeWithLeaf> = data.into_iter().filter(|n| n.node_type == NodeType::ImageLeaf).collect();
+            images.sort_by_key(|p| std::cmp::Reverse( p.updated_at.clone()));
             view! {
                 <div class="carousel-container">
                     <div class="node-info">
-                        <h2>{branch.name.clone()}</h2>
+                        <h3>{branch.name.clone()}</h3>
                         <div class="node-meta">
                             <span class="meta-item">
                                 <i class="fas fa-images"></i>
                                 " "
                                 {images.len()}
-                                " images"
-                            </span>
-                            <span class="meta-item">
-                                <i class="fas fa-clock"></i>
-                                " "
-                                {branch.updated_at.clone()}
+                                " " "reports"
                             </span>
                         </div>
                     </div>
@@ -76,10 +71,26 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                                 .name.clone()
                                                 .unwrap_or_else(|| format!("Image {}", idx + 1));
                                             let popup_id = format!("popup-{}", Uuid::now_v7());
+                                            let popup_id_for_click = popup_id.clone();
+
                                             log!("thumbnail: {}, full_url: {}, img_name: {}, popup_id: {}", thumbnail, full_url, img_name, popup_id);
                                             view! {
                                                 <div class="carousel-item">
-                                                    <a href=format!("#{}", popup_id) class="thumbnail-link">
+                                                    <a href=format!("#{}", popup_id) class="thumbnail-link"
+                                                        on:click=move |e: ev::MouseEvent| {
+                e.prevent_default();
+
+                let popup_id = popup_id_for_click.clone();
+                log!("Opening popup: {}", popup_id);
+
+                // Меняем hash
+                let _ = window().location().set_hash(&popup_id);
+
+                // Вызываем JavaScript функцию напрямую
+                let js_code = "if (window.handlePopupHash) window.handlePopupHash();";
+                let _ = js_sys::eval(js_code);
+            }
+                                                    >
                                                         <img crossorigin="anonymous"
                                                             src=thumbnail
                                                             alt=img_name.clone()
@@ -92,9 +103,17 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                                     // CSS Popup
                                                     <div id=popup_id class="popup">
                                                         <div class="popup-content">
-                                                            <a href="#" class="popup-close">
-                                                                "×"
-                                                            </a>
+                                                            <a
+                    href="#"
+                    class="popup-close"
+                    on:click=move |e: ev::MouseEvent| {
+                        e.prevent_default();
+                        let _ = window().location().set_hash("");
+                        let _ = js_sys::eval("if (window.handlePopupHash) window.handlePopupHash();");
+                    }
+                >
+                    "×"
+                </a>
                                                             <img crossorigin="anonymous" src=full_url alt=img_name class="popup-image" />
                                                         </div>
                                                     </div>

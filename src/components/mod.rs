@@ -10,3 +10,4 @@ pub(crate) mod tree;
 pub(crate) mod show_tree;
 pub(crate) mod show_carusel;
 pub(crate) mod node_info_display;
+pub(crate) mod popup_script;

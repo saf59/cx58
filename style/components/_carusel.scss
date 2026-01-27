@@ -2,18 +2,19 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 5px;
-  width: max-content;
+  width: auto;
 }
 
 .node-info {
-  margin-bottom: 1.5rem;
-  padding: 1rem;
+  //margin-bottom: 1.5rem;
+  padding: 0.5rem;
   background: #f8f9fa;
   border-radius: 8px;
 }
 
-.node-info h2 {
-  margin: 0 0 0.5rem 0;
+.node-info h3 {
+  margin-block: 0;
+  //margin: 0 0 0.5rem 0;
   color: #333;
 }
 
@@ -46,12 +47,12 @@
 .carousel {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: 50%; /* 2 images visible */
+  grid-auto-columns: auto; //50%; /* 2 images visible */
   gap: 1rem;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   scroll-behavior: smooth;
-  padding: 1rem;
+  padding: 1rem 0.5rem;
   scrollbar-width: thin;
   scrollbar-color: #888 #f1f1f1;
 }
@@ -87,6 +88,7 @@
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   transition: transform 0.2s, box-shadow 0.2s;
   text-decoration: none;
+  width: max-content;
 }
 
 .thumbnail-link:hover {
@@ -95,8 +97,7 @@
 }
 
 .thumbnail {
-  width: 100%;
-  height: 100%;
+  min-height: 100px;
   object-fit: cover;
   display: block;
 }
@@ -126,9 +127,10 @@
   justify-content: center;
   animation: fadeIn 0.3s;
 }
-
+div.popup:target,
 .popup:target {
-  display: flex;
+  display: flex !important;
+  visibility: visible !important;
 }
 
 @keyframes fadeIn {

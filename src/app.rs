@@ -15,6 +15,7 @@ use leptos_router::components::ParentRoute;
 use leptos_router::components::{Route, Router, Routes};
 use leptos_router::nested_router::Outlet;
 use leptos_router::*;
+use crate::components::popup_script::PopupScript;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();
@@ -31,6 +32,7 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
                 <Stylesheet href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
                 <HydrationScripts options />
                 <MetaTags />
+                <PopupScript />
             </head>
             <body>
                 <App />
@@ -45,7 +47,7 @@ pub fn App() -> impl IntoView {
 
     view! {
         <I18nProvider>
-            <Router>
+            <Router >
                 <main>
                     <Routes fallback=|| view! { <NotFoundPage /> }>
                         <ParentRoute path=path!("") view=AuthWrapper>
