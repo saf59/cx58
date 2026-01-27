@@ -78,6 +78,7 @@
 .carousel-item {
   scroll-snap-align: start;
   position: relative;
+  align-self: end;
 }
 
 .thumbnail-link {
