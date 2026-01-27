@@ -291,7 +291,10 @@ pub fn Chat() -> impl IntoView {
                     <button
                         type="submit"
                         class="input-submit"
-                        class=(["fa", "fa-arrow-up"], move || !is_loading.get() && !input.get().is_empty() )
+                        class=(
+                            ["fa", "fa-arrow-up"],
+                            move || !is_loading.get() && !input.get().is_empty(),
+                        )
                         class:none=move || is_loading.get() || input.get().is_empty()
                         data-descr=move_tr!("start")
                     />

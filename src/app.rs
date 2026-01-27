@@ -47,7 +47,7 @@ pub fn App() -> impl IntoView {
 
     view! {
         <I18nProvider>
-            <Router >
+            <Router>
                 <main>
                     <Routes fallback=|| view! { <NotFoundPage /> }>
                         <ParentRoute path=path!("") view=AuthWrapper>

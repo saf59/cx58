@@ -30,7 +30,8 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                 <i class="fas fa-images"></i>
                                 " "
                                 {images.len()}
-                                " " "reports"
+                                " "
+                                "reports"
                             </span>
                         </div>
                     </div>
@@ -53,7 +54,7 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                             log!("Data: {:?}", &img.data);
                                             let thumbnail = match &img.data {
                                                 NodeData::Image(img_data) => {
-                                                log!("ImageData: {:?}", &img_data);
+                                                    log!("ImageData: {:?}", &img_data);
                                                     img_data
                                                         .thumbnail_url
                                                         .clone()
@@ -68,30 +69,31 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                                 _ => String::new(),
                                             };
                                             let img_name = img
-                                                .name.clone()
+                                                .name
+                                                .clone()
                                                 .unwrap_or_else(|| format!("Image {}", idx + 1));
                                             let popup_id = format!("popup-{}", Uuid::now_v7());
                                             let popup_id_for_click = popup_id.clone();
+                                            log!(
+                                                "thumbnail: {}, full_url: {}, img_name: {}, popup_id: {}", thumbnail, full_url, img_name, popup_id
+                                            );
 
-                                            log!("thumbnail: {}, full_url: {}, img_name: {}, popup_id: {}", thumbnail, full_url, img_name, popup_id);
                                             view! {
                                                 <div class="carousel-item">
-                                                    <a href=format!("#{}", popup_id) class="thumbnail-link"
+                                                    <a
+                                                        href=format!("#{}", popup_id)
+                                                        class="thumbnail-link"
                                                         on:click=move |e: ev::MouseEvent| {
-                e.prevent_default();
-
-                let popup_id = popup_id_for_click.clone();
-                log!("Opening popup: {}", popup_id);
-
-                // Меняем hash
-                let _ = window().location().set_hash(&popup_id);
-
-                // Вызываем JavaScript функцию напрямую
-                let js_code = "if (window.handlePopupHash) window.handlePopupHash();";
-                let _ = js_sys::eval(js_code);
-            }
+                                                            e.prevent_default();
+                                                            let popup_id = popup_id_for_click.clone();
+                                                            log!("Opening popup: {}", popup_id);
+                                                            let _ = window().location().set_hash(&popup_id);
+                                                            let js_code = "if (window.handlePopupHash) window.handlePopupHash();";
+                                                            let _ = js_sys::eval(js_code);
+                                                        }
                                                     >
-                                                        <img crossorigin="anonymous"
+                                                        <img
+                                                            crossorigin="anonymous"
                                                             src=thumbnail
                                                             alt=img_name.clone()
                                                             class="thumbnail"
@@ -104,17 +106,24 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                                     <div id=popup_id class="popup">
                                                         <div class="popup-content">
                                                             <a
-                    href="#"
-                    class="popup-close"
-                    on:click=move |e: ev::MouseEvent| {
-                        e.prevent_default();
-                        let _ = window().location().set_hash("");
-                        let _ = js_sys::eval("if (window.handlePopupHash) window.handlePopupHash();");
-                    }
-                >
-                    "×"
-                </a>
-                                                            <img crossorigin="anonymous" src=full_url alt=img_name class="popup-image" />
+                                                                href="#"
+                                                                class="popup-close"
+                                                                on:click=move |e: ev::MouseEvent| {
+                                                                    e.prevent_default();
+                                                                    let _ = window().location().set_hash("");
+                                                                    let _ = js_sys::eval(
+                                                                        "if (window.handlePopupHash) window.handlePopupHash();",
+                                                                    );
+                                                                }
+                                                            >
+                                                                "×"
+                                                            </a>
+                                                            <img
+                                                                crossorigin="anonymous"
+                                                                src=full_url
+                                                                alt=img_name
+                                                                class="popup-image"
+                                                            />
                                                         </div>
                                                     </div>
                                                 </div>
@@ -127,7 +136,7 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                             .into_any()
                     }}
                 </div>
-                }.into_any()
+            }.into_any()
         }
         None => {
             view! {
