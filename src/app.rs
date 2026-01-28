@@ -6,6 +6,7 @@ use crate::components::side_body::SideBody;
 use crate::components::side_top::SideTop;
 use crate::components::sidebar::SideBar;
 use crate::components::user_info::UserRolesDisplay;
+use crate::components::media_proxy_script::MediaProxyScript;
 use crate::server_fn::*;
 use leptos::IntoView;
 use leptos::prelude::*;
@@ -18,6 +19,10 @@ use leptos_router::*;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();
+    #[cfg(feature = "ssr")]
+    if let Some(client_config) = use_context::<crate::state::ClientConfig>() {
+        provide_context(client_config);
+    }
     view! {
         <!DOCTYPE html>
         <html lang="en">
@@ -31,6 +36,7 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
                 <Stylesheet href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
                 <HydrationScripts options />
                 <MetaTags />
+                <MediaProxyScript/>
             </head>
             <body>
                 <App />

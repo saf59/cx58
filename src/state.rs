@@ -19,6 +19,10 @@ pub struct ChatSession {
     //pub cache: tokio::sync::Mutex<Vec<String>>,
     pub current_request_id: tokio::sync::RwLock<Option<String>>,
 }
+#[derive(Clone, Debug)]
+pub struct ClientConfig {
+    pub media_proxy: String,
+}
 
 impl AppState {
     /// Initializes and returns the application state.

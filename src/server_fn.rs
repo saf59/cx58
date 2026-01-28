@@ -5,11 +5,6 @@ use leptos_macro::server;
 #[allow(unused_imports)]
 use tracing::info;
 
-#[derive(Clone, Debug)]
-pub struct ClientConfig {
-    pub media_proxy: String,
-}
-
 #[server(GetAuth, "/api")]
 pub async fn get_auth() -> Result<Auth, ServerFnError> {
     #[cfg(feature = "ssr")]
@@ -33,7 +28,7 @@ pub async fn get_auth() -> Result<Auth, ServerFnError> {
     }
 }
 
-#[server(GetMediaProxy, "/api")]
+/*#[server(GetMediaProxy, "/api")]
 pub async fn get_media_proxy() -> Result<String, ServerFnError> {
     let media_proxy =  match leptos::context::use_context::<ClientConfig>() {
         Some(config) => config.media_proxy,
@@ -45,7 +40,7 @@ pub async fn get_media_proxy() -> Result<String, ServerFnError> {
         }
     };
     Ok(media_proxy)
-}
+}*/
 
 /*#[server(GetMediaProxy, "/api")]
 pub async fn get_media_proxy() -> Result<String, ServerFnError> {

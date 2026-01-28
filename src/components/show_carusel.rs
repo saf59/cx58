@@ -1,12 +1,11 @@
 ﻿#![allow(unused_variables)]
 #![allow(dead_code)]
 use crate::components::tree::{NodeData, NodeType, NodeWithLeaf};
-use crate::server_fn::get_media_proxy;
 use leptos::logging::log;
-use leptos::prelude::{ClassAttribute, GetUntracked};
 use leptos::prelude::GlobalAttributes;
 use leptos::prelude::IntoAny;
-use leptos::prelude::{ElementChild, OnceResource};
+use leptos::prelude::ClassAttribute;
+use leptos::prelude::ElementChild;
 use leptos::*;
 use uuid::Uuid;
 
@@ -14,14 +13,19 @@ use uuid::Uuid;
 /// Displays node info and a 2-image-wide carousel with CSS popup
 #[component]
 pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
+    use web_sys::window;
     // Expecting exactly one Branch node
     log!("CarouselRenderer with {} nodes", &data.len());
-    let resource = {move || OnceResource::new(get_media_proxy()).get_untracked()};
-    let media_proxy = match resource() {
-        Some(futures) => futures.unwrap_or_else(|_| "".to_string()),
-        None => "".to_string(),
-    };
-    log!("Media proxy rule: {}", &media_proxy);
+
+    let media_proxy = window()
+        .and_then(|w| {
+            js_sys::Reflect::get(&w, &wasm_bindgen::JsValue::from_str("MEDIA_PROXY"))
+                .ok()
+                .and_then(|v| v.as_string())
+        })
+        .unwrap_or_default();
+
+    log!("Media proxy: {}", media_proxy);
     let branches = data.iter().find(|n| n.node_type == NodeType::Branch);
     match branches {
         Some(branch) => {

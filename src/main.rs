@@ -1,5 +1,3 @@
-use axum::routing::post;
-
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() {
@@ -31,7 +29,7 @@ async fn main() {
             "/api/get_auth{_}",
             post(leptos_server_fn_handler).get(leptos_server_fn_handler),
         )
-        .route("/api/get_media_proxy{_}", post(leptos_server_fn_handler))
+        //.route("/api/get_media_proxy{_}", post(leptos_server_fn_handler))
         .route("/api/stop", post(stop_handler))
         .route("/api/proxy/tree/{user_id}", get(proxy_tree_handler))
         .route("/api/chat_stream", axum::routing::post(chat_stream_handler))

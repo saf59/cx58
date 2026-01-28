@@ -232,7 +232,7 @@ pub async fn leptos_server_fn_handler(
     let auth_state = get_auth_state(state.clone(), headers).await;
     handle_server_fns_with_context(
         move || {
-            let client_config = crate::server_fn::ClientConfig {
+            let client_config = crate::state::ClientConfig {
                 media_proxy: state.oidc_client.config.media_proxy.clone()
             };
             println!("Providing ClientConfig with media_proxy: {}", client_config.media_proxy);
@@ -262,11 +262,17 @@ pub async fn leptos_main_handler(
         .unwrap_or_else(leptos::nonce::Nonce::new);
     let handler = leptos_axum::render_app_to_stream_with_context(
         move || {
+            let client_config = crate::state::ClientConfig {
+                media_proxy: state.oidc_client.config.media_proxy.clone()
+            };
+            println!("Providing ClientConfig with media_proxy 1: {}", client_config.media_proxy);
+            provide_context(client_config);
             provide_context(jar.clone());
             provide_context(state.sessions.clone());
             provide_context(auth_state.clone());
             provide_context(nonce.clone());
         },
+        //move || view! { <App/> },
         move || shell(leptos_options.clone()),
     );
     handler(req).await.into_response()
@@ -512,7 +518,7 @@ pub async fn security_headers(
                  frame-ancestors 'none'; \
                  script-src 'self' 'nonce-{}' 'wasm-unsafe-eval'; \
                  style-src 'self' {trust_data_list} 'nonce-{}'; \
-                 img-src 'self' data: blob:; \
+                 img-src 'self' data: blob: {trust_connect_list}; \
                  font-src 'self' data: {trust_data_list}; \
                  connect-src 'self' {trust_connect_list}",
             nonce, nonce
