@@ -232,6 +232,11 @@ pub async fn leptos_server_fn_handler(
     let auth_state = get_auth_state(state.clone(), headers).await;
     handle_server_fns_with_context(
         move || {
+            let client_config = crate::server_fn::ClientConfig {
+                media_proxy: state.oidc_client.config.media_proxy.clone()
+            };
+            println!("Providing ClientConfig with media_proxy: {}", client_config.media_proxy);
+            provide_context(client_config);
             provide_context(state.sessions.clone());
             provide_context(jar.clone());
             provide_context(auth_state.clone());

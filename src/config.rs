@@ -14,6 +14,7 @@ pub struct AppConfig {
     pub cookie_config: CookieConfig,
     pub trust_data_list:String,
     pub trust_connect_list:String,
+    pub media_proxy:String,
     pub chat_config: ChatConfig,
     pub is_prod:bool
 }
@@ -114,6 +115,7 @@ impl AppConfig {
             cookie_config: cookie,
             trust_data_list:env::var("TRUST_DATA_LIST").unwrap_or_else(|_| "".to_string()),
             trust_connect_list:env::var("TRUST_CONNECT_LIST").unwrap_or_else(|_| "".to_string()),
+            media_proxy:env::var("MEDIA_PROXY").unwrap_or_else(|_| "".to_string()),
 			chat_config,
             is_prod
         })

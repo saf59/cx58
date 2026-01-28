@@ -1,6 +1,6 @@
 use crate::auth::Auth;
 use crate::components::chat::Chat;
-use crate::components::chat_context::ChatContext;
+use crate::components::chat_context::{ChatContext};
 use crate::components::lang::{I18nProvider, LanguageSelector, LanguageSwitcher};
 use crate::components::side_body::SideBody;
 use crate::components::side_top::SideTop;
@@ -15,7 +15,6 @@ use leptos_router::components::ParentRoute;
 use leptos_router::components::{Route, Router, Routes};
 use leptos_router::nested_router::Outlet;
 use leptos_router::*;
-use crate::components::popup_script::PopupScript;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();
@@ -32,7 +31,6 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
                 <Stylesheet href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
                 <HydrationScripts options />
                 <MetaTags />
-                <PopupScript />
             </head>
             <body>
                 <App />

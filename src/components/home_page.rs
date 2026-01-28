@@ -1,8 +1,3 @@
-#![allow(unused_imports)]
-use crate::config::AppConfig;
-use leptos::ev::{click, on};
-use leptos::html::{br, button};
-use leptos::logging::log;
 use leptos::prelude::*;
 use leptos::{component, view, IntoView};
 use crate::app::LogoutButton;

@@ -5,13 +5,13 @@ use crate::components::show_carusel::CarouselRenderer;
 use crate::components::show_tree::DetailsTreeRendererWithContext;
 use crate::components::tree::{NodeInfo, NodeWithLeaf, Tree};
 use leptos::prelude::*;
-use leptos::*;
-use leptos::logging::log;
 #[cfg(not(feature = "ssr"))]
 use leptos::reactive::spawn_local;
-use leptos_fluent::{I18n, move_tr};
+use leptos::*;
+#[cfg(not(feature = "ssr"))]
+use leptos::logging::log;
+use leptos_fluent::{move_tr, I18n};
 use serde::{Deserialize, Serialize};
-use tracing::info;
 #[cfg(not(feature = "ssr"))]
 use wasm_bindgen::JsCast;
 #[cfg(not(feature = "ssr"))]
@@ -103,6 +103,8 @@ pub fn Chat() -> impl IntoView {
     let ctx = use_context::<ChatContext>().expect("ChatContext not provided");
     let delete_node_info =
         Callback::new(move |node_info: NodeInfo| ctx.delete_node_info(node_info));
+    //let client_config = use_context::<ClientConfig>().expect("ClientConfig context not found");
+
 
     // Subscribe to context
     Effect::new(move |_| {
@@ -539,7 +541,7 @@ fn process_sse_event(
     set_is_loading: WriteSignal<bool>,
     set_chat_state: WriteSignal<String>,
 ) {
-    use crate::components::tree::{TreeNode, build_tree};
+    use crate::components::tree::{build_tree, TreeNode};
 
     match event.as_deref() {
         None | Some("chunk") | Some("replay") => {

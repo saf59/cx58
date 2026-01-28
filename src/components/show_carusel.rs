@@ -1,13 +1,14 @@
 ﻿#![allow(unused_variables)]
 #![allow(dead_code)]
-use leptos::*;
+use crate::components::tree::{NodeData, NodeType, NodeWithLeaf};
+use crate::server_fn::get_media_proxy;
 use leptos::logging::log;
-use leptos::prelude::{window, ElementChild, OnAttribute};
-use leptos::prelude::ClassAttribute;
+use leptos::prelude::{ClassAttribute, GetUntracked};
 use leptos::prelude::GlobalAttributes;
 use leptos::prelude::IntoAny;
+use leptos::prelude::{ElementChild, OnceResource};
+use leptos::*;
 use uuid::Uuid;
-use crate::components::tree::{NodeData, NodeType, NodeWithLeaf, Tree};
 
 /// Carousel renderer for a single Branch node with ImageLeaf children
 /// Displays node info and a 2-image-wide carousel with CSS popup
@@ -15,6 +16,12 @@ use crate::components::tree::{NodeData, NodeType, NodeWithLeaf, Tree};
 pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
     // Expecting exactly one Branch node
     log!("CarouselRenderer with {} nodes", &data.len());
+    let resource = {move || OnceResource::new(get_media_proxy()).get_untracked()};
+    let media_proxy = match resource() {
+        Some(futures) => futures.unwrap_or_else(|_| "".to_string()),
+        None => "".to_string(),
+    };
+    log!("Media proxy rule: {}", &media_proxy);
     let branches = data.iter().find(|n| n.node_type == NodeType::Branch);
     match branches {
         Some(branch) => {
@@ -51,14 +58,14 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                         .into_iter()
                                         .enumerate()
                                         .map(|(idx, img)| {
-                                            log!("Data: {:?}", &img.data);
                                             let thumbnail = match &img.data {
                                                 NodeData::Image(img_data) => {
-                                                    log!("ImageData: {:?}", &img_data);
-                                                    img_data
+                                                    log!("ImageData: {:?}", &img_data.thumbnail_url);
+                                                    let img = img_data
                                                         .thumbnail_url
                                                         .clone()
-                                                        .unwrap_or_else(|| img_data.url.clone().unwrap_or_default())
+                                                        .unwrap_or_else(|| img_data.url.clone().unwrap_or_default());
+                                                    proxy_media(&media_proxy, &img)
                                                 }
                                                 _ => String::new(),
                                             };
@@ -68,6 +75,7 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                                 }
                                                 _ => String::new(),
                                             };
+                                            let full_url = proxy_media(&media_proxy, &full_url);
                                             let img_name = img
                                                 .name
                                                 .clone()
@@ -78,56 +86,38 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                                 "thumbnail: {}, full_url: {}, img_name: {}, popup_id: {}", thumbnail, full_url, img_name, popup_id
                                             );
 
-                                            view! {
-                                                <div class="carousel-item">
-                                                    <a
-                                                        href=format!("#{}", popup_id)
-                                                        class="thumbnail-link"
-                                                        on:click=move |e: ev::MouseEvent| {
-                                                            e.prevent_default();
-                                                            let popup_id = popup_id_for_click.clone();
-                                                            log!("Opening popup: {}", popup_id);
-                                                            let _ = window().location().set_hash(&popup_id);
-                                                            let js_code = "if (window.handlePopupHash) window.handlePopupHash();";
-                                                            let _ = js_sys::eval(js_code);
-                                                        }
-                                                    >
-                                                        <img
-                                                            crossorigin="anonymous"
-                                                            src=thumbnail
-                                                            alt=img_name.clone()
-                                                            class="thumbnail"
-                                                            loading="lazy"
-                                                        />
-                                                        <div class="image-label">{img_name.clone()}</div>
-                                                    </a>
+view! {
+    <div class="carousel-item">
+        <button
+            popovertarget=popup_id.clone()
+            class="thumbnail-link"
+        >
+            <img crossorigin="anonymous"
+                src=thumbnail
+                alt=img_name.clone()
+                class="thumbnail"
+                loading="lazy"
+            />
+            <div class="image-label">{img_name.clone()}</div>
+        </button>
+    </div>
 
-                                                    // CSS Popup
-                                                    <div id=popup_id class="popup">
-                                                        <div class="popup-content">
-                                                            <a
-                                                                href="#"
-                                                                class="popup-close"
-                                                                on:click=move |e: ev::MouseEvent| {
-                                                                    e.prevent_default();
-                                                                    let _ = window().location().set_hash("");
-                                                                    let _ = js_sys::eval(
-                                                                        "if (window.handlePopupHash) window.handlePopupHash();",
-                                                                    );
-                                                                }
-                                                            >
-                                                                "×"
-                                                            </a>
-                                                            <img
-                                                                crossorigin="anonymous"
-                                                                src=full_url
-                                                                alt=img_name
-                                                                class="popup-image"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            }
+    // ВАЖНО: popover без значения или popover="auto"
+    <div id=popup_id popover class="popup">
+        <div class="popup-content">
+            <button
+                popovertarget=popup_id.clone()
+                class="popup-close"
+            >
+                "×"
+            </button>
+            <img crossorigin="anonymous"
+                 src=full_url
+                 alt=img_name
+                 class="popup-image" />
+        </div>
+    </div>
+}
                                         })
                                         .collect::<Vec<_>>()}
                                 </div>
@@ -146,4 +136,16 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
             }.into_any()
         }
     }
+}
+fn proxy_media(rule: &str, value: &str) -> String {
+    if rule.is_empty() {
+        return value.to_string();
+    }
+    let parts: Vec<&str> = rule.split(',').collect();
+    if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
+        return value.to_string();
+    }
+    let old_value = parts[0];
+    let new_value = parts[1];
+    value.replace(old_value, new_value)
 }
