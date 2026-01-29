@@ -6,7 +6,6 @@ use leptos::prelude::{ElementChild, LocalResource};
 use leptos::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use leptos::logging::log;
 use uuid::Uuid;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
@@ -123,36 +122,22 @@ impl Tree {
         }
     }
 }
-/*fn parse_dt_or_default(s: &str) -> i64 {
-    // Default value (Unix epoch start)
-    let default = NaiveDateTime::from_timestamp_opt(0, 0).unwrap();
-
-    let dt = NaiveDateTime::parse_from_str(s, "%d.%m.%Y %H:%M:%S")
-        .unwrap_or(default);
-
-    dt.and_utc().timestamp()
-}
-*/
 pub fn parse_dt_or_default_ms(s: &str) -> i64 {
     // default: Unix epoch
     let default = 0.0;
-    log!("Parsing date string: {}", s);
     // 2026-01-09T18:00:00
     let parts: Vec<&str> = s.split(['-','.','T',' ', ':']).collect();
     if parts.len() != 6 {
         return default as i64;
     }
-    log!("Date parts: {:?}", parts);
-    let day: i32 = parts[2].parse().unwrap_or(0);
-    let month: i32 = parts[1].parse().unwrap_or(0); // 1..12
     let year: u32 = parts[0].parse().unwrap_or(0);
+    let month: i32 = parts[1].parse().unwrap_or(0); // 1..12
+    let day: i32 = parts[2].parse().unwrap_or(0);
     let hour: i32 = parts[3].parse().unwrap_or(0);
     let min: i32 = parts[4].parse().unwrap_or(0);
     let sec: i32 = parts[5].parse().unwrap_or(0);
-    log!("Parsed date parts: {}-{}-{} {}:{}:{}", year, month, day, hour, min, sec);
     // JS Date: month is 0-based
     let date = Date::new_with_year_month_day_hr_min_sec(year, month - 1, day, hour, min, sec);
-    log!("Constructed Date: {:?}", date);
     let ms = date.get_time();
 
     if ms.is_nan() {

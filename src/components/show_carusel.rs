@@ -3,7 +3,6 @@
 use crate::components::chat_context::ChatContext;
 use crate::components::tree::{NodeData, NodeType, NodeWithLeaf};
 use leptos::context::use_context;
-use leptos::logging::log;
 use leptos::prelude::ClassAttribute;
 use leptos::prelude::ElementChild;
 use leptos::prelude::IntoAny;
@@ -17,8 +16,6 @@ use uuid::Uuid;
 #[component]
 pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
     use web_sys::window;
-    // Expecting exactly one Branch node
-    log!("CarouselRenderer with {} nodes", &data.len());
 
     let media_proxy = window()
         .and_then(|w| {
@@ -28,7 +25,6 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
         })
         .unwrap_or_default();
 
-    log!("Media proxy: {}", media_proxy);
     let ctx = use_context::<ChatContext>().expect("Context lost");
     let branches = data.iter().find(|n| n.node_type == NodeType::Branch);
     match branches {
@@ -68,7 +64,6 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                         .map(|(idx, img)| {
                                             let thumbnail = match &img.data {
                                                 NodeData::Image(img_data) => {
-                                                    log!("ImageData: {:?}", &img_data.thumbnail_url);
                                                     let img = img_data
                                                         .thumbnail_url
                                                         .clone()
@@ -92,25 +87,8 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                                 .unwrap_or_else(|| format!("Image {}", idx + 1));
                                             let popup_id = format!("popup-{}", Uuid::now_v7());
                                             let popup_id_for_click = popup_id.clone();
-                                            log!(
-                                                "thumbnail: {}, full_url: {}, img_name: {}, popup_id: {}", thumbnail, full_url, img_name, popup_id
-                                            );
-
                                             let img_clone_for_label = img.clone();
                                             let branch_clone_for_label = branch.clone();
-                                            //let ctx_clone = ctx.clone();
-
-                                        /*                                            // Clone необходимые данные для обработчиков событий
-
-                                            // Store node data in Store for event handlers
-                                            let img_stored = leptos::prelude::StoredValue::new(img.clone());
-                                            let ctx_stored = leptos::prelude::StoredValue::new(ctx.clone());
-*/
-                                            // Store node data in Store for event handlers
-                                            //let img_stored = leptos::prelude::StoredValue::new(img.clone());
-                                            //let branch_stored = leptos::prelude::StoredValue::new(branch.clone());
-                                            //let ctx_stored = leptos::prelude::StoredValue::new(ctx.clone());
-
                                             view! {
                                                 <div class="carousel-item">
                                                     <button
@@ -128,30 +106,9 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                                     <div
                                                         class="image-label"
                                                         on:click=move |ev| {
-                                                            log!("Label clicked!");
-                                                            //let img_val = img_clone_for_label.get_value();
-                                                            //let branch_val = branch_clone_for_label.get_value();
-/*                                                            let ctx_val = ctx.get_value();
-                                                            log!("Calling set_leaf with img: {:?}, branch: {:?}",
-                                                                img_val.name,
-                                                                branch_val.name);
-*/                                                            ctx.set_leaf(&img_clone_for_label, &branch_clone_for_label);
+                                                            ctx.set_leaf(&img_clone_for_label, &branch_clone_for_label);
                                                         }
-
-/*                                                        on:click=move |_| {
-                                                            ctx_clone.set_leaf(&img_clone_for_label, &branch_clone_for_label);
-                                                        }
-*/
-/*                                            on:click=move |ev| {
-                                                            log!("Label clicked!");
-                                                            let img_val = img_stored.get_value();
-                                                            let ctx_val = ctx_stored.get_value();
-                                                            let name = img_val.name.clone().unwrap_or("(unnamed)".to_string());
-                                                            log!("Setting insert_text to: {}", name);
-                                                            ctx_val.insert_text.set(Some(name));
-                                                        }
-*/
-                                            >
+                                                    >
                                                         {img_name.clone()}
                                                     </div>
                                                 </div>
