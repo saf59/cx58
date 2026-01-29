@@ -44,7 +44,6 @@ fn DetailsTreeNode(node: Tree) -> impl IntoView {
                     class:clickable=is_own
                     on:click=move |e: MouseEvent| {
                         if is_own {
-                            logging::log!("Clicked on {}", node_name);
                             e.stop_propagation();
                             e.prevent_default();
                         }
@@ -65,7 +64,6 @@ fn DetailsTreeNode(node: Tree) -> impl IntoView {
                         class:clickable=is_own
                         on:click=move |e: MouseEvent| {
                             if is_own {
-                                logging::log!("Clicked on {}", node_name);
                                 e.stop_propagation();
                                 e.prevent_default();
                             }
@@ -92,7 +90,6 @@ fn DetailsTreeNode(node: Tree) -> impl IntoView {
                     class:clickable=is_own
                     on:click=move |e: MouseEvent| {
                         if is_own {
-                            logging::log!("Clicked on {}", node_name);
                             e.stop_propagation();
                             e.prevent_default();
                         }
@@ -151,7 +148,6 @@ fn DetailsTreeNodeWithContext(
                     class:clickable=is_own
                     on:click=move |e: MouseEvent| {
                         if is_own {
-                            logging::log!("Clicked on {}", node_name);
                             on_node_click(node.node_info());
                             e.stop_propagation();
                             e.prevent_default();
@@ -174,7 +170,6 @@ fn DetailsTreeNodeWithContext(
                             let value = on_node_click.clone();
                             move |e: MouseEvent| {
                                 if is_own {
-                                    logging::log!("Clicked on {}", node_name);
                                     value(node.node_info());
                                     e.stop_propagation();
                                     e.prevent_default();
@@ -207,7 +202,6 @@ fn DetailsTreeNodeWithContext(
                     class:clickable=is_own
                     on:click=move |e: MouseEvent| {
                         if is_own {
-                            logging::log!("Clicked on {}", node_name);
                             on_node_click(node.node_info());
                             e.stop_propagation();
                             e.prevent_default();

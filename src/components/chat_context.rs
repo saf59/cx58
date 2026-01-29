@@ -1,5 +1,4 @@
 use crate::components::tree::{NodeInfo, NodeWithLeaf};
-use leptos::logging::log;
 use leptos::prelude::*;
 
 #[derive(Clone, Copy)]
@@ -55,7 +54,6 @@ impl ChatContext {
     }
     #[allow(dead_code)]
     pub fn set_one_leaf(&self, new_node: NodeInfo) {
-        log!("set_one_leaf: {:?}", new_node);
         if self.prev_leaf.get().is_none() {
             self.prev_leaf.set(Some(new_node));
         } else {

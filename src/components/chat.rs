@@ -571,10 +571,8 @@ fn process_sse_event(
         }
 
         Some("document_chunk") => {
-            log!("Document_chunk");
             match serde_json::from_str::<Vec<NodeWithLeaf>>(data) {
             Ok(nodes) => {
-                log!("Received document_chunk with {} nodes", &nodes.len());
                 set_history.update(|h| {
                     h.push(Message::new(
                         MessageRole::Llm,
@@ -583,8 +581,8 @@ fn process_sse_event(
                 });
             }
                 Err(e) => {
-                    log!("Failed to parse document_chunk: {}", e);
-                    log!("{}",data);
+                    leptos::logging::error!("Failed to parse document_chunk: {}", e);
+                    leptos::logging::log!("{}",data);
                 }
             }
         }

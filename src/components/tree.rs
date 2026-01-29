@@ -254,8 +254,6 @@ pub async fn fetch_tree_data(user_id: &str, with_leafs: bool) -> Result<Vec<Tree
         url
     };
 
-    logging::log!("Fetching from URL: {}", url);
-
     // Create request options
     let opts = RequestInit::new();
     opts.set_method("GET");
@@ -300,12 +298,8 @@ pub async fn fetch_tree_data(user_id: &str, with_leafs: bool) -> Result<Vec<Tree
         format!("Failed to deserialize: {:?}", e)
     })?;
 
-    logging::log!("✓ Received {} nodes", nodes.len());
-
     // Convert flat nodes to hierarchical tree
     let tree = build_tree(nodes);
-
-    logging::log!("✓ Built tree with {} root nodes", tree.len());
 
     Ok(tree)
 }
