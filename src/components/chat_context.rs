@@ -40,11 +40,18 @@ impl ChatContext {
         self.parent.set(Some(node_info));
     }
 
-    pub fn set_leaf(&self, node_info: &NodeWithLeaf, parent_leaf: &NodeWithLeaf) {
-        log!("set_leaf called with node_info: {:?}, parent_leaf: {:?}", node_info.name, parent_leaf.name);
+    pub fn set_leaf(&self, node_info: &NodeWithLeaf, parent_node: &NodeWithLeaf) {
+        log!("set_leaf called with node_info: {:?}, parent_leaf: {:?}", node_info.name, parent_node.name);
+        if let Some(parent) = &self.parent.get() && parent.id != parent_node.id {
+            self.parent.set(Some(parent_node.clone().into()));
+        }
+        if self.parent.get().is_none() {
+            self.parent.set(Some(parent_node.clone().into()));
+        }
+        self.set_one_leaf(node_info.clone().into())
     }
         #[allow(dead_code)]
-    pub fn set_leaf1(&self, node_info: NodeInfo) {
+    pub fn set_one_leaf(&self, node_info: NodeInfo) {
         if self.prev_leaf.get().is_none() {
             self.prev_leaf.set(Some(node_info));
         } else if self.next_leaf.get().is_none() {

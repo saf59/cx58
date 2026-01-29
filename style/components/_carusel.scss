@@ -40,12 +40,30 @@
   position: relative;
   overflow: hidden;
   border-radius: 8px;
+  max-width: calc(2 * 300px + 2rem);
 }
+/*
 
 .carousel {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: auto; //50%; /* 2 images visible */
+  //grid-auto-columns: auto; //50%; !* 2 images visible *!
+  grid-auto-columns: minmax(auto, calc((100% - 1rem) / 2));
+  gap: 1rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  padding: 1rem 0.5rem 0.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: #888 #f1f1f1;
+}
+.carousel > * {
+  scroll-snap-align: start;
+}
+
+*/
+.carousel {
+  display: flex;
   gap: 1rem;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
@@ -55,6 +73,11 @@
   scrollbar-color: #888 #f1f1f1;
 }
 
+.carousel > * {
+  flex: 0 0 calc((100% - 1rem) / 2); /* не растягивается, не сжимается, фиксированная ширина */
+  scroll-snap-align: start;
+  min-width: 0; /* для корректной работы с длинным контентом */
+}
 .carousel::-webkit-scrollbar {
   height: 8px;
 }
@@ -83,6 +106,7 @@
   display: block;
   position: relative;
   overflow: hidden;
+  border: none;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   transition: transform 0.2s, box-shadow 0.2s;
@@ -108,10 +132,12 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
   color: white;
   padding: 1rem 0.75rem 0.75rem;
   font-size: 0.9rem;
+}
+.image-label:hover {
+  font-weight: 500;
 }
 
 /* CSS Popup */

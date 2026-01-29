@@ -82,6 +82,17 @@ pub struct NodeWithLeaf {
     pub full_name: Option<String>,
 }
 
+impl From<NodeWithLeaf> for NodeInfo {
+    fn from(node: NodeWithLeaf) -> Self {
+        NodeInfo {
+            id: node.id,
+            parent_id: node.parent_id,
+            name: node.name,
+            node_type: node.node_type,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeInfo {
     pub id: Uuid,
