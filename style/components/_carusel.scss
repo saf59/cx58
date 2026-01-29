@@ -6,7 +6,6 @@
 }
 
 .node-info {
-  //margin-bottom: 1.5rem;
   padding: 0.5rem;
   background: #f8f9fa;
   border-radius: 8px;
@@ -14,7 +13,6 @@
 
 .node-info h3 {
   margin-block: 0;
-  //margin: 0 0 0.5rem 0;
   color: #333;
 }
 
@@ -52,7 +50,7 @@
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   scroll-behavior: smooth;
-  padding: 1rem 0.5rem;
+  padding: 1rem 0.5rem 0.5rem;
   scrollbar-width: thin;
   scrollbar-color: #888 #f1f1f1;
 }
@@ -90,6 +88,8 @@
   transition: transform 0.2s, box-shadow 0.2s;
   text-decoration: none;
   width: max-content;
+  padding: 0;
+  cursor: pointer;
 }
 
 .thumbnail-link:hover {
@@ -171,7 +171,7 @@
 }
 
 .popup-image {
-  max-width: 100%;
+  max-width: 90vw;
   max-height: 90vh;
   object-fit: contain;
   border-radius: 4px;
@@ -208,63 +208,3 @@
   justify-content: center;
   align-items: center;
 }
-
-.popup-content {
-  position: relative;
-}
-
-.popup-close {
-  position: absolute;
-  top: -40px;
-  right: 0;
-  font-size: 40px;
-  color: white;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.popup-image {
-  max-width: 90vw;
-  max-height: 90vh;
-  object-fit: contain;
-}
-
-.thumbnail-link {
-  border: none;
-  background: none;
-  padding: 0;
-  cursor: pointer;
-}
-
-/*.popup-content {
-  position: relative;
-  max-width: 90%;
-  max-height: 90%;
-}*/
-
-/*.popup-close {
-  position: absolute;
-  top: -40px;
-  right: 0;
-  font-size: 40px;
-  color: white;
-  background: none;
-  border: none;
-  cursor: pointer;
-}*/
-
-/*.popup-image {
-  max-width: 90vw;
-  max-height: 90vh;
-  object-fit: contain;
-}*/
-
-/* Стили для thumbnail-link как кнопки */
-/*.thumbnail-link {
-  border: none;
-  background: none;
-  padding: 0;
-  cursor: pointer;
-  display: block;
-}*/

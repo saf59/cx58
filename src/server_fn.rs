@@ -1,6 +1,5 @@
 use crate::auth::Auth;
 use leptos::prelude::ServerFnError;
-use leptos::logging::error;
 use leptos_macro::server;
 #[allow(unused_imports)]
 use tracing::info;

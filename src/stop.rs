@@ -33,8 +33,6 @@ pub async fn stop_handler(
             let agent_api_url = state.oidc_client.config.chat_config.agent_api_url.clone();
             let client = state.async_http_client.clone();
             cancel_agent_request(request_id, agent_api_url, client);
-            //let mut req_id = chat_session.current_request_id.write().await;
-            //*req_id = None;
         }
 
         (StatusCode::OK, "stopped")

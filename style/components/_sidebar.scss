@@ -7,7 +7,6 @@
 
 /* Left pane */
 .sb-sidebar {
-    //flex: 0 0 var(--sidebar-width);
     flex-direction: column;
     background: var(--sidebar-bcolor);
     display: flex;
@@ -41,23 +40,7 @@
     overflow: visible;
     border-bottom: thick;
 }
-
-/* Top section inside left pane Header */
-.sb-side-top {
-    /*
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    white-space: nowrap;
-    */
-    /*display: flex;
-    flex-wrap: wrap;
-    align-self: center;
-    justify-content: center;*/
-}
-
 .sb-sidebar-body {
-    //width: 100%;
     flex-grow: 1;
     flex-shrink: 1;
     flex-basis: auto;
@@ -69,12 +52,10 @@
     scroll-padding: 1ch;
 }
 
-/* Right pane – flex centers its content */
 .sb-content {
     display: flex;
     flex-grow: 1;
     flex-shrink: 1;
-    //flex-basis: var(--content-width);
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -84,7 +65,6 @@
     overflow: auto;
 }
 
-/* Hover strip – only when left hidden */
 .sb-hoverStrip {
     position: absolute;
     left: 0;
@@ -104,17 +84,10 @@
 }
 
 .sb-pin {
-    //grid-column: 1;
-    //position: absolute;
-    //left: 0;
     margin: 14px;
 }
 
 .sb-unpin {
-    //grid-column: 3;
-    //justify-self: end;
-    //position: absolute;
-    //right: 0;
     margin: 14px 0 14px 14px;
 }
 
@@ -133,7 +106,7 @@
 .sb-unpin {
     background-image: url("data:image/svg+xml,%3C%3Fxml version='1.0' %3F%3E%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Crect data-name='Square' fill='none' height='18' id='Square-2' rx='2' ry='2' stroke='%23000000' stroke-miterlimit='10' stroke-width='1.2' width='18' x='3' y='3'/%3E%3C/svg%3E%0A");
 }
-/* Common styles for pin/unpin buttons */
+
 .sb-unpin,
 .sb-pin,
 .sb-fakepin {
@@ -151,16 +124,13 @@
 }
 
 .sb-wrapper {
-    /* Visible sidebar */
     &:not(.sb-collapsed) {
         .sb-hoverStrip {
             display: none;
         }
 
         .sb-sidebar {
-            //flex-basis: var(--sidebar-width);
             margin-right: 10px;
-            //box-shadow: 2px 2px 10px rgb(0 0 0 / var(--sidebar-width));
             border: 1px solid var(--border-color);
             border-radius: 10px;
             width: max-content;

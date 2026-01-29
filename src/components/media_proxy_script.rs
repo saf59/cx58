@@ -1,4 +1,3 @@
-// components/media_proxy_script.rs
 use leptos::prelude::*;
 
 #[component]
@@ -16,12 +15,12 @@ pub fn MediaProxyScript() -> impl IntoView {
                         </script>
                     }.into_any()
                 } else {
-                    view! {}.into_any()
+                    ().into_any()
                 }
             }
             #[cfg(not(feature = "ssr"))]
             {
-                view! {}.into_any()
+                 ().into_any()
             }
         }}
     }

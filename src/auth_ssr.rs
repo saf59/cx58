@@ -407,7 +407,6 @@ pub fn extract_name_from_claims(claims: &serde_json::Value) -> String {
     }
 }
 pub fn extract_email_from_claims(claims: &serde_json::Value) -> Option<String> {
-    // Попробуем извлечь email из разных полей, которые могут его содержать
     claims
         .get("email")
         .and_then(|v| v.as_str())

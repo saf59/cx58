@@ -17,7 +17,6 @@
     padding: 1rem;
     overflow-y: auto;
 
-    // Дополнительные стили для красивой полосы прокрутки (необязательно)
     &::-webkit-scrollbar {
         width: 8px;
     }
@@ -123,15 +122,9 @@
     }
 }
 .tree-loader {
-    //height: 100%;
-    //top: 5px;
-    //left: 50px;
-    //aspect-ratio: 1;
-    //border-radius: 50%;
     animation: l5 1s infinite linear alternate;
 }
 
-/* HTML: <div class="loader"></div> */
 .loader {
     width: 10px;
     height: 10px;

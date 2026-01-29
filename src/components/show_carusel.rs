@@ -7,7 +7,9 @@ use leptos::prelude::IntoAny;
 use leptos::prelude::ClassAttribute;
 use leptos::prelude::ElementChild;
 use leptos::*;
+use leptos::context::use_context;
 use uuid::Uuid;
+use crate::components::chat_context::ChatContext;
 
 /// Carousel renderer for a single Branch node with ImageLeaf children
 /// Displays node info and a 2-image-wide carousel with CSS popup
@@ -26,6 +28,7 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
         .unwrap_or_default();
 
     log!("Media proxy: {}", media_proxy);
+    let ctx = use_context::<ChatContext>().expect("Context lost");
     let branches = data.iter().find(|n| n.node_type == NodeType::Branch);
     match branches {
         Some(branch) => {
@@ -106,7 +109,6 @@ view! {
         </button>
     </div>
 
-    // ВАЖНО: popover без значения или popover="auto"
     <div id=popup_id popover class="popup">
         <div class="popup-content">
             <button
