@@ -2,12 +2,13 @@
 #![allow(dead_code)]
 use crate::components::tree::{NodeData, NodeType, NodeWithLeaf};
 use leptos::logging::log;
-use leptos::prelude::GlobalAttributes;
+use leptos::prelude::{GetValue, GlobalAttributes, Set};
 use leptos::prelude::IntoAny;
 use leptos::prelude::ClassAttribute;
 use leptos::prelude::ElementChild;
 use leptos::*;
 use leptos::context::use_context;
+use leptos::prelude::OnAttribute;
 use uuid::Uuid;
 use crate::components::chat_context::ChatContext;
 
@@ -95,6 +96,20 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                                 "thumbnail: {}, full_url: {}, img_name: {}, popup_id: {}", thumbnail, full_url, img_name, popup_id
                                             );
 
+/*                                            // Clone необходимые данные для обработчиков событий
+                                            let img_clone_for_label = img.clone();
+                                            let branch_clone_for_label = branch.clone();
+                                            let ctx_clone = ctx.clone();
+
+                                            // Store node data in Store for event handlers
+                                            let img_stored = leptos::prelude::StoredValue::new(img.clone());
+                                            let ctx_stored = leptos::prelude::StoredValue::new(ctx.clone());
+*/
+                                            // Store node data in Store for event handlers
+                                            let img_stored = leptos::prelude::StoredValue::new(img.clone());
+                                            let branch_stored = leptos::prelude::StoredValue::new(branch.clone());
+                                            let ctx_stored = leptos::prelude::StoredValue::new(ctx.clone());
+
                                             view! {
                                                 <div class="carousel-item">
                                                     <button
@@ -108,8 +123,36 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                                             class="thumbnail"
                                                             loading="lazy"
                                                         />
-                                                        <div class="image-label">{img_name.clone()}</div>
                                                     </button>
+                                                    <div
+                                                        class="image-label"
+                                                        on:click=move |ev| {
+                                                            log!("Label clicked!");
+                                                            let img_val = img_stored.get_value();
+                                                            let branch_val = branch_stored.get_value();
+                                                            let ctx_val = ctx_stored.get_value();
+                                                            log!("Calling set_leaf with img: {:?}, branch: {:?}",
+                                                                img_val.name,
+                                                                branch_val.name);
+                                                            ctx_val.set_leaf(&img_val, &branch_val);
+                                                        }
+
+/*                                                        on:click=move |_| {
+                                                            ctx_clone.set_leaf(&img_clone_for_label, &branch_clone_for_label);
+                                                        }
+*/
+/*                                            on:click=move |ev| {
+                                                            log!("Label clicked!");
+                                                            let img_val = img_stored.get_value();
+                                                            let ctx_val = ctx_stored.get_value();
+                                                            let name = img_val.name.clone().unwrap_or("(unnamed)".to_string());
+                                                            log!("Setting insert_text to: {}", name);
+                                                            ctx_val.insert_text.set(Some(name));
+                                                        }
+*/
+                                            >
+                                                        {img_name.clone()}
+                                                    </div>
                                                 </div>
 
                                                 <div id=popup_id popover class="popup">
