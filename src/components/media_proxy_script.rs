@@ -13,15 +13,13 @@ pub fn MediaProxyScript() -> impl IntoView {
                         <script nonce=nonce>
                             {format!("window.MEDIA_PROXY = '{}';", client_config.media_proxy)}
                         </script>
-                    }.into_any()
+                    }
+                        .into_any()
                 } else {
                     ().into_any()
                 }
             }
-            #[cfg(not(feature = "ssr"))]
-            {
-                 ().into_any()
-            }
+            #[cfg(not(feature = "ssr"))] { ().into_any() }
         }}
     }
 }

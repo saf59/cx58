@@ -71,7 +71,9 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                                     let img = img_data
                                                         .thumbnail_url
                                                         .clone()
-                                                        .unwrap_or_else(|| img_data.url.clone().unwrap_or_default());
+                                                        .unwrap_or_else(|| {
+                                                            img_data.url.clone().unwrap_or_default()
+                                                        });
                                                     proxy_media(&media_proxy, &img)
                                                 }
                                                 _ => String::new(),
@@ -93,37 +95,37 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                                 "thumbnail: {}, full_url: {}, img_name: {}, popup_id: {}", thumbnail, full_url, img_name, popup_id
                                             );
 
-view! {
-    <div class="carousel-item">
-        <button
-            popovertarget=popup_id.clone()
-            class="thumbnail-link"
-        >
-            <img crossorigin="anonymous"
-                src=thumbnail
-                alt=img_name.clone()
-                class="thumbnail"
-                loading="lazy"
-            />
-            <div class="image-label">{img_name.clone()}</div>
-        </button>
-    </div>
+                                            view! {
+                                                <div class="carousel-item">
+                                                    <button
+                                                        popovertarget=popup_id.clone()
+                                                        class="thumbnail-link"
+                                                    >
+                                                        <img
+                                                            crossorigin="anonymous"
+                                                            src=thumbnail
+                                                            alt=img_name.clone()
+                                                            class="thumbnail"
+                                                            loading="lazy"
+                                                        />
+                                                        <div class="image-label">{img_name.clone()}</div>
+                                                    </button>
+                                                </div>
 
-    <div id=popup_id popover class="popup">
-        <div class="popup-content">
-            <button
-                popovertarget=popup_id.clone()
-                class="popup-close"
-            >
-                "×"
-            </button>
-            <img crossorigin="anonymous"
-                 src=full_url
-                 alt=img_name
-                 class="popup-image" />
-        </div>
-    </div>
-}
+                                                <div id=popup_id popover class="popup">
+                                                    <div class="popup-content">
+                                                        <button popovertarget=popup_id.clone() class="popup-close">
+                                                            "×"
+                                                        </button>
+                                                        <img
+                                                            crossorigin="anonymous"
+                                                            src=full_url
+                                                            alt=img_name
+                                                            class="popup-image"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            }
                                         })
                                         .collect::<Vec<_>>()}
                                 </div>
