@@ -183,7 +183,7 @@ pub async fn chat_stream_handler(
 
                                     match serde_json::from_str::<StreamEvent>(data) {
                                         Ok(event) => {
-                                            info!("Parsed StreamEvent: {:?}", event);
+                                            //info!("Parsed StreamEvent: {:?}", event);
                                             let request_id = match &event {
                                                             StreamEvent::Started { request_id, .. }
                                                             | StreamEvent::TextChunk { request_id, .. }

@@ -1,5 +1,5 @@
-use leptos::logging::log;
 use crate::components::tree::{NodeInfo, NodeWithLeaf};
+use leptos::logging::log;
 use leptos::prelude::*;
 
 #[derive(Clone, Copy)]
@@ -22,18 +22,20 @@ impl ChatContext {
         }
     }
     pub fn delete_node_info(&self, node_info: NodeInfo) {
+        let id = node_info.id;
         if let Some(parent) = self.parent.get()
-            && parent.id == node_info.id {
-                self.parent.set(None);
-                self.prev_leaf.set(None);
-                self.next_leaf.set(None);
-        }
-        if let Some(_next) = self.next_leaf.get() {
+            && parent.id == id
+        {
+            self.parent.set(None);
+            self.prev_leaf.set(None);
             self.next_leaf.set(None);
         }
-        if let Some(_prev) = self.prev_leaf.get() {
-            self.prev_leaf.set(self.next_leaf.read().clone());
+        if let Some(next) = self.next_leaf.get()  && next.id == id {
             self.next_leaf.set(None);
+        } else if let Some(prev) = self.prev_leaf.get() && prev.id == id {
+            let new_prev = self.next_leaf.read().clone();
+            self.next_leaf.set(None);
+            self.prev_leaf.set(new_prev);
         }
     }
     pub fn set_parent(&self, node_info: NodeInfo) {
@@ -41,8 +43,9 @@ impl ChatContext {
     }
 
     pub fn set_leaf(&self, node_info: &NodeWithLeaf, parent_node: &NodeWithLeaf) {
-        log!("set_leaf called with node_info: {:?}, parent_leaf: {:?}", node_info.name, parent_node.name);
-        if let Some(parent) = &self.parent.get() && parent.id != parent_node.id {
+        if let Some(parent) = &self.parent.get()
+            && parent.id != parent_node.id
+        {
             self.parent.set(Some(parent_node.clone().into()));
         }
         if self.parent.get().is_none() {
@@ -50,40 +53,23 @@ impl ChatContext {
         }
         self.set_one_leaf(node_info.clone().into())
     }
-        #[allow(dead_code)]
-    pub fn set_one_leaf(&self, node_info: NodeInfo) {
+    #[allow(dead_code)]
+    pub fn set_one_leaf(&self, new_node: NodeInfo) {
+        log!("set_one_leaf: {:?}", new_node);
         if self.prev_leaf.get().is_none() {
-            self.prev_leaf.set(Some(node_info));
-        } else if self.next_leaf.get().is_none() {
-            let new_cloned = node_info.clone();
-            if let (Some(prev_node), new_node) = (self.prev_leaf.read().as_ref(), &node_info) {
-                let prev_name = prev_node.name.as_deref().unwrap_or("");
-                let new_name = new_node.name.as_deref().unwrap_or("");
-                match prev_name.cmp(new_name) {
-                    std::cmp::Ordering::Less => {
-                        // prev < new
-                        self.next_leaf.set(Some(new_cloned));
-                    }
-                    std::cmp::Ordering::Equal => {} // do nothing
-                    std::cmp::Ordering::Greater => {
-                        // prev > next
-                        self.next_leaf
-                            .set(Some(self.prev_leaf.read().clone().expect("prev leaf")));
-                        self.prev_leaf.set(Some(new_cloned));
-                    }
+            self.prev_leaf.set(Some(new_node));
+        } else {
+            let prev_cloned = self.prev_leaf.read().clone().expect("prev leaf");
+            match prev_cloned.date_time.cmp(&new_node.date_time) {
+                std::cmp::Ordering::Less => {
+                    // prev < new (next is None)
+                    self.prev_leaf.set(Some(new_node.clone()));
+                    self.next_leaf.set(Some(prev_cloned));
                 }
-            } else if let (Some(prev_node), new_node) = (self.prev_leaf.read().as_ref(), &node_info)
-            {
-                let prev_name = prev_node.name.as_deref().unwrap_or("");
-                let new_name = new_node.name.as_deref().unwrap_or("");
-                match prev_name.cmp(new_name) {
-                    std::cmp::Ordering::Greater => {
-                        // prev < new
-                        self.prev_leaf.set(Some(new_cloned));
-                    }
-                    _ => {
-                        self.next_leaf.set(Some(new_cloned));
-                    }
+                std::cmp::Ordering::Equal => {} // do nothing
+                std::cmp::Ordering::Greater => {
+                    // prev > next
+                    self.next_leaf.set(Some(new_node.clone()));
                 }
             }
         }
