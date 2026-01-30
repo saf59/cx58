@@ -133,8 +133,9 @@
   left: 0;
   right: 0;
   color: white;
-  padding: 1rem 0.75rem 0.75rem;
+  padding: .5rem;
   font-size: 0.9rem;
+  width: fit-content;
 }
 .image-label:hover {
   font-weight: 500;

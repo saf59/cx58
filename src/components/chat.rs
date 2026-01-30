@@ -21,7 +21,7 @@ use web_sys::{
     HtmlDivElement, ReadableStreamDefaultReader, RequestInit, Response, ScrollBehavior,
     ScrollIntoViewOptions,
 };
-
+use crate::components::show_description::{DescriptionData, DescriptionRendererCompact};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum MessageRole {
@@ -47,14 +47,8 @@ pub enum MessageContent {
     Text(String),
     ObjectTree(Vec<Tree>),
     DocumentTree(Vec<NodeWithLeaf>),
-    Description(DescriptionData),
+    Description(Box<DescriptionData>),
     Comparison(ComparisonData),
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct DescriptionData {
-    pub description: String,
-    pub fields: Vec<(String, String)>, // (key, value) pairs
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -334,22 +328,7 @@ fn MessageRenderer(message: Message) -> impl IntoView {
         .into_any(),
         MessageContent::Description(data) => view! {
             <div class=css_class>
-                <div class="description-content">
-                    <h4>"Description"</h4>
-                    <p>{data.description}</p>
-                    {data
-                        .fields
-                        .into_iter()
-                        .map(|(key, value)| {
-                            view! {
-                                <div class="description-field">
-                                    <h5>{key}</h5>
-                                    <p>{value}</p>
-                                </div>
-                            }
-                        })
-                        .collect_view()}
-                </div>
+                <DescriptionRendererCompact data=*data />
             </div>
         }
         .into_any(),
@@ -588,37 +567,19 @@ fn process_sse_event(
         }
 
         Some("description_chunk") => {
-            match serde_json::from_str::<serde_json::Value>(data) {
+            match serde_json::from_str::<DescriptionData>(data) {
                 Ok(json_data) => {
-                    let mut fields = Vec::new();
-                    let description = json_data
-                        .get("description")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
-
-                    if let Some(obj) = json_data.as_object() {
-                        for (key, value) in obj.iter() {
-                            if key != "description"
-                                && let Some(val_str) = value.as_str()
-                            {
-                                fields.push((capitalize(key), val_str.to_string()));
-                            }
-                        }
-                    }
-
+                    leptos::logging::log!("Received description_chunk:\n{:?}", &json_data);
                     set_history.update(|h| {
                         h.push(Message::new(
                             MessageRole::Llm,
-                            MessageContent::Description(DescriptionData {
-                                description,
-                                fields,
-                            }),
+                            MessageContent::Description(Box::new(json_data)),
                         ));
                     });
                 },
                 Err(e) => {
-                    log!("Failed to parse description_chunk: {}", e);
+                    leptos::logging::error!("Failed to parse description_chunk: {}", e);
+                    leptos::logging::log!("{}",data);
                 }
             }
         }
