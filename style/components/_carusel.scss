@@ -73,11 +73,6 @@
   scrollbar-color: #888 #f1f1f1;
 }
 
-.carousel > * {
-  flex: 0 0 calc((100% - 1rem) / 2); /* не растягивается, не сжимается, фиксированная ширина */
-  scroll-snap-align: start;
-  min-width: 0; /* для корректной работы с длинным контентом */
-}
 .carousel::-webkit-scrollbar {
   height: 8px;
 }
@@ -95,11 +90,13 @@
 .carousel::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
-
 .carousel-item {
+  //flex: 0 0 calc((100% - 1rem) / 2); /* не растягивается, не сжимается, фиксированная ширина */
+  flex: 0 0 auto; /* не растягивается, не сжимается, фиксированная ширина */
   scroll-snap-align: start;
   position: relative;
   align-self: end;
+  min-width: 0; /* для корректной работы с длинным контентом */
 }
 
 .thumbnail-link {

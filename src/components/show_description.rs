@@ -2,7 +2,6 @@ use leptos::*;
 use leptos::prelude::ClassAttribute;
 use leptos::prelude::ElementChild;
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
 
 /// Client-side structure matching server's DescriptionData
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -24,17 +23,15 @@ pub struct DescriptionData {
     pub openings: Option<String>,
     pub model_name: String,
     pub confidence: Option<f32>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: String,
 }
 
 /// Component to render a single DescriptionData item
 #[component]
 pub fn DescriptionRenderer(
-    /// The description data to display
     data: DescriptionData,
 ) -> impl IntoView {
-    // Format the timestamp
-    let formatted_date = data.created_at.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+    let formatted_date = data.created_at; //.format("%Y-%m-%d %H:%M:%S UTC").to_string();
 
     // Format confidence as percentage if present
     let confidence_display = data.confidence.map(|c| format!("{:.1}%", c * 100.0));

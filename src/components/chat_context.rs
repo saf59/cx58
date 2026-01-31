@@ -37,8 +37,15 @@ impl ChatContext {
             self.prev_leaf.set(new_prev);
         }
     }
+
     pub fn set_parent(&self, node_info: NodeInfo) {
+        if let Some(parent) = &self.parent.get()
+            && parent.date_time == node_info.date_time {
+                return;
+            }
         self.parent.set(Some(node_info));
+        self.prev_leaf.set(None);
+        self.next_leaf.set(None);
     }
 
     pub fn set_leaf(&self, node_info: &NodeWithLeaf, parent_node: &NodeWithLeaf) {
