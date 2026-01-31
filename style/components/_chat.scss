@@ -13,9 +13,11 @@
     flex-direction: column;
     flex-grow: 1;
     flex-basis: 0;
-    width: 60vw;
+    width: 70vw;
     padding: 1rem;
     overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
 
     &::-webkit-scrollbar {
         width: 8px;
@@ -55,7 +57,7 @@
 .chat-input {
     display: flex;
     flex-basis: 15%;
-    width: 60%;
+    width: 75%;
     position: relative;
     align-self: center;
     margin-bottom: 10px;

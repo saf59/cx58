@@ -42,26 +42,7 @@
   border-radius: 8px;
   max-width: calc(2 * 300px + 2rem);
 }
-/*
 
-.carousel {
-  display: grid;
-  grid-auto-flow: column;
-  //grid-auto-columns: auto; //50%; !* 2 images visible *!
-  grid-auto-columns: minmax(auto, calc((100% - 1rem) / 2));
-  gap: 1rem;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scroll-behavior: smooth;
-  padding: 1rem 0.5rem 0.5rem;
-  scrollbar-width: thin;
-  scrollbar-color: #888 #f1f1f1;
-}
-.carousel > * {
-  scroll-snap-align: start;
-}
-
-*/
 .carousel {
   display: flex;
   gap: 1rem;
@@ -204,16 +185,6 @@
   cursor: pointer;
   user-select: none;
 }
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .carousel {
-    grid-auto-columns: 100%; /* 1 image on mobile */
-  }
-
-  .thumbnail {
-    height: 250px;
-  }
-}
 
 [popover] {
   width: 100vw;
@@ -235,3 +206,19 @@
   justify-content: center;
   align-items: center;
 }
+
+/* Responsive adjustments */
+
+@media (max-width: 768px) {
+  .chat-container {
+    align-self: start;
+  }
+  .chat-history {
+    width: 100vw;
+  }
+
+  .chat-input {
+    width: 90%;
+  }
+}
+

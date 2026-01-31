@@ -40,7 +40,7 @@ impl ChatContext {
 
     pub fn set_parent(&self, node_info: NodeInfo) {
         if let Some(parent) = &self.parent.get()
-            && parent.date_time == node_info.date_time {
+            && parent.id == node_info.id {
                 return;
             }
         self.parent.set(Some(node_info));
