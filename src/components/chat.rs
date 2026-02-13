@@ -531,13 +531,13 @@ fn process_sse_event(
             }
         }
 
-        Some("coordinator_thinking") => {
+        Some("progress") => {
             set_chat_state.set(data.to_string());
         }
 
-        Some("object_chunk") => {
+        Some("object") => {
             if let Ok(nodes) = serde_json::from_str::<Vec<TreeNode>>(data) {
-                log!("Received object_chunk with {} nodes", &nodes.len());
+                log!("Received object with {} nodes", &nodes.len());
                 let tree = build_tree(nodes);
                 log!("Converted to tree with {} nodes", &tree.len());
                 set_history.update(|h| {
@@ -549,7 +549,7 @@ fn process_sse_event(
             }
         }
 
-        Some("document_chunk") => {
+        Some("report_list") => {
             match serde_json::from_str::<Vec<NodeWithLeaf>>(data) {
             Ok(nodes) => {
                 set_history.update(|h| {
@@ -560,16 +560,16 @@ fn process_sse_event(
                 });
             }
                 Err(e) => {
-                    leptos::logging::error!("Failed to parse document_chunk: {}", e);
+                    leptos::logging::error!("Failed to parse document chunk: {}", e);
                     leptos::logging::log!("{}",data);
                 }
             }
         }
 
-        Some("description_chunk") => {
+        Some("description") => {
             match serde_json::from_str::<DescriptionData>(data) {
                 Ok(json_data) => {
-                    leptos::logging::log!("Received description_chunk:\n{:?}", &json_data);
+                    leptos::logging::log!("Received description chunk:\n{:?}", &json_data);
                     set_history.update(|h| {
                         h.push(Message::new(
                             MessageRole::Llm,
@@ -578,13 +578,13 @@ fn process_sse_event(
                     });
                 },
                 Err(e) => {
-                    leptos::logging::error!("Failed to parse description_chunk: {}", e);
+                    leptos::logging::error!("Failed to parse description chunk: {}", e);
                     leptos::logging::log!("{}",data);
                 }
             }
         }
 
-        Some("comparison_chunk") => {
+        Some("comparison") => {
             if let Ok(json_data) = serde_json::from_str::<serde_json::Value>(data) {
                 let mut fields = Vec::new();
 

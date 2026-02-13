@@ -187,11 +187,11 @@ pub async fn chat_stream_handler(
                                             let request_id = match &event {
                                                             StreamEvent::Started { request_id, .. }
                                                             | StreamEvent::TextChunk { request_id, .. }
-                                                            | StreamEvent::CoordinatorThinking { request_id, .. }
-                                                            | StreamEvent::ObjectChunk { request_id, .. }
-                                                            | StreamEvent::DocumentChunk { request_id, .. }
-                                                            | StreamEvent::DescriptionChunk { request_id, .. }
-                                                            | StreamEvent::ComparisonChunk { request_id, .. }
+                                                            | StreamEvent::Progress { request_id, .. }
+                                                            | StreamEvent::ObjectTree { request_id, .. }
+                                                            | StreamEvent::ReportList { request_id, .. }
+                                                            | StreamEvent::Description { request_id, .. }
+                                                            | StreamEvent::Comparison { request_id, .. }
                                                             | StreamEvent::Completed { request_id, .. }
                                                             | StreamEvent::Error { request_id, .. }
                                                             | StreamEvent::Cancelled { request_id, .. } => request_id,
@@ -220,28 +220,28 @@ pub async fn chat_stream_handler(
                                                     tracing::debug!("Started request: {:?}", request_id);
                                                     yield Ok(Event::default().event("started").data(data));
                                                 }
-                                                StreamEvent::CoordinatorThinking { message, .. } => {
-                                                    yield Ok(Event::default().event("coordinator_thinking").data(message));
+                                                StreamEvent::Progress { message, .. } => {
+                                                    yield Ok(Event::default().event("progress").data(message));
                                                 }
-                                                StreamEvent::ObjectChunk { data: obj_data, .. } => {
+                                                StreamEvent::ObjectTree { data: obj_data, .. } => {
                                                     let data_str = serde_json::to_string(&obj_data).unwrap_or_default();
-                                                    yield Ok(Event::default().event("object_chunk").data(data_str));
+                                                    yield Ok(Event::default().event("object").data(data_str));
                                                 }
-                                                StreamEvent::DocumentChunk { data: doc_data, .. } => {
+                                                StreamEvent::ReportList { data: doc_data, .. } => {
                                                     let data_str = serde_json::to_string(&doc_data).unwrap_or_default();
-                                                    yield Ok(Event::default().event("document_chunk").data(data_str));
+                                                    yield Ok(Event::default().event("report_list").data(data_str));
                                                 }
-                                                StreamEvent::DescriptionChunk { data: desc_data, .. } => {
+                                                StreamEvent::Description { data: desc_data, .. } => {
                                                     let data_str = serde_json::to_string(&desc_data).unwrap_or_default();
-                                                    yield Ok(Event::default().event("description_chunk").data(data_str));
+                                                    yield Ok(Event::default().event("description").data(data_str));
                                                 }
-                                                StreamEvent::ComparisonChunk { data: comp_data, .. } => {
+                                                StreamEvent::Comparison { data: comp_data, .. } => {
                                                     let data_str = serde_json::to_string(&comp_data).unwrap_or_default();
                                                     yield Ok(Event::default().event("comparison_chunk").data(data_str));
                                                 }
-                                                StreamEvent::Completed { final_result, .. } => {
+                                                StreamEvent::Completed { .. } => {
                                                     info!("Stream completed");
-                                                    yield Ok(Event::default().event("completed").data(final_result));
+                                                    //yield Ok(Event::default().event("completed").data(final_result));
                                                     break 'outer FinishReason::Complete;
                                                 }
                                                 StreamEvent::Error { error, .. } => {

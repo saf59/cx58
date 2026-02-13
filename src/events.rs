@@ -10,9 +10,14 @@ pub enum StreamEvent {
     },
 
     // Coordinator events
-    CoordinatorThinking {
+    Progress {
         request_id: String,
         message: String,
+    },
+    // Specialized chunk events
+    ObjectTree {
+        request_id: String,
+        data: serde_json::Value,
     },
 
     // Content generation events
@@ -21,23 +26,17 @@ pub enum StreamEvent {
         chunk: String,
     },
 
-    // Specialized chunk events
-    ObjectChunk {
+    ReportList {
         request_id: String,
         data: serde_json::Value,
     },
 
-    DocumentChunk {
+    Description {
         request_id: String,
         data: serde_json::Value,
     },
 
-    DescriptionChunk {
-        request_id: String,
-        data: serde_json::Value,
-    },
-
-    ComparisonChunk {
+    Comparison {
         request_id: String,
         data: serde_json::Value,
     },
