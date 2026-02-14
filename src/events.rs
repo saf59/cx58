@@ -12,6 +12,8 @@ pub enum StreamEvent {
     // Coordinator events
     Progress {
         request_id: String,
+        status: String,
+        percent: u8,
         message: String,
     },
     // Specialized chunk events
@@ -44,15 +46,16 @@ pub enum StreamEvent {
     // Completion events
     Completed {
         request_id: String,
-        final_result: String,
-        timestamp: i64,
+        //final_result: String,
+        //timestamp: i64,
+        total_time_ms: u64,
     },
 
     // Error events
     Error {
         request_id: String,
         error: String,
-        recoverable: bool,
+        //recoverable: bool,
     },
 
     // Cancelled events

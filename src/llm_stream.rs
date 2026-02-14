@@ -79,7 +79,7 @@ pub async fn chat_stream_handler(
     let sse_stream = stream! {
         let mut local_cache: Vec<String> = Vec::new();
         let mut retries = 0;
-        let max_retries = 3;
+        let max_retries = 0;
 
         loop {
             info!("Sending request to agent (attempt {})", retries + 1);
@@ -225,10 +225,12 @@ pub async fn chat_stream_handler(
                                                 }
                                                 StreamEvent::ObjectTree { data: obj_data, .. } => {
                                                     let data_str = serde_json::to_string(&obj_data).unwrap_or_default();
+                                                    info!("ObjectTree event with data: {}", data_str);
                                                     yield Ok(Event::default().event("object").data(data_str));
                                                 }
                                                 StreamEvent::ReportList { data: doc_data, .. } => {
                                                     let data_str = serde_json::to_string(&doc_data).unwrap_or_default();
+                                                    info!("ReportList event with data: {}", data_str);
                                                     yield Ok(Event::default().event("report_list").data(data_str));
                                                 }
                                                 StreamEvent::Description { data: desc_data, .. } => {
@@ -239,8 +241,8 @@ pub async fn chat_stream_handler(
                                                     let data_str = serde_json::to_string(&comp_data).unwrap_or_default();
                                                     yield Ok(Event::default().event("comparison_chunk").data(data_str));
                                                 }
-                                                StreamEvent::Completed { .. } => {
-                                                    info!("Stream completed");
+                                                StreamEvent::Completed { total_time_ms, .. } => {
+                                                    info!("Stream completed in {}ms", total_time_ms);
                                                     //yield Ok(Event::default().event("completed").data(final_result));
                                                     break 'outer FinishReason::Complete;
                                                 }
