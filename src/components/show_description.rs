@@ -1,5 +1,5 @@
 use leptos::*;
-use leptos::prelude::ClassAttribute;
+use leptos::prelude::{ClassAttribute, For};
 use leptos::prelude::ElementChild;
 use serde::{Deserialize, Serialize};
 
@@ -117,7 +117,7 @@ pub fn DescriptionRenderer(
 }
 
 /// Component to render multiple descriptions
-/*#[component]
+#[component]
 pub fn DescriptionListRenderer(
     /// List of description data to display
     data: Vec<DescriptionData>,
@@ -126,7 +126,7 @@ pub fn DescriptionListRenderer(
         <div class="description-list">
             <For
                 each=move || data.clone()
-                key=|item| format!("{}-{}", item.object, item.created_at.timestamp())
+                key=|item| format!("{}-{}", item.object, item.date_id)
                 children=move |item| {
                     view! {
                         <DescriptionRenderer data=item />
@@ -136,7 +136,7 @@ pub fn DescriptionListRenderer(
         </div>
     }
 }
-*/
+
 /// Compact version without optional sections
 #[component]
 pub fn DescriptionRendererCompact(

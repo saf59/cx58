@@ -21,7 +21,7 @@ use web_sys::{
     HtmlDivElement, ReadableStreamDefaultReader, RequestInit, Response, ScrollBehavior,
     ScrollIntoViewOptions,
 };
-use crate::components::show_description::{DescriptionData, DescriptionRendererCompact};
+use crate::components::show_description::{DescriptionData, DescriptionListRenderer, DescriptionRendererCompact};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum MessageRole {
@@ -47,7 +47,7 @@ pub enum MessageContent {
     Text(String),
     ObjectTree(Vec<Tree>),
     DocumentTree(Vec<NodeWithLeaf>),
-    Description(Box<DescriptionData>),
+    Description(Box<Vec<DescriptionData>>),
     Comparison(ComparisonData),
 }
 
@@ -328,7 +328,7 @@ fn MessageRenderer(message: Message) -> impl IntoView {
         .into_any(),
         MessageContent::Description(data) => view! {
             <div class=css_class>
-                <DescriptionRendererCompact data=*data />
+                <DescriptionListRenderer data=*data />
             </div>
         }
         .into_any(),
@@ -567,7 +567,7 @@ fn process_sse_event(
         }
 
         Some("description") => {
-            match serde_json::from_str::<DescriptionData>(data) {
+            match serde_json::from_str::<Vec<DescriptionData>>(data) {
                 Ok(json_data) => {
                     leptos::logging::log!("Received description chunk:\n{:?}", &json_data);
                     set_history.update(|h| {
