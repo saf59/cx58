@@ -1,6 +1,6 @@
-use leptos::*;
-use leptos::prelude::{ClassAttribute, For};
 use leptos::prelude::ElementChild;
+use leptos::prelude::{ClassAttribute, For};
+use leptos::*;
 use serde::{Deserialize, Serialize};
 
 /// Client-side structure matching server's DescriptionData
@@ -28,9 +28,7 @@ pub struct DescriptionData {
 
 /// Component to render a single DescriptionData item
 #[component]
-pub fn DescriptionRenderer(
-    data: DescriptionData,
-) -> impl IntoView {
+pub fn DescriptionRenderer(data: DescriptionData) -> impl IntoView {
     let formatted_date = data.created_at; //.format("%Y-%m-%d %H:%M:%S UTC").to_string();
 
     // Format confidence as percentage if present
@@ -40,10 +38,12 @@ pub fn DescriptionRenderer(
         <div class="description-container">
             // Header section
             <div class="description-header">
-                <h3 class="description-title">{data.object.clone()}</h3>
+                //<h3 class="description-title">{data.object.clone()}</h3>
                 <div class="description-meta">
-                    <span class="description-date">{data.date.clone()}</span>
-                    <span class="description-model">"Model: " {data.model_name.clone()}</span>
+                    <i class="fas fa-building"></i>
+                    <span class="description-date">{data.object.clone()}</span>
+                    <i class="fas fa-image"></i>
+                    <span class="description-model">"Model: " {data.date.clone()}</span>
                     {confidence_display
                         .map(|conf| {
                             view! {
@@ -60,60 +60,23 @@ pub fn DescriptionRenderer(
             </div>
 
             // Optional sections
-            {data
-                .windows
-                .as_ref()
-                .map(|windows| {
-                    view! {
-                        <div class="description-section">
-                            <h4 class="section-title">"Windows"</h4>
-                            <p class="section-content">{windows.clone()}</p>
-                        </div>
-                    }
-                })}
-
-            {data
-                .doors
-                .as_ref()
-                .map(|doors| {
-                    view! {
-                        <div class="description-section">
-                            <h4 class="section-title">"Doors"</h4>
-                            <p class="section-content">{doors.clone()}</p>
-                        </div>
-                    }
-                })}
-
-            {data
-                .radiators
-                .as_ref()
-                .map(|radiators| {
-                    view! {
-                        <div class="description-section">
-                            <h4 class="section-title">"Radiators"</h4>
-                            <p class="section-content">{radiators.clone()}</p>
-                        </div>
-                    }
-                })}
-
-            {data
-                .openings
-                .as_ref()
-                .map(|openings| {
-                    view! {
-                        <div class="description-section">
-                            <h4 class="section-title">"Openings"</h4>
-                            <p class="section-content">{openings.clone()}</p>
-                        </div>
-                    }
-                })}
-
-            // Footer with timestamp
-            <div class="description-footer">
-                <span class="description-timestamp">"Generated: " {formatted_date}</span>
-            </div>
+            {optional_section("Windows", data.windows.as_ref())}
+            {optional_section("Doors", data.doors.as_ref())}
+            {optional_section("Radiators", data.radiators.as_ref())}
+            {optional_section("Openings", data.openings.as_ref())}
         </div>
     }
+}
+
+fn optional_section(title: &'static str, content: Option<&String>) -> impl IntoView {
+    content.map(|text| {
+        view! {
+            <div class="description-section">
+                <h4 class="section-title">{title}</h4>
+                <p class="section-content">{text.clone()}</p>
+            </div>
+        }
+    })
 }
 
 /// Component to render multiple descriptions
@@ -128,9 +91,7 @@ pub fn DescriptionListRenderer(
                 each=move || data.clone()
                 key=|item| format!("{}-{}", item.object, item.date_id)
                 children=move |item| {
-                    view! {
-                        <DescriptionRenderer data=item />
-                    }
+                    view! { <DescriptionRenderer data=item /> }
                 }
             />
         </div>
@@ -139,9 +100,7 @@ pub fn DescriptionListRenderer(
 
 /// Compact version without optional sections
 #[component]
-pub fn DescriptionRendererCompact(
-    data: DescriptionData,
-) -> impl IntoView {
+pub fn DescriptionRendererCompact(data: DescriptionData) -> impl IntoView {
     view! {
         <div class="description-compact">
             <div class="compact-header">
