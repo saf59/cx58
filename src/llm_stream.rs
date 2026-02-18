@@ -72,7 +72,7 @@ pub async fn chat_stream_handler(
 
     let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
-        .timeout(Duration::from_secs(600))
+        .timeout(Duration::from_secs(1000))
         .build()
         .unwrap();
 
