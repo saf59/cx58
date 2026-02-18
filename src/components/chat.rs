@@ -108,7 +108,16 @@ pub fn Chat() -> impl IntoView {
             ctx.clear_history.set(false);
         }
     });
-
+    Effect::new(move |_| {
+        if let Some(text) = ctx.insert_and_enter.get() {
+            set_input.set(text);
+            ctx.insert_and_enter.set(None);
+            if let Some(form) = form_ref.get() {
+                let event = web_sys::SubmitEvent::new("submit").unwrap();
+                let _ = form.dispatch_event(&event);
+            }
+        }
+    });
     Effect::new(move |_| {
         if let Some(text) = ctx.insert_text.get() {
             set_input.set(text);

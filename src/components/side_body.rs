@@ -34,10 +34,11 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
                 .into_iter()
                 .map(|key| {
                     let question = move || i18n.tr(&key);
+                    let question_clone = question.clone();
                     view! {
-                        <div class="faq" on:click=move |_| ctx.insert_text.set(Some(question()))>
-                            <i class="fas fa-question"></i>
-                            <span class="faq-item">{question.clone()}</span>
+                        <div class="faq" >
+                            <i class="fas fa-question" on:click=move |_| ctx.insert_and_enter.set(Some(question_clone()))></i>
+                            <span class="faq-item" on:click=move |_| ctx.insert_text.set(Some(question()))>{question.clone()}</span>
                         </div>
                     }
                 })

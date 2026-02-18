@@ -29,7 +29,7 @@ pub struct DescriptionData {
 /// Component to render a single DescriptionData item
 #[component]
 pub fn DescriptionRenderer(data: DescriptionData) -> impl IntoView {
-    let formatted_date = data.created_at; //.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+    //let formatted_date = data.created_at; //.format("%Y-%m-%d %H:%M:%S UTC").to_string();
 
     // Format confidence as percentage if present
     let confidence_display = data.confidence.map(|c| format!("{:.1}%", c * 100.0));
@@ -91,7 +91,7 @@ pub fn DescriptionListRenderer(
                 each=move || data.clone()
                 key=|item| format!("{}-{}", item.object, item.date_id)
                 children=move |item| {
-                    view! { <DescriptionRenderer data=item /> }
+                    view! { <DescriptionRendererCompact data=item /> }
                 }
             />
         </div>
@@ -101,11 +101,15 @@ pub fn DescriptionListRenderer(
 /// Compact version without optional sections
 #[component]
 pub fn DescriptionRendererCompact(data: DescriptionData) -> impl IntoView {
+    let (object_name, report_name) = extract_name_pair(data.object.as_str());
     view! {
         <div class="description-compact">
             <div class="compact-header">
-                <strong>{data.object.clone()}</strong>
-                <span class="compact-date">{data.date.clone()}</span>
+                <span>
+                    <i class="fas fa-building right5"></i>
+                    <strong>{object_name}</strong>
+                </span>
+                <span class="compact-date"><i class="fas fa-image right5"></i>{report_name}</span>
             </div>
             <p class="compact-description">{data.description.clone()}</p>
 
@@ -157,4 +161,14 @@ pub fn DescriptionRendererCompact(data: DescriptionData) -> impl IntoView {
             </div>
         </div>
     }
+}
+
+fn extract_name_pair(full_name: &str) -> (String, String) {
+    let full_name = full_name.replace("Root/","");
+    let parts: Vec<&str> = full_name.split('/').collect();
+
+    let report_name = parts.last().unwrap_or(&"").to_string();
+    let object_name = parts[..parts.len().saturating_sub(1)].join(" - ");
+
+    (object_name, report_name)
 }
