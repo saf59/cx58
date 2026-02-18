@@ -24,12 +24,12 @@ stop = Stopp
 
 # FAQ
 q-1 = Meine Objekte anzeigen
-q-2 = Letzte Änderungen anzeigen
-q-3 = Letzte Änderungen anzeigen für
-q-4 = Datei anzeigen
-q-5 = Dateibeschreibung anzeigen
-q-6 = Letzte Änderungen beschreiben
-q-7 = Änderungen beschreiben für
+q-2 = Letzte Berichte anzeigen
+q-3 = Alle Berichte anzeigen
+q-4 = Beschreibung anzeigen
+q-5 = Letzte Beschreibung anzeigen
+q-6 = Vorherige Beschreibung anzeigen
+q-7 = Vergleich anzeigen
 
 # Under construction
 select-a-language = Wählen Sie eine Sprache:

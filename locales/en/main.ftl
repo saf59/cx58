@@ -24,12 +24,12 @@ stop = Stop
 
 # FAQ
 q-1 = Show my objects
-q-2 = Show latest changes
-q-3 = Show latest changes for
-q-4 = Show file
-q-5 = Show file description
-q-6 = Describe latest changes
-q-7 = Describe changes for
+q-2 = Show last reports
+q-3 = Show all reports
+q-4 = Show description
+q-5 = Show last description
+q-6 = Show prev description
+q-7 = Show comparition
 
 # Under construction
 select-a-language = Select a language:

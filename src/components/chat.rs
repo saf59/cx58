@@ -313,8 +313,8 @@ fn MessageRenderer(message: Message) -> impl IntoView {
                     tree=tree
                     on_node_click=move |node_info| {
                         tracing::info!("Node clicked: {:?}", node_info.name);
-                        ctx.insert_text
-                            .set(Some(node_info.name.unwrap_or("(unnamed)".to_string())));
+                        ctx.set_parent(node_info.clone())
+                        //ctx.insert_text.set(Some(node_info.name.unwrap_or("(unnamed)".to_string())));
                     }
                 />
             </div>
