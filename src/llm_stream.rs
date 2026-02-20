@@ -225,12 +225,12 @@ pub async fn chat_stream_handler(
                                                 }
                                                 StreamEvent::ObjectTree { data: obj_data, .. } => {
                                                     let data_str = serde_json::to_string(&obj_data).unwrap_or_default();
-                                                    info!("ObjectTree event with data: {}", data_str);
+                                                    //info!("ObjectTree event with data: {}", data_str);
                                                     yield Ok(Event::default().event("object").data(data_str));
                                                 }
                                                 StreamEvent::ReportList { data: doc_data, .. } => {
                                                     let data_str = serde_json::to_string(&doc_data).unwrap_or_default();
-                                                    info!("ReportList event with data: {}", data_str);
+                                                    //info!("ReportList event with data: {}", data_str);
                                                     yield Ok(Event::default().event("report_list").data(data_str));
                                                 }
                                                 StreamEvent::Description { data: desc_data, .. } => {

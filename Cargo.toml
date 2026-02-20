@@ -18,7 +18,8 @@ leptos_meta = { version = "0.8" }
 leptos_macro = "0.8"
 oauth2 = { version = "5.0",optional = true }
 openidconnect = { version = "4.0",optional = true }
-tokio = { version = "1.48", features = ["macros","rt-multi-thread"], optional = true }
+tokio = { version = "1.49", features = ["macros","rt-multi-thread"], optional = true }
+# !!! not 0.13 because of incompatibility with client implementation
 reqwest = { version = "0.12", features = ["json", "stream", "multipart"]}
 # "rustls-tls",
 serde = { version = "1.0", features = ["derive"] }
@@ -28,7 +29,7 @@ tracing = "0.1"
 tower-cookies = "0.11"
 console_error_panic_hook = { version = "0.1", optional = true }
 url = "2.5"
-uuid = { version = "1.19", features = ["v7", "rng-rand", "serde", "js"] }
+uuid = { version = "1.21", features = ["v7", "rng-rand", "serde", "js"] }
 wasm-bindgen = { version = "0.2", features = [], optional = true }
 base64 = "0.22"
 cookie = "0.18"
@@ -76,8 +77,11 @@ gloo-timers = "0.3"
 leptos-fluent = {version = "0.3.1", features = ["yaml"]}
 serde-wasm-bindgen = "0.6.5"
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.3.4", features = ["wasm_js"] }
+
 [dev-dependencies]
-tokio = { version = "1.48", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.49", features = ["rt-multi-thread", "macros"] }
 
 [features]
 hydrate = [
@@ -100,8 +104,6 @@ ssr = [
     "leptos-fluent/axum",
 ]
 
-#[target.wasm32-unknown-unknown]
-#rustflags = ["--cfg", "erase_components", ]
 
 # Defines a size-optimized profile for the WASM bundle in release mode
 [profile.wasm-release]
@@ -112,6 +114,9 @@ codegen-units = 1
 panic = "abort"
 
 [package.metadata.leptos]
+bin-target-triple = "x86_64-pc-windows-msvc"
+bin-target = "gmr"
+
 # The name used by wasm-bindgen/cargo-leptos for the JS/WASM bundle. Defaults to the crate name
 output-name = "cx58-client"
 
