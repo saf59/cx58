@@ -29,7 +29,7 @@ q-3 = Show all reports
 q-4 = Show description
 q-5 = Show last description
 q-6 = Show prev description
-q-7 = Show comparition
+q-7 = Show comparison
 
 # Under construction
 select-a-language = Select a language:

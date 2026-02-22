@@ -6,12 +6,15 @@
 }
 
 .node-info {
-  padding: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  padding: 0.3rem;
   background: #f8f9fa;
   border-radius: 8px;
 }
 
 .node-info h3 {
+  margin-left: 6px;
   margin-block: 0;
   color: #333;
 }
@@ -24,6 +27,7 @@
 }
 
 .meta-item {
+  margin-right: 6px;
   display: flex;
   align-items: center;
   gap: 0.3rem;

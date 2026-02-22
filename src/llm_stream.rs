@@ -239,7 +239,7 @@ pub async fn chat_stream_handler(
                                                 }
                                                 StreamEvent::Comparison { data: comp_data, .. } => {
                                                     let data_str = serde_json::to_string(&comp_data).unwrap_or_default();
-                                                    yield Ok(Event::default().event("comparison_chunk").data(data_str));
+                                                    yield Ok(Event::default().event("comparison").data(data_str));
                                                 }
                                                 StreamEvent::Completed { total_time_ms, .. } => {
                                                     info!("Stream completed in {}ms", total_time_ms);

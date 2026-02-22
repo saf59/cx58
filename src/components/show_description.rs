@@ -26,7 +26,7 @@ pub struct DescriptionData {
     pub created_at: String,
 }
 
-/// Component to render a single DescriptionData item
+/*/// Component to render a single DescriptionData item
 #[component]
 pub fn DescriptionRenderer(data: DescriptionData) -> impl IntoView {
     //let formatted_date = data.created_at; //.format("%Y-%m-%d %H:%M:%S UTC").to_string();
@@ -78,6 +78,7 @@ fn optional_section(title: &'static str, content: Option<&String>) -> impl IntoV
         }
     })
 }
+*/
 
 /// Component to render multiple descriptions
 #[component]
@@ -100,6 +101,16 @@ pub fn DescriptionListRenderer(
 
 /// Compact version without optional sections
 #[component]
+fn DetailItem(label: &'static str, value: String) -> impl IntoView {
+    view! {
+        <div class="detail-item">
+            <strong>{label}</strong>
+            {value}
+        </div>
+    }
+}
+
+#[component]
 pub fn DescriptionRendererCompact(data: DescriptionData) -> impl IntoView {
     let (object_name, report_name) = extract_name_pair(data.object.as_str());
     view! {
@@ -109,55 +120,19 @@ pub fn DescriptionRendererCompact(data: DescriptionData) -> impl IntoView {
                     <i class="fas fa-building right5"></i>
                     <strong>{object_name}</strong>
                 </span>
-                <span class="compact-date"><i class="fas fa-image right5"></i>{report_name}</span>
+                <span class="compact-date">
+                    <span class="right5">"Report "</span>
+                    <i class="fas fa-image right5"></i>
+                    {report_name}
+                </span>
             </div>
-            <p class="compact-description">{data.description.clone()}</p>
+            <p class="compact-description">{data.description}</p>
 
             <div class="compact-details">
-                {data
-                    .windows
-                    .as_ref()
-                    .map(|w| {
-                        view! {
-                            <div class="detail-item">
-                                <strong>"Windows: "</strong>
-                                {w.clone()}
-                            </div>
-                        }
-                    })}
-                {data
-                    .doors
-                    .as_ref()
-                    .map(|d| {
-                        view! {
-                            <div class="detail-item">
-                                <strong>"Doors: "</strong>
-                                {d.clone()}
-                            </div>
-                        }
-                    })}
-                {data
-                    .radiators
-                    .as_ref()
-                    .map(|r| {
-                        view! {
-                            <div class="detail-item">
-                                <strong>"Radiators: "</strong>
-                                {r.clone()}
-                            </div>
-                        }
-                    })}
-                {data
-                    .openings
-                    .as_ref()
-                    .map(|o| {
-                        view! {
-                            <div class="detail-item">
-                                <strong>"Openings: "</strong>
-                                {o.clone()}
-                            </div>
-                        }
-                    })}
+                {data.windows.map(|v| view! { <DetailItem label="Windows: " value=v /> })}
+                {data.doors.map(|v| view! { <DetailItem label="Doors: " value=v /> })}
+                {data.radiators.map(|v| view! { <DetailItem label="Radiators: " value=v /> })}
+                {data.openings.map(|v| view! { <DetailItem label="Openings: " value=v /> })}
             </div>
         </div>
     }

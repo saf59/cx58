@@ -235,7 +235,6 @@ pub async fn leptos_server_fn_handler(
             let client_config = crate::state::ClientConfig {
                 media_proxy: state.oidc_client.config.media_proxy.clone()
             };
-            println!("Providing ClientConfig with media_proxy: {}", client_config.media_proxy);
             provide_context(client_config);
             provide_context(state.sessions.clone());
             provide_context(jar.clone());
@@ -265,7 +264,6 @@ pub async fn leptos_main_handler(
             let client_config = crate::state::ClientConfig {
                 media_proxy: state.oidc_client.config.media_proxy.clone()
             };
-            println!("Providing ClientConfig with media_proxy 1: {}", client_config.media_proxy);
             provide_context(client_config);
             provide_context(jar.clone());
             provide_context(state.sessions.clone());

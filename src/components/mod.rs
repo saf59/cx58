@@ -12,3 +12,5 @@ pub(crate) mod show_carusel;
 pub(crate) mod node_info_display;
 pub(crate) mod media_proxy_script;
 pub(crate) mod show_description;
+
+pub(crate) mod show_comparsion;

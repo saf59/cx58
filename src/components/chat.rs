@@ -21,7 +21,8 @@ use web_sys::{
     HtmlDivElement, ReadableStreamDefaultReader, RequestInit, Response, ScrollBehavior,
     ScrollIntoViewOptions,
 };
-use crate::components::show_description::{DescriptionData, DescriptionListRenderer, DescriptionRendererCompact};
+use crate::components::show_comparsion::{ComparisonData, ComparisonRenderer};
+use crate::components::show_description::{DescriptionData, DescriptionListRenderer};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum MessageRole {
@@ -49,11 +50,6 @@ pub enum MessageContent {
     DocumentTree(Vec<NodeWithLeaf>),
     Description(Box<Vec<DescriptionData>>),
     Comparison(ComparisonData),
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ComparisonData {
-    pub fields: Vec<(String, String)>, // (key, value) pairs
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -343,21 +339,7 @@ fn MessageRenderer(message: Message) -> impl IntoView {
         .into_any(),
         MessageContent::Comparison(data) => view! {
             <div class=css_class>
-                <div class="comparison-content">
-                    <h4>"Comparison"</h4>
-                    {data
-                        .fields
-                        .into_iter()
-                        .map(|(key, value)| {
-                            view! {
-                                <div class="comparison-field">
-                                    <h5>{key}</h5>
-                                    <p>{value}</p>
-                                </div>
-                            }
-                        })
-                        .collect_view()}
-                </div>
+                <ComparisonRenderer data=data />
             </div>
         }
         .into_any(),
@@ -594,23 +576,20 @@ fn process_sse_event(
         }
 
         Some("comparison") => {
-            if let Ok(json_data) = serde_json::from_str::<serde_json::Value>(data) {
-                let mut fields = Vec::new();
-
-                if let Some(obj) = json_data.as_object() {
-                    for (key, value) in obj.iter() {
-                        if let Some(val_str) = value.as_str() {
-                            fields.push((capitalize(key), val_str.to_string()));
-                        }
-                    }
+            match serde_json::from_str::<ComparisonData>(data) {
+                Ok(json_data) => {
+                    leptos::logging::log!("Received comparision:\n{:?}", &json_data);
+                    set_history.update(|h| {
+                        h.push(Message::new(
+                            MessageRole::Llm,
+                            MessageContent::Comparison(json_data),
+                        ));
+                    });
+                },
+                Err(e) => {
+                    leptos::logging::error!("Failed to parse comparision: {}", e);
+                    leptos::logging::log!("{}",data);
                 }
-
-                set_history.update(|h| {
-                    h.push(Message::new(
-                        MessageRole::Llm,
-                        MessageContent::Comparison(ComparisonData { fields }),
-                    ));
-                });
             }
         }
 
@@ -652,7 +631,7 @@ fn append_or_create_text_message(history: &mut Vec<Message>, content: String) {
     }
     history.push(Message::new_text(MessageRole::Llm, content));
 }
-#[cfg(not(feature = "ssr"))]
+/*#[cfg(not(feature = "ssr"))]
 fn capitalize(s: &str) -> String {
     let mut chars = s.chars();
     match chars.next() {
@@ -660,7 +639,7 @@ fn capitalize(s: &str) -> String {
         Some(first) => first.to_uppercase().chain(chars).collect(),
     }
 }
-
+*/
 // Stop request - session_id extracted from cookie on server
 #[cfg(not(feature = "ssr"))]
 fn send_stop_beacon() -> Result<bool, String> {
