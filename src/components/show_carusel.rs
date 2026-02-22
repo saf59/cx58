@@ -38,7 +38,7 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                         <h3>{branch.name.clone()}</h3>
                         <div class="node-meta">
                             <span class="meta-item">
-                                <i class="fas fa-images"></i>
+                                <i class="fas fa-images top4_left10"></i>
                                 " "
                                 {images.len()}
                                 " "
