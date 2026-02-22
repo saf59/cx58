@@ -1,4 +1,4 @@
-use leptos::prelude::ElementChild;
+use leptos::prelude::{ElementChild, GlobalAttributes, OnAttribute};
 use leptos::prelude::{ClassAttribute, For};
 use leptos::*;
 use serde::{Deserialize, Serialize};
@@ -26,59 +26,72 @@ pub struct DescriptionData {
     pub created_at: String,
 }
 
-/*/// Component to render a single DescriptionData item
-#[component]
-pub fn DescriptionRenderer(data: DescriptionData) -> impl IntoView {
-    //let formatted_date = data.created_at; //.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+impl DescriptionData {
+    /// Renders the description data as a Markdown string
+    fn to_markdown(&self) -> String {
+        let (object_name, report_name) = extract_name_pair(&self.object);
+        let mut md = format!(
+            "# {}\n\n**Report:** {}\n\n{}\n",
+            object_name, report_name, self.description
+        );
+        if let Some(v) = &self.windows {
+            md.push_str(&format!("\n**Windows:** {}\n", v));
+        }
+        if let Some(v) = &self.doors {
+            md.push_str(&format!("\n**Doors:** {}\n", v));
+        }
+        if let Some(v) = &self.radiators {
+            md.push_str(&format!("\n**Radiators:** {}\n", v));
+        }
+        if let Some(v) = &self.openings {
+            md.push_str(&format!("\n**Openings:** {}\n", v));
+        }
+        md
+    }
 
-    // Format confidence as percentage if present
-    let confidence_display = data.confidence.map(|c| format!("{:.1}%", c * 100.0));
-
-    view! {
-        <div class="description-container">
-            // Header section
-            <div class="description-header">
-                //<h3 class="description-title">{data.object.clone()}</h3>
-                <div class="description-meta">
-                    <i class="fas fa-building"></i>
-                    <span class="description-date">{data.object.clone()}</span>
-                    <i class="fas fa-image"></i>
-                    <span class="description-model">"Model: " {data.date.clone()}</span>
-                    {confidence_display
-                        .map(|conf| {
-                            view! {
-                                <span class="description-confidence">"Confidence: " {conf}</span>
-                            }
-                        })}
-                </div>
-            </div>
-
-            // Main description
-            <div class="description-section">
-                <h4 class="section-title">"Description"</h4>
-                <p class="section-content">{data.description.clone()}</p>
-            </div>
-
-            // Optional sections
-            {optional_section("Windows", data.windows.as_ref())}
-            {optional_section("Doors", data.doors.as_ref())}
-            {optional_section("Radiators", data.radiators.as_ref())}
-            {optional_section("Openings", data.openings.as_ref())}
-        </div>
+    /// Builds the filename from the header text (spaces replaced with underscores)
+    fn filename(&self) -> String {
+        let (object_name, report_name) = extract_name_pair(&self.object);
+        let object_name = object_name.replace(" - ", "_");
+        let header = format!("Report_{}_{}", object_name, report_name);
+        let sanitized = header.replace(' ', "_");
+        format!("{}.md", sanitized)
     }
 }
 
-fn optional_section(title: &'static str, content: Option<&String>) -> impl IntoView {
-    content.map(|text| {
-        view! {
-            <div class="description-section">
-                <h4 class="section-title">{title}</h4>
-                <p class="section-content">{text.clone()}</p>
-            </div>
-        }
-    })
+/// Triggers a browser download of `content` as a text file with the given `filename`
+pub fn download_text_file(filename: &str, content: &str) {
+    use wasm_bindgen::JsCast;
+    let window = web_sys::window().expect("no window");
+    let document = window.document().expect("no document");
+
+    // Build a Blob containing the markdown text
+    let blob_parts = js_sys::Array::new();
+    blob_parts.push(&wasm_bindgen::JsValue::from_str(content));
+    let mut blob_options = web_sys::BlobPropertyBag::new();
+    blob_options.type_("text/markdown");
+    let blob =
+        web_sys::Blob::new_with_str_sequence_and_options(&blob_parts, &blob_options)
+            .expect("failed to create blob");
+
+    // Create a temporary object URL and click a hidden <a> element to trigger download
+    let url = web_sys::Url::create_object_url_with_blob(&blob)
+        .expect("failed to create object URL");
+
+    let a: web_sys::HtmlAnchorElement = document
+        .create_element("a")
+        .expect("failed to create <a>")
+        .dyn_into()
+        .expect("not an anchor");
+
+    a.set_href(&url);
+    a.set_download(filename);
+    a.set_attribute("style", "display:none").ok();
+    document.body().expect("no body").append_child(&a).ok();
+    a.click();
+    document.body().expect("no body").remove_child(&a).ok();
+    web_sys::Url::revoke_object_url(&url).ok();
 }
-*/
 
 /// Component to render multiple descriptions
 #[component]
@@ -113,8 +126,17 @@ fn DetailItem(label: &'static str, value: String) -> impl IntoView {
 #[component]
 pub fn DescriptionRendererCompact(data: DescriptionData) -> impl IntoView {
     let (object_name, report_name) = extract_name_pair(data.object.as_str());
+
+    // Prepare download payload before the view consumes `data`
+    let markdown = data.to_markdown();
+    let filename = data.filename();
+
+    let on_download = move |_| {
+        download_text_file(&filename, &markdown);
+    };
+
     view! {
-        <div class="description-compact">
+        <div class="description-compact border-left-green">
             <div class="compact-header">
                 <span>
                     <i class="fas fa-building right5"></i>
@@ -134,12 +156,23 @@ pub fn DescriptionRendererCompact(data: DescriptionData) -> impl IntoView {
                 {data.radiators.map(|v| view! { <DetailItem label="Radiators: " value=v /> })}
                 {data.openings.map(|v| view! { <DetailItem label="Openings: " value=v /> })}
             </div>
+
+            // Download button anchored to the bottom-right of the card
+            <div class="compact-download-row">
+                <button
+                    class="compact-download-btn"
+                    title="Download as Markdown"
+                    on:click=on_download
+                >
+                    <i class="fas fa-arrow-down"></i>
+                </button>
+            </div>
         </div>
     }
 }
 
 fn extract_name_pair(full_name: &str) -> (String, String) {
-    let full_name = full_name.replace("Root/","");
+    let full_name = full_name.replace("Root/", "");
     let parts: Vec<&str> = full_name.split('/').collect();
 
     let report_name = parts.last().unwrap_or(&"").to_string();

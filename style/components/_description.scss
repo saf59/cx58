@@ -75,10 +75,15 @@
 
 /* Compact version styles */
 .description-compact {
-  border-left: 3px solid #4CAF50;
-  padding: 12px 15px;
+  padding: 12px 15px 4px;
   margin: 5px 0;
   background-color: #fafafa;
+}
+.border-left-green{
+  border-left: 3px solid #4CAF50;
+}
+.border-left-cx58 {
+  border-left: 3px solid var(--cx58-color);
 }
 
 .compact-header {
@@ -111,3 +116,17 @@
 .detail-item strong {
   color: #333;
 }
+.compact-download-row {
+  display: flex;
+  justify-content: flex-end;
+}
+.compact-download-btn {
+  background: none;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 1px 4px;
+  cursor: pointer;
+  font-size: 0.5rem;
+  color: #555;
+}
+.compact-download-btn:hover { background: #f0f0f0; }
