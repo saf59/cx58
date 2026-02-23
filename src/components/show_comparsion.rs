@@ -48,7 +48,7 @@ impl ComparisonData {
         let object_name = self.object_name.replace(" - ", "_");
         let header = format!(
             "Changes_{}_from_{}_to_{}",
-            self.object_name, self.prev_date, self.next_date
+            &object_name, self.prev_date, self.next_date
         );
         let sanitized = header.replace(' ', "_");
         format!("{}.md", sanitized)
@@ -64,40 +64,6 @@ fn ComparisonDetailItem(label: &'static str, value: String) -> impl IntoView {
             {value}
         </div>
     }
-}
-
-/// Triggers a browser download of `content` as a text file with the given `filename`
-fn download_text_file_(filename: &str, content: &str) {
-    use wasm_bindgen::JsCast;
-    let window = web_sys::window().expect("no window");
-    let document = window.document().expect("no document");
-
-    // Build a Blob containing the markdown text
-    let blob_parts = js_sys::Array::new();
-    blob_parts.push(&wasm_bindgen::JsValue::from_str(content));
-    let mut blob_options = web_sys::BlobPropertyBag::new();
-    blob_options.type_("text/markdown");
-    let blob =
-        web_sys::Blob::new_with_str_sequence_and_options(&blob_parts, &blob_options)
-            .expect("failed to create blob");
-
-    // Create a temporary object URL and click a hidden <a> element to trigger download
-    let url = web_sys::Url::create_object_url_with_blob(&blob)
-        .expect("failed to create object URL");
-
-    let a: web_sys::HtmlAnchorElement = document
-        .create_element("a")
-        .expect("failed to create <a>")
-        .dyn_into()
-        .expect("not an anchor");
-
-    a.set_href(&url);
-    a.set_download(filename);
-    a.set_attribute("style", "display:none").ok();
-    document.body().expect("no body").append_child(&a).ok();
-    a.click();
-    document.body().expect("no body").remove_child(&a).ok();
-    web_sys::Url::revoke_object_url(&url).ok();
 }
 
 #[component]

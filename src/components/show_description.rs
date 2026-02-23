@@ -68,8 +68,8 @@ pub fn download_text_file(filename: &str, content: &str) {
     // Build a Blob containing the markdown text
     let blob_parts = js_sys::Array::new();
     blob_parts.push(&wasm_bindgen::JsValue::from_str(content));
-    let mut blob_options = web_sys::BlobPropertyBag::new();
-    blob_options.type_("text/markdown");
+    let blob_options = web_sys::BlobPropertyBag::new();
+    blob_options.set_type("text/markdown");
     let blob =
         web_sys::Blob::new_with_str_sequence_and_options(&blob_parts, &blob_options)
             .expect("failed to create blob");
