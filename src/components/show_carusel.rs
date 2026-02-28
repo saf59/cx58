@@ -50,7 +50,7 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                     {if images.is_empty() {
                         view! {
                             <div class="no-images">
-                                <p>"No images available"</p>
+                                <p>"No reports available"</p>
                             </div>
                         }
                             .into_any()

@@ -49,8 +49,19 @@ pub enum StreamEvent {
         //final_result: String,
         //timestamp: i64,
         total_time_ms: u64,
+        stats: serde_json::Value,
     },
-
+    /// Triggered in exactly three situations:
+    /// 1. `object_id` is absent from context (any intent that needs a tree node).
+    /// 2. Intent is `DescribeReport` and neither `current_report_id` nor
+    ///    `previous_report_id` is present.
+    /// 3. Intent is `CompareReports` and both `current_report_id` and
+    ///    `previous_report_id` are absent.
+    ContextRequest {
+        request_id: String,
+        prompt: String,           // локализованный вопрос
+        suggestions: Vec<String>, // список подсказок для UI
+    },
     // Error events
     Error {
         request_id: String,

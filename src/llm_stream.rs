@@ -4,6 +4,7 @@ use crate::events::*;
 use crate::hmac::build_hmac;
 use crate::state::AppState;
 use crate::state::ChatSession;
+use crate::stats::format_stats_table;
 use async_stream::stream;
 use axum::{
     extract::State,
@@ -17,7 +18,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 #[allow(unused_imports)]
 use tracing::{error, info, warn};
-
+use crate::components::show_context_request::ContextRequest;
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PromptRequest {
     pub message: String,
@@ -192,6 +193,7 @@ pub async fn chat_stream_handler(
                                                             | StreamEvent::ReportList { request_id, .. }
                                                             | StreamEvent::Description { request_id, .. }
                                                             | StreamEvent::Comparison { request_id, .. }
+                                                            | StreamEvent::ContextRequest { request_id, .. }
                                                             | StreamEvent::Completed { request_id, .. }
                                                             | StreamEvent::Error { request_id, .. }
                                                             | StreamEvent::Cancelled { request_id, .. } => request_id,
@@ -241,8 +243,22 @@ pub async fn chat_stream_handler(
                                                     let data_str = serde_json::to_string(&comp_data).unwrap_or_default();
                                                     yield Ok(Event::default().event("comparison").data(data_str));
                                                 }
-                                                StreamEvent::Completed { total_time_ms, .. } => {
-                                                    info!("Stream completed in {}ms", total_time_ms);
+                                                StreamEvent::ContextRequest { prompt, suggestions, .. } => {
+                                                     let data = serde_json::to_string(&ContextRequest {
+                                                        prompt,
+                                                        suggestions,
+                                                        }).unwrap_or_default();
+                                                    leptos::logging::log!("ContextRequest event with data: {}", data);
+                                                    yield Ok(Event::default().event("context_request").data(data));
+/*                                                    let prompt = serde_json::to_string(&prompt).unwrap_or_default();
+                                                    let suggestions = serde_json::to_string(&suggestions).unwrap_or_default();
+                                                    yield Ok(Event::default().event("prompt").data(prompt));
+                                                    yield Ok(Event::default().event("suggestions").data(suggestions));
+*/                                                }
+                                                StreamEvent::Completed { total_time_ms, stats,.. } => {
+                                                    //info!("Stream completed in {}ms\n{:#?} ", total_time_ms, stats);
+                                                    info!("{}", format_stats_table(total_time_ms, &stats));
+                                                    //let final_result = serde_json::to_string(&stats).unwrap_or_default();
                                                     //yield Ok(Event::default().event("completed").data(final_result));
                                                     break 'outer FinishReason::Complete;
                                                 }

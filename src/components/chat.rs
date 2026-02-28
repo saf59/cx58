@@ -22,6 +22,7 @@ use web_sys::{
     ScrollIntoViewOptions,
 };
 use crate::components::show_comparsion::{ComparisonData, ComparisonRenderer};
+use crate::components::show_context_request::{ContextRequest,ContextRequestRenderer};
 use crate::components::show_description::{DescriptionData, DescriptionListRenderer};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -50,6 +51,7 @@ pub enum MessageContent {
     DocumentTree(Vec<NodeWithLeaf>),
     Description(Box<Vec<DescriptionData>>),
     Comparison(ComparisonData),
+    ContextRequest(ContextRequest)
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -109,9 +111,10 @@ pub fn Chat() -> impl IntoView {
             set_input.set(text);
             ctx.insert_and_enter.set(None);
             if let Some(form) = form_ref.get() {
-                let event = web_sys::SubmitEvent::new("submit").unwrap();
+                let _ = form.request_submit();
+/*                let event = web_sys::SubmitEvent::new("submit").unwrap();
                 let _ = form.dispatch_event(&event);
-            }
+*/            }
         }
     });
     Effect::new(move |_| {
@@ -149,7 +152,11 @@ pub fn Chat() -> impl IntoView {
             history.track();
             let history_ref: Option<HtmlDivElement> = chat_history_ref.get();
             if let Some(el) = history_ref {
-                let scroll_options = ScrollIntoViewOptions::new();
+                let _ = gloo_timers::callback::Timeout::new(100, move || {
+                    el.set_scroll_top(el.scroll_height());
+                })
+                    .forget();
+/*                let scroll_options = ScrollIntoViewOptions::new();
                 scroll_options.set_behavior(ScrollBehavior::Smooth);
                 let history_el: HtmlDivElement = el.clone();
                 let _ = gloo_timers::callback::Timeout::new(50, move || {
@@ -158,6 +165,7 @@ pub fn Chat() -> impl IntoView {
                     }
                 })
                 .forget();
+*/
             }
         });
     }
@@ -242,14 +250,12 @@ pub fn Chat() -> impl IntoView {
                         .collect_view()
                 }}
             </div>
-
-            <div class="chat-state" class:hidden=move || chat_state.get().is_empty()>
-                <i class="fa fa-spinner fa-spin"></i>
-                <span inner_html=move || chat_state.get()></span>
-            </div>
-
             <div class="chat-input">
-                <i class="loader" class:none=move || !is_loading.get() />
+                <div class="chat-state" class:hidden=move || chat_state.get().is_empty()>
+                    <i class="fa fa-spinner fa-spin"></i>
+                    <span inner_html=move || chat_state.get()></span>
+                </div>
+                /*<i class="loader" class:none=move || !is_loading.get() />*/
                 <form class="chat-input-form" on:submit=on_submit node_ref=form_ref>
                     <textarea
                         name="chat-input-name"
@@ -302,6 +308,9 @@ pub fn Chat() -> impl IntoView {
                 </form>
             </div>
         </div>
+        <div class="sb-footer">
+          "CX-58 is AI and can make mistakes."
+        </div>
     }
 }
 
@@ -340,6 +349,12 @@ fn MessageRenderer(message: Message) -> impl IntoView {
         MessageContent::Comparison(data) => view! {
             <div class=css_class>
                 <ComparisonRenderer data=data />
+            </div>
+        }
+        .into_any(),
+        MessageContent::ContextRequest(data) => view! {
+            <div class=css_class>
+                <ContextRequestRenderer data=data.clone() />
             </div>
         }
         .into_any(),
@@ -528,9 +543,9 @@ fn process_sse_event(
 
         Some("object") => {
             if let Ok(nodes) = serde_json::from_str::<Vec<TreeNode>>(data) {
-                log!("Received object with {} nodes", &nodes.len());
+                //log!("Received object with {} nodes", &nodes.len());
                 let tree = build_tree(nodes);
-                log!("Converted to tree with {} nodes", &tree.len());
+                //log!("Converted to tree with {} nodes", &tree.len());
                 set_history.update(|h| {
                     h.push(Message::new(
                         MessageRole::Llm,
@@ -551,8 +566,8 @@ fn process_sse_event(
                 });
             }
                 Err(e) => {
-                    leptos::logging::error!("Failed to parse document chunk: {}", e);
-                    leptos::logging::log!("{}",data);
+                    logging::error!("Failed to parse document chunk: {}", e);
+                    log!("{}",data);
                 }
             }
         }
@@ -560,7 +575,7 @@ fn process_sse_event(
         Some("description") => {
             match serde_json::from_str::<Vec<DescriptionData>>(data) {
                 Ok(json_data) => {
-                    leptos::logging::log!("Received description chunk:\n{:?}", &json_data);
+                    log!("Received description chunk:\n{:?}", &json_data);
                     set_history.update(|h| {
                         h.push(Message::new(
                             MessageRole::Llm,
@@ -569,8 +584,8 @@ fn process_sse_event(
                     });
                 },
                 Err(e) => {
-                    leptos::logging::error!("Failed to parse description chunk: {}", e);
-                    leptos::logging::log!("{}",data);
+                    logging::error!("Failed to parse description chunk: {}", e);
+                    log!("{}",data);
                 }
             }
         }
@@ -578,7 +593,7 @@ fn process_sse_event(
         Some("comparison") => {
             match serde_json::from_str::<ComparisonData>(data) {
                 Ok(json_data) => {
-                    leptos::logging::log!("Received comparision:\n{:?}", &json_data);
+                    //log!("Received comparision:\n{:?}", &json_data);
                     set_history.update(|h| {
                         h.push(Message::new(
                             MessageRole::Llm,
@@ -587,11 +602,52 @@ fn process_sse_event(
                     });
                 },
                 Err(e) => {
-                    leptos::logging::error!("Failed to parse comparision: {}", e);
-                    leptos::logging::log!("{}",data);
+                    logging::error!("Failed to parse comparision: {}", e);
+                    log!("{}",data);
                 }
             }
         }
+        Some("context_request") => {
+            match serde_json::from_str::<ContextRequest>(data) {
+                Ok(json_data) => {
+                    //log!("Received comparision:\n{:?}", &json_data);
+                    set_history.update(|h| {
+                        h.push(Message::new(
+                            MessageRole::Llm,
+                            MessageContent::ContextRequest(json_data),
+                        ));
+                    });
+                },
+                Err(e) => {
+                    logging::error!("Failed to parse context request: {}", e);
+                    log!("{}",data);
+                }
+            }
+        }
+        Some("prompt") => {
+            if let Ok(prompt) = serde_json::from_str::<String>(data) {
+                //log!("Received prompt: {}", &prompt);
+                set_history.update(|h| {
+                    h.push(Message::new(
+                        MessageRole::Llm,
+                        MessageContent::Text(prompt),
+                    ));
+                });
+            }
+        }
+        Some("suggestions") => {
+            if let Ok(suggestions) = serde_json::from_str::<Vec<String>>(data) {
+                //log!("Received suggestions with {} lines", &suggestions.len());
+                let _ = suggestions.iter().for_each(|s|
+                    set_history.update(|h| {
+                        h.push(Message::new(
+                            MessageRole::Llm,
+                            MessageContent::Text(s.to_string()),
+                        ));
+                    }));
+            }
+        }
+
 
         Some("completed") | Some("on_complete") => {
             set_is_loading.set(false);
@@ -599,13 +655,13 @@ fn process_sse_event(
         }
 
         Some("on_stop") | Some("cancelled") => {
-            set_history.update(|h| {
+/*            set_history.update(|h| {
                 h.push(Message::new_text(
                     MessageRole::System,
                     format!("<i>ℹ Request stopped: {}</i>", data),
                 ));
             });
-            set_is_loading.set(false);
+*/          set_is_loading.set(false);
             set_chat_state.set(String::new());
         }
 

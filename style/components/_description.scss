@@ -74,6 +74,7 @@
 }
 
 /* Compact version styles */
+.context-request,
 .description-compact {
   padding: 12px 15px 4px;
   margin: 5px 0;
@@ -84,6 +85,9 @@
 }
 .border-left-cx58 {
   border-left: 3px solid var(--cx58-color);
+}
+.border-left-red{
+  border-left: 3px solid #AF4F50;
 }
 
 .compact-header {
@@ -107,6 +111,13 @@
   margin-top: 10px;
   font-size: 0.9em;
 }
+.context-request__prompt,
+.context-request__hint,
+.context-request__suggestions {
+  margin: 4px 0;
+  line-height: 1.5;
+}
+
 
 .detail-item {
   margin: 5px 0;
