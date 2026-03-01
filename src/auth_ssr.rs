@@ -111,7 +111,7 @@ pub async fn get_and_refresh_session(state: &AppState, session_id: &str) -> Opti
             let refresh_token = session_data.refresh_token.clone().unwrap();
             let session_id_clone = session_id.to_owned();
             let session_store_clone = state.sessions.clone();
-            let oidc_client_clone = state.oidc_client.clone();
+            let oidc_client_clone = state.http_client.clone();
             let http_client_clone = state.async_http_client.clone();
 
             tokio::spawn(async move {
@@ -205,7 +205,7 @@ where
             drop(sessions);
         }
 
-        let verifier = state.oidc_client.id_token_verifier();
+        let verifier = state.http_client.id_token_verifier();
         let http_client = &state.async_http_client;
 
         if let Some(id_token_str) = &session.id_token {
@@ -218,7 +218,7 @@ where
                 Err(_) => {
                     if let Some(refresh_token) = &session.refresh_token
                         && let Ok(new_tokens) = state
-                            .oidc_client
+                            .http_client
                             .exchange_refresh_token(
                                 &RefreshToken::new(refresh_token.clone()),
                                 http_client,

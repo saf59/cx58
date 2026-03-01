@@ -155,7 +155,7 @@ impl FromRef<AppState> for Arc<Mutex<HashMap<String, SessionData>>> {
 
 impl FromRef<AppState> for ISPOidcClient {
     fn from_ref(state: &AppState) -> Self {
-        state.oidc_client.as_ref().clone()
+        state.http_client.as_ref().clone()
     }
 }
 
@@ -188,7 +188,7 @@ pub async fn logout_handler(State(state): State<AppState>, jar: CookieJar) -> im
                 && let Some(request_id) = &chat_session.current_request_id.read().await.clone()
             {
                 let client = state.async_http_client.clone();
-                let agent_api_url = state.oidc_client.config.chat_config.agent_api_url.clone();
+                let agent_api_url = state.http_client.config.chat_config.agent_api_url.clone();
                 crate::stop::cancel_agent_request(request_id, agent_api_url, client);
             }
 
@@ -202,7 +202,7 @@ pub async fn logout_handler(State(state): State<AppState>, jar: CookieJar) -> im
             let base_logout_url = format!("{}/oidc/logout", issuer_url.trim_end_matches('/'));
 
             post_logout_redirect_uri = state
-                .oidc_client
+                .http_client
                 .config
                 .oidc_post_logout_redirect_uri
                 .clone();
@@ -233,7 +233,7 @@ pub async fn leptos_server_fn_handler(
     handle_server_fns_with_context(
         move || {
             let client_config = crate::state::ClientConfig {
-                media_proxy: state.oidc_client.config.media_proxy.clone()
+                media_proxy: state.http_client.config.media_proxy.clone()
             };
             provide_context(client_config);
             provide_context(state.sessions.clone());
@@ -262,7 +262,7 @@ pub async fn leptos_main_handler(
     let handler = leptos_axum::render_app_to_stream_with_context(
         move || {
             let client_config = crate::state::ClientConfig {
-                media_proxy: state.oidc_client.config.media_proxy.clone()
+                media_proxy: state.http_client.config.media_proxy.clone()
             };
             provide_context(client_config);
             provide_context(jar.clone());
@@ -277,7 +277,7 @@ pub async fn leptos_main_handler(
 }
 
 pub async fn login_handler(State(state): State<AppState>, jar: CookieJar) -> impl IntoResponse {
-    let (auth_url, csrf_token, nonce, pkce_verifier) = state.oidc_client.authorize_url();
+    let (auth_url, csrf_token, nonce, pkce_verifier) = state.http_client.authorize_url();
 
     let session_id = Uuid::now_v7().to_string();
 
@@ -310,7 +310,7 @@ pub async fn login_handler(State(state): State<AppState>, jar: CookieJar) -> imp
 }
 /// For both: leptos_main_handler and leptos_server_fn_handler
 async fn get_auth_state(state: AppState, headers: HeaderMap) -> Auth {
-    // Извлечение Session ID из кук
+    // extract Session ID from cookie
     let session_id = headers
         .get(http::header::COOKIE)
         .and_then(|h| h.to_str().ok())
@@ -387,7 +387,7 @@ pub async fn callback_handler(
     let http_client = &state.async_http_client;
 
     match state
-        .oidc_client
+        .http_client
         .exchange_code(code, pkce_verifier, http_client)
         .await
     {
@@ -396,7 +396,7 @@ pub async fn callback_handler(
 
             if let Some(id_token) = token_response.extra_fields().id_token()
                 && let Ok(claims) =
-                    id_token.claims(&state.oidc_client.id_token_verifier(), &session.nonce)
+                    id_token.claims(&state.http_client.id_token_verifier(), &session.nonce)
             {
                 session.subject = Some(claims.subject().to_string());
 
@@ -404,7 +404,7 @@ pub async fn callback_handler(
                 let expiry_system_time: SystemTime = expiry_datetime_utc.into();
                 let duration_until_expiry = expiry_system_time
                     .duration_since(SystemTime::now())
-                    .unwrap_or(Duration::ZERO); // Если время уже прошло -> 0
+                    .unwrap_or(Duration::ZERO); // If time is out -> 0
                 session.id_token_expires_at = Some(Instant::now() + duration_until_expiry);
 
                 if let Ok(claims_json) = serde_json::to_value(claims) {
@@ -485,7 +485,7 @@ pub async fn security_headers(
         return next.run(req).await;
     }
     // tracing::info!(">> security_headers called for {}", req.uri());
-    let config = &app_state.oidc_client.config;
+    let config = &app_state.http_client.config;
     let is_prod = config.is_prod;
     let trust_data_list = &config.trust_data_list;
     let trust_connect_list = &config.trust_connect_list;
@@ -522,9 +522,7 @@ pub async fn security_headers(
             nonce, nonce
         )
     };
-    //println!("{csp}");
     let headers = res.headers_mut();
-    //println!("{:?}",&headers);
     headers.insert(
         "Content-Security-Policy",
         HeaderValue::from_str(&csp).unwrap(),

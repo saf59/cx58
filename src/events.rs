@@ -59,8 +59,8 @@ pub enum StreamEvent {
     ///    `previous_report_id` are absent.
     ContextRequest {
         request_id: String,
-        prompt: String,           // локализованный вопрос
-        suggestions: Vec<String>, // список подсказок для UI
+        prompt: String,
+        suggestions: Vec<String>,
     },
     // Error events
     Error {

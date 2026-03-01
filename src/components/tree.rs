@@ -1,5 +1,5 @@
-#![allow(unused_variables)]
-#![allow(dead_code)]
+
+
 use js_sys::Date;
 use leptos::prelude::{ClassAttribute, Get, IntoAny, Suspense};
 use leptos::prelude::{ElementChild, LocalResource};

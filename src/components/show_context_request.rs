@@ -17,19 +17,19 @@ pub fn ContextRequestRenderer(data: ContextRequest) -> impl IntoView {
         <div class="context-request border-left-red">
             <p class="context-request__prompt">{data.prompt.clone()}</p>
             {if data.suggestions.len() == 1 {
-                view! {
-                    <p class="context-request__hint">
-                        {data.suggestions[0].clone()}
-                    </p>
-                }.into_any()
+                view! { <p class="context-request__hint">{data.suggestions[0].clone()}</p> }
+                    .into_any()
             } else if !data.suggestions.is_empty() {
                 view! {
                     <ul class="context-request__suggestions">
-                        {data.suggestions.iter().map(|s| view! {
-                            <li>{s.clone()}</li>
-                        }).collect_view()}
+                        {data
+                            .suggestions
+                            .iter()
+                            .map(|s| view! { <li>{s.clone()}</li> })
+                            .collect_view()}
                     </ul>
-                }.into_any()
+                }
+                    .into_any()
             } else {
                 view! { <></> }.into_any()
             }}

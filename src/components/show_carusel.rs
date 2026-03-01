@@ -1,5 +1,5 @@
-﻿#![allow(unused_variables)]
-#![allow(dead_code)]
+﻿
+
 use crate::components::chat_context::ChatContext;
 use crate::components::tree::{NodeData, NodeType, NodeWithLeaf};
 use leptos::context::use_context;

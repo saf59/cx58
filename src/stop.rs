@@ -30,7 +30,7 @@ pub async fn stop_handler(
 
         // Cancel on agent if active request exists
         if let Some(request_id) = &chat_session.current_request_id.read().await.clone() {
-            let agent_api_url = state.oidc_client.config.chat_config.agent_api_url.clone();
+            let agent_api_url = state.http_client.config.chat_config.agent_api_url.clone();
             let client = state.async_http_client.clone();
             cancel_agent_request(request_id, agent_api_url, client);
         }

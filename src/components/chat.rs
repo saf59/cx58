@@ -17,14 +17,24 @@ use wasm_bindgen::JsCast;
 #[cfg(not(feature = "ssr"))]
 use wasm_bindgen_futures::JsFuture;
 #[cfg(not(feature = "ssr"))]
-use web_sys::{
-    HtmlDivElement, ReadableStreamDefaultReader, RequestInit, Response, ScrollBehavior,
-    ScrollIntoViewOptions,
-};
+use web_sys::{HtmlDivElement, ReadableStreamDefaultReader, RequestInit, Response};
 use crate::components::show_comparsion::{ComparisonData, ComparisonRenderer};
 use crate::components::show_context_request::{ContextRequest,ContextRequestRenderer};
 use crate::components::show_description::{DescriptionData, DescriptionListRenderer};
 
+// Builds a FluentValue args map from key => value pairs.
+// Usage: args!["error" => some_string, "status" => code]
+#[cfg(not(feature = "ssr"))]
+macro_rules! args {
+    ( $( $k:literal => $v:expr ),* $(,)? ) => {{
+        use std::collections::HashMap;
+        use std::borrow::Cow;
+        use fluent_templates::fluent_bundle::FluentValue;
+        HashMap::from([
+            $( (Cow::Borrowed($k), FluentValue::from($v)), )*
+        ])
+    }};
+}
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum MessageRole {
     User,
@@ -37,7 +47,7 @@ impl MessageRole {
     fn css_class(&self) -> &'static str {
         match self {
             Self::User => "message user",
-            Self::Llm => "message bot",
+            Self::Llm => "message bot balance",
             Self::System => "message system",
             Self::Error => "message error",
         }
@@ -84,10 +94,10 @@ pub fn Chat() -> impl IntoView {
     let chat_history_ref = NodeRef::new();
     let form_ref = NodeRef::<html::Form>::new();
     let chat_id = uuid::Uuid::now_v7().to_string();
-    #[allow(unused)]
+
     let i18n = expect_context::<I18n>();
     let auth_signal = use_context::<RwSignal<Auth>>().expect("Auth must be provided");
-    #[allow(unused)]
+
     let user_id = auth_signal
         .get_untracked()
         .email()
@@ -95,8 +105,6 @@ pub fn Chat() -> impl IntoView {
     let ctx = use_context::<ChatContext>().expect("ChatContext not provided");
     let delete_node_info =
         Callback::new(move |node_info: NodeInfo| ctx.delete_node_info(node_info));
-    //let client_config = use_context::<ClientConfig>().expect("ClientConfig context not found");
-
 
     // Subscribe to context
     Effect::new(move |_| {
@@ -112,9 +120,7 @@ pub fn Chat() -> impl IntoView {
             ctx.insert_and_enter.set(None);
             if let Some(form) = form_ref.get() {
                 let _ = form.request_submit();
-/*                let event = web_sys::SubmitEvent::new("submit").unwrap();
-                let _ = form.dispatch_event(&event);
-*/            }
+            }
         }
     });
     Effect::new(move |_| {
@@ -156,24 +162,14 @@ pub fn Chat() -> impl IntoView {
                     el.set_scroll_top(el.scroll_height());
                 })
                     .forget();
-/*                let scroll_options = ScrollIntoViewOptions::new();
-                scroll_options.set_behavior(ScrollBehavior::Smooth);
-                let history_el: HtmlDivElement = el.clone();
-                let _ = gloo_timers::callback::Timeout::new(50, move || {
-                    if let Some(last) = history_el.last_element_child() {
-                        last.scroll_into_view_with_scroll_into_view_options(&scroll_options);
-                    }
-                })
-                .forget();
-*/
             }
         });
     }
-    #[allow(unused)]
+
     let owner = Owner::current();
     // Submit handler
     let on_submit = {
-        #[allow(unused)]
+
         let chat_id = chat_id.clone();
         move |ev: ev::SubmitEvent| {
             ev.prevent_default();
@@ -205,14 +201,14 @@ pub fn Chat() -> impl IntoView {
                                     set_chat_state,
                                     language,
                                     user_id,
-                                    ctx,
+                                    ctx, i18n
                                 )
                                 .await
                                 {
                                     set_history.update(|h| {
                                         h.push(Message::new_text(
                                             MessageRole::Error,
-                                            format!("⚠ Connection error: {}", e),
+                                            i18n.tr_with_args("chat-error-connection", &args!["error" => e]),
                                         ));
                                     });
                                     set_is_loading.set(false);
@@ -255,7 +251,6 @@ pub fn Chat() -> impl IntoView {
                     <i class="fa fa-spinner fa-spin"></i>
                     <span inner_html=move || chat_state.get()></span>
                 </div>
-                /*<i class="loader" class:none=move || !is_loading.get() />*/
                 <form class="chat-input-form" on:submit=on_submit node_ref=form_ref>
                     <textarea
                         name="chat-input-name"
@@ -308,9 +303,7 @@ pub fn Chat() -> impl IntoView {
                 </form>
             </div>
         </div>
-        <div class="sb-footer">
-          "CX-58 is AI and can make mistakes."
-        </div>
+        <div class="sb-footer">{move_tr!("chat-footer")}</div>
     }
 }
 
@@ -328,7 +321,6 @@ fn MessageRenderer(message: Message) -> impl IntoView {
                     on_node_click=move |node_info| {
                         tracing::info!("Node clicked: {:?}", node_info.name);
                         ctx.set_parent(node_info.clone())
-                        //ctx.insert_text.set(Some(node_info.name.unwrap_or("(unnamed)".to_string())));
                     }
                 />
             </div>
@@ -373,6 +365,7 @@ async fn handle_stream(
     language: String,
     email: String,
     context: ChatContext,
+    i18n: I18n
 ) -> Result<(), String> {
     use serde_json::json;
 
@@ -438,7 +431,7 @@ async fn handle_stream(
         set_history.update(|h| {
             h.push(Message::new_text(
                 MessageRole::Error,
-                format!("Request failed: {}", error_text),
+                i18n.tr_with_args("chat-error-request-failed", &args!["error" => error_text.clone()])
             ));
         });
         set_is_loading.set(false);
@@ -449,9 +442,9 @@ async fn handle_stream(
     let reader = body.get_reader();
     let reader: ReadableStreamDefaultReader = reader
         .dyn_into()
-        .map_err(|_| "Invalid reader".to_string())?;
+        .map_err(|_| i18n.tr("chat-error-invalid-reader"))?;
 
-    process_stream(reader, set_history, set_is_loading, set_chat_state).await
+    process_stream(reader, set_history, set_is_loading, set_chat_state, i18n).await
 }
 #[cfg(not(feature = "ssr"))]
 async fn process_stream(
@@ -459,6 +452,7 @@ async fn process_stream(
     set_history: WriteSignal<Vec<Message>>,
     set_is_loading: WriteSignal<bool>,
     set_chat_state: WriteSignal<String>,
+    i18n: I18n
 ) -> Result<(), String> {
     let mut current_event: Option<String> = None;
     let mut buffer = String::new();
@@ -466,7 +460,7 @@ async fn process_stream(
     loop {
         let chunk = JsFuture::from(reader.read())
             .await
-            .map_err(|e| format!("Read error: {:?}", e))?;
+            .map_err(|e| i18n.tr_with_args("chat-error-read-error", &args!["error" => format!("{:?}", e)]))?;
 
         let done = js_sys::Reflect::get(&chunk, &wasm_bindgen::JsValue::from_str("done"))
             .ok()
@@ -478,7 +472,7 @@ async fn process_stream(
         }
 
         let value = js_sys::Reflect::get(&chunk, &wasm_bindgen::JsValue::from_str("value"))
-            .map_err(|_| "No value in chunk")?;
+            .map_err(|_| i18n.tr("chat-error-no-chunk-value"))?;
 
         let array = js_sys::Uint8Array::from(value);
         let bytes = array.to_vec();
@@ -507,6 +501,7 @@ async fn process_stream(
                     set_history,
                     set_is_loading,
                     set_chat_state,
+                    i18n
                 );
                 current_event = None;
             }
@@ -525,6 +520,7 @@ fn process_sse_event(
     set_history: WriteSignal<Vec<Message>>,
     set_is_loading: WriteSignal<bool>,
     set_chat_state: WriteSignal<String>,
+    i18n: I18n
 ) {
     use crate::components::tree::{build_tree, TreeNode};
 
@@ -543,9 +539,7 @@ fn process_sse_event(
 
         Some("object") => {
             if let Ok(nodes) = serde_json::from_str::<Vec<TreeNode>>(data) {
-                //log!("Received object with {} nodes", &nodes.len());
                 let tree = build_tree(nodes);
-                //log!("Converted to tree with {} nodes", &tree.len());
                 set_history.update(|h| {
                     h.push(Message::new(
                         MessageRole::Llm,
@@ -575,7 +569,6 @@ fn process_sse_event(
         Some("description") => {
             match serde_json::from_str::<Vec<DescriptionData>>(data) {
                 Ok(json_data) => {
-                    log!("Received description chunk:\n{:?}", &json_data);
                     set_history.update(|h| {
                         h.push(Message::new(
                             MessageRole::Llm,
@@ -593,7 +586,6 @@ fn process_sse_event(
         Some("comparison") => {
             match serde_json::from_str::<ComparisonData>(data) {
                 Ok(json_data) => {
-                    //log!("Received comparision:\n{:?}", &json_data);
                     set_history.update(|h| {
                         h.push(Message::new(
                             MessageRole::Llm,
@@ -624,50 +616,44 @@ fn process_sse_event(
                 }
             }
         }
-        Some("prompt") => {
-            if let Ok(prompt) = serde_json::from_str::<String>(data) {
-                //log!("Received prompt: {}", &prompt);
-                set_history.update(|h| {
-                    h.push(Message::new(
-                        MessageRole::Llm,
-                        MessageContent::Text(prompt),
-                    ));
-                });
-            }
-        }
-        Some("suggestions") => {
-            if let Ok(suggestions) = serde_json::from_str::<Vec<String>>(data) {
-                //log!("Received suggestions with {} lines", &suggestions.len());
-                let _ = suggestions.iter().for_each(|s|
-                    set_history.update(|h| {
-                        h.push(Message::new(
-                            MessageRole::Llm,
-                            MessageContent::Text(s.to_string()),
-                        ));
-                    }));
-            }
-        }
-
-
         Some("completed") | Some("on_complete") => {
             set_is_loading.set(false);
             set_chat_state.set(String::new());
         }
-
         Some("on_stop") | Some("cancelled") => {
-/*            set_history.update(|h| {
-                h.push(Message::new_text(
-                    MessageRole::System,
-                    format!("<i>ℹ Request stopped: {}</i>", data),
-                ));
+            let reason = match data {
+                "by_user"         => i18n.tr("chat-stop-by-user"),
+                "timeout"         => i18n.tr("chat-stop-timeout"),
+                "max_tokens"      => i18n.tr("chat-stop-max-tokens"),
+                "transport_error" => i18n.tr("chat-stop-transport-error"),
+                other             => other.to_string(),
+            };
+            set_history.update(|h| {
+                h.push(Message::new_text(MessageRole::System, reason));
             });
-*/          set_is_loading.set(false);
+            set_is_loading.set(false);
             set_chat_state.set(String::new());
         }
-
         Some("error") => {
+            let msg = if let Some(rest) = data.strip_prefix("llm-error|") {
+                let mut parts = rest.splitn(2, '|');
+                let status = parts.next().unwrap_or("");
+                let detail = parts.next().unwrap_or("");
+                i18n.tr_with_args("chat-llm-error", &args![
+            "status" => status,
+            "detail" => detail,
+        ])
+            } else if let Some(rest) = data.strip_prefix("transport-error|") {
+                i18n.tr_with_args("chat-transport-error", &args![
+            "error" => rest,
+        ])
+            } else {
+                // Fallback: plain text from agent (legacy or unknown format)
+                i18n.tr_with_args("chat-error-server", &args!["error" => data])
+            };
+
             set_history.update(|h| {
-                h.push(Message::new_text(MessageRole::Error, format!("⚠ {}", data)));
+                h.push(Message::new_text(MessageRole::Error, msg));
             });
             set_is_loading.set(false);
             set_chat_state.set(String::new());
@@ -687,15 +673,6 @@ fn append_or_create_text_message(history: &mut Vec<Message>, content: String) {
     }
     history.push(Message::new_text(MessageRole::Llm, content));
 }
-/*#[cfg(not(feature = "ssr"))]
-fn capitalize(s: &str) -> String {
-    let mut chars = s.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(first) => first.to_uppercase().chain(chars).collect(),
-    }
-}
-*/
 // Stop request - session_id extracted from cookie on server
 #[cfg(not(feature = "ssr"))]
 fn send_stop_beacon() -> Result<bool, String> {
@@ -707,3 +684,4 @@ fn send_stop_beacon() -> Result<bool, String> {
         .send_beacon_with_opt_str("/api/stop", None)
         .map_err(|e| format!("Beacon error: {:?}", e))
 }
+

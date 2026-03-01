@@ -14,8 +14,7 @@ pub async fn proxy_tree_handler(
     Path(user_id): Path<String>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    let agent_api_url = &state.oidc_client.config.chat_config.agent_api_url;
-    println!("Proxying tree request for user_id: {}", user_id);
+    let agent_api_url = &state.http_client.config.chat_config.agent_api_url;
     // Extract query parameters (with_leafs)
     let with_leafs = headers
         .get("x-with-leafs")

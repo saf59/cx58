@@ -7,10 +7,11 @@ use tokio::sync::Mutex;
 #[derive(Clone)]
 pub struct AppState {
     pub leptos_options: Arc<LeptosOptions>,
-    pub oidc_client: Arc<ISPOidcClient>, // with config: AppConfig
+    pub http_client: Arc<ISPOidcClient>, // with config: AppConfig
     pub sessions: Arc<Mutex<HashMap<String, SessionData>>>,
     pub async_http_client: reqwest::Client,
-    pub chat_sessions: Arc<Mutex<HashMap<String, Arc<ChatSession>>>>
+    pub chat_sessions: Arc<Mutex<HashMap<String, Arc<ChatSession>>>>,
+    pub agent_max_retries: usize
 }
 pub struct ChatSession {
     pub current_request_id: tokio::sync::RwLock<Option<String>>,
@@ -44,13 +45,15 @@ impl AppState {
             // as they are typically used by the server setup too.
             leptos_options: Arc::new(leptos_options),
             // The OIDC client is put into an Arc.
-            oidc_client: Arc::new(oidc_client),
+            http_client: Arc::new(oidc_client),
             // The sessions map is initialized empty and wrapped in Arc<Mutex<...>>.
             sessions: Arc::new(Mutex::new(HashMap::new())),
             // The reqwest::Client is typically cheap to clone for use in AppState.
             async_http_client: async_http_client.clone(),
 
             chat_sessions: Arc::new(Mutex::new(HashMap::new())),
+
+            agent_max_retries: 1
         };
 
         Ok(state)

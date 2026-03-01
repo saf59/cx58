@@ -85,9 +85,11 @@ pub fn ComparisonRenderer(data: ComparisonData) -> impl IntoView {
                 </span>
                 <span class="compact-date">
                     <span class="right5">"Changes from "</span>
-                    <i class="fas fa-image right5"></i>{data.prev_date}
+                    <i class="fas fa-image right5"></i>
+                    {data.prev_date}
                     <span class="left5 right5">" to "</span>
-                    <i class="fas fa-image right5"></i>{data.next_date}
+                    <i class="fas fa-image right5"></i>
+                    {data.next_date}
                 </span>
             </div>
             <p class="compact-description">{data.description}</p>
@@ -95,8 +97,12 @@ pub fn ComparisonRenderer(data: ComparisonData) -> impl IntoView {
             <div class="compact-details">
                 {data.windows.map(|v| view! { <ComparisonDetailItem label="Windows: " value=v /> })}
                 {data.doors.map(|v| view! { <ComparisonDetailItem label="Doors: " value=v /> })}
-                {data.radiators.map(|v| view! { <ComparisonDetailItem label="Radiators: " value=v /> })}
-                {data.openings.map(|v| view! { <ComparisonDetailItem label="Openings: " value=v /> })}
+                {data
+                    .radiators
+                    .map(|v| view! { <ComparisonDetailItem label="Radiators: " value=v /> })}
+                {data
+                    .openings
+                    .map(|v| view! { <ComparisonDetailItem label="Openings: " value=v /> })}
             </div>
 
             // Download button anchored to the bottom-right of the card

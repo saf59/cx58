@@ -36,9 +36,17 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
                     let question = move || i18n.tr(&key);
                     let question_clone = question.clone();
                     view! {
-                        <div class="faq" >
-                            <i class="fas fa-question" on:click=move |_| ctx.insert_text.set(Some(question_clone()))></i>
-                            <span class="faq-item" on:click=move |_| ctx.insert_and_enter.set(Some(question()))>{question.clone()}</span>
+                        <div class="faq">
+                            <i
+                                class="fas fa-question"
+                                on:click=move |_| ctx.insert_text.set(Some(question_clone()))
+                            ></i>
+                            <span
+                                class="faq-item"
+                                on:click=move |_| ctx.insert_and_enter.set(Some(question()))
+                            >
+                                {question.clone()}
+                            </span>
                         </div>
                     }
                 })

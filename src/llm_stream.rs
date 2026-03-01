@@ -1,5 +1,6 @@
 use crate::auth::SESSION_ID;
 use crate::chunk_assembler::*;
+use crate::components::show_context_request::ContextRequest;
 use crate::events::*;
 use crate::hmac::build_hmac;
 use crate::state::AppState;
@@ -16,9 +17,7 @@ use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-#[allow(unused_imports)]
-use tracing::{error, info, warn};
-use crate::components::show_context_request::ContextRequest;
+use tracing::{debug, error, info, warn};
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PromptRequest {
     pub message: String,
@@ -54,7 +53,7 @@ pub async fn chat_stream_handler(
             })
             .clone()
     };
-    let chat_config = state.oidc_client.config.chat_config.clone();
+    let chat_config = state.http_client.config.chat_config.clone();
     let start_at = Instant::now();
     let max_duration = Duration::from_secs(chat_config.max_duration_sec);
     let max_tokens: usize = chat_config.max_chat_tokens;
@@ -71,237 +70,228 @@ pub async fn chat_stream_handler(
         TransportError,
     }
 
-    let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(true)
-        .timeout(Duration::from_secs(1000))
-        .build()
-        .unwrap();
+    let client = state.async_http_client.clone();
 
     let sse_stream = stream! {
-        let mut local_cache: Vec<String> = Vec::new();
-        let mut retries = 0;
-        let max_retries = 0;
+                let mut retries = 0;
+                let max_retries = state.agent_max_retries;
 
-        loop {
-            info!("Sending request to agent (attempt {})", retries + 1);
+            loop {
+                    debug!("Sending request to agent (attempt {})", retries + 1);
+                    let mut local_cache: Vec<String> = Vec::new();
 
-            //let llm_req = client.post(&agent_url).json(&req);
+                    let req_bytes = match serde_json::to_vec(&req) {
+                        Ok(bytes) => bytes,
+                        Err(e) => {
+                            error!("Failed to serialize PromptRequest: {}", e);
+                            yield Ok(Event::default().event("error")
+                                .data(format!("transport-error|{}", e)));
+                            break;
+                        }
+                    };
 
-            let req_bytes = serde_json::to_vec(&req).unwrap_or_default();
-            let llm_req = match build_hmac(&agent_secret,&req_bytes) {
-                Ok ((timestamp,signature)) => {
-                    info!("Sending request with timestamp: {}", &timestamp);
-                    info!("Signature: {}", &signature);
-                    client.post(&agent_url)
-                        .header("X-Timestamp", timestamp.to_string())
-                        .header("X-Signature", signature)
-                        .header("Content-Type", "application/json")
-                        .json(&req)
-                }
-                Err(e) => {
-                        tracing::warn!("Transport error: {:#?}", e);
-                        break;
-                }
-            };
+                    let llm_req = match build_hmac(&agent_secret,&req_bytes) {
+                        Ok ((timestamp,signature)) => {
+                            debug!("Sending request with timestamp: {} and signature: {}", &timestamp, &signature);
+                            client.post(&agent_url)
+                                .header("X-Timestamp", timestamp.to_string())
+                                .header("X-Signature", signature)
+                                .header("Content-Type", "application/json")
+                                .json(&req)
+                        }
+                        Err(e) => {
+                            tracing::warn!("Transport error: {:#?}", e);
+                            yield Ok(Event::default().event("error")
+                                .data(format!("transport-error|{}", e)));
+                            break;
+                        }
+                    };
 
+                    let response_result = llm_req.send().await;
+                    debug!("Response received from agent: {:?}", response_result.as_ref().map(|r| r.status()));
 
-
-            let response_result = llm_req.send().await;
-            info!("Response received from agent: {:?}", response_result.as_ref().map(|r| r.status()));
-
-            let mut byte_stream = match response_result {
-                Ok(res) if res.status().is_success() => {
-                    res.bytes_stream()
-                },
-                Ok(res) => {
-                    tracing::error!("Agent error response: {:#?}", res);
-                    let status = res.status();
-                    let text = res.text().await.unwrap_or_default();
-                    tracing::error!("Agent error body: {}", text);
-                    yield Ok(Event::default().event("error").data(format!("LLM error [{}]: {}", status, text)));
-                    break;
-                }
-                Err(e) => {
-                    tracing::warn!("Transport error: {:#?}", e);
-                    yield Ok(Event::default().event("error").data(format!("Transport error: {}", e)));
-                    if retries < max_retries {
-                        retries += 1;
-                        tokio::time::sleep(Duration::from_secs(1 << retries)).await;
-                        continue;
-                    } else {
-                        break;
-                    }
-                }
-            };
-
-            {
-                for cached in local_cache.iter() {
-                    yield Ok(Event::default().event("replay").data(cached.clone()));
-                }
+                    let mut byte_stream = match response_result {
+                        Ok(res) if res.status().is_success() => {
+                            res.bytes_stream()
+                        },
+                        Ok(res) => {
+            let status = res.status().as_u16().to_string();
+            let text = res.text().await.unwrap_or_default();
+            tracing::error!("Agent error: {} — {}", status, text);
+            yield Ok(Event::default().event("error")
+                .data(format!("llm-error|{}|{}", status, text)));
+            break;
+        }
+        Err(e) => {
+            tracing::warn!("Transport error: {:#?}", e);
+            yield Ok(Event::default().event("error")
+                .data(format!("transport-error|{}", e)));
+            if retries < max_retries {
+                retries += 1;
+                tokio::time::sleep(Duration::from_secs(1 << retries)).await;
+                continue;
+            } else {
+                break;
             }
+        }
 
-            let mut assembler = ChunkAssembler::new();
-            let mut buffer = String::new();
-            let mut chunk_count = 0;
+                    };
 
-            let finish_reason = 'outer: loop {
-                tokio::select! {
-                    _ = tokio::time::sleep_until((start_at + max_duration).into()) => {
-                        info!("Stream timeout");
-                        break 'outer FinishReason::Timeout;
+                    {
+                        for cached in local_cache.iter() {
+                            yield Ok(Event::default().event("replay").data(cached.clone()));
+                        }
                     }
-                    maybe_chunk = byte_stream.next() => {
-                        let bytes_chunk = match maybe_chunk {
-                            Some(Ok(b)) => {
-                                chunk_count += 1;
-                                if chunk_count % 10 == 0 {
-                                    info!("Received {} chunks so far", chunk_count);
-                                }
-                                b
-                            },
-                            Some(Err(e)) => {
-                                tracing::warn!("Stream error: {:#?}", e);
-                                yield Err(std::io::Error::other(e.to_string()));
-                                break 'outer FinishReason::TransportError;
+
+                    let mut assembler = ChunkAssembler::new();
+
+                    let finish_reason = 'outer: loop {
+                    let mut buffer = String::new();
+                        tokio::select! {
+                            _ = tokio::time::sleep_until((start_at + max_duration).into()) => {
+                                warn!("Stream timeout");
+                                break 'outer FinishReason::Timeout;
                             }
-                            None => {
-                                info!("Stream ended normally after {} chunks", chunk_count);
-                                break 'outer FinishReason::Complete;
-                            }
-                        };
+                            maybe_chunk = byte_stream.next() => {
+                                let bytes_chunk = match maybe_chunk {
+                                    Some(Ok(bytes)) => bytes,
+                                    Some(Err(e)) => {
+                                        tracing::warn!("Stream error: {:#?}", e);
+                                        yield Err(std::io::Error::other(e.to_string()));
+                                        break 'outer FinishReason::TransportError;
+                                    }
+                                    None => {
+                                        break 'outer FinishReason::Complete;
+                                    }
+                                };
 
-                        let text = String::from_utf8_lossy(&bytes_chunk);
-                        buffer.push_str(&text);
+                                let text = String::from_utf8_lossy(&bytes_chunk);
+                                buffer.push_str(&text);
 
-                        // Parse SSE lines
-                        while let Some(line_end) = buffer.find("\n\n") {
-                            let sse_block = buffer[..line_end].to_string();
-                            buffer = buffer[line_end + 2..].to_string();
+                                // Parse SSE lines
+                                while let Some(line_end) = buffer.find("\n\n") {
+                                    let sse_block = buffer[..line_end].to_string();
+                                    buffer = buffer[line_end + 2..].to_string();
 
-                            // Extract data: from SSE
-                            for line in sse_block.lines() {
-                                if let Some(data) = line.strip_prefix("data: ") {
-
-                                    match serde_json::from_str::<StreamEvent>(data) {
-                                        Ok(event) => {
-                                            //info!("Parsed StreamEvent: {:?}", event);
-                                            let request_id = match &event {
-                                                            StreamEvent::Started { request_id, .. }
-                                                            | StreamEvent::TextChunk { request_id, .. }
-                                                            | StreamEvent::Progress { request_id, .. }
-                                                            | StreamEvent::ObjectTree { request_id, .. }
-                                                            | StreamEvent::ReportList { request_id, .. }
-                                                            | StreamEvent::Description { request_id, .. }
-                                                            | StreamEvent::Comparison { request_id, .. }
-                                                            | StreamEvent::ContextRequest { request_id, .. }
-                                                            | StreamEvent::Completed { request_id, .. }
-                                                            | StreamEvent::Error { request_id, .. }
-                                                            | StreamEvent::Cancelled { request_id, .. } => request_id,
-                                                        };
-
-                                            {
-                                                    let mut sessions = state.chat_sessions.lock().await;
-                                                    if let Some(session) = sessions.get_mut(&session_id) {
-                                                         let mut req_id = session.current_request_id.write().await;
-                                                        *req_id = Some(request_id.clone());
-                                                    }
-                                            }
-
-                                            match event {
-                                                StreamEvent::TextChunk { chunk, .. } => {
-
-                                                    token_counter += chunk.split_whitespace().count();
-                                                    local_cache.push(chunk.clone());
-                                                    yield Ok(Event::default().data(chunk));
-
-                                                    if token_counter >= max_tokens {
-                                                        break 'outer FinishReason::MaxTokens;
-                                                    }
-                                                }
-                                                StreamEvent::Started { request_id, .. } => {
-                                                    tracing::debug!("Started request: {:?}", request_id);
-                                                    yield Ok(Event::default().event("started").data(data));
-                                                }
-                                                StreamEvent::Progress { message, .. } => {
-                                                    yield Ok(Event::default().event("progress").data(message));
-                                                }
-                                                StreamEvent::ObjectTree { data: obj_data, .. } => {
-                                                    let data_str = serde_json::to_string(&obj_data).unwrap_or_default();
-                                                    //info!("ObjectTree event with data: {}", data_str);
-                                                    yield Ok(Event::default().event("object").data(data_str));
-                                                }
-                                                StreamEvent::ReportList { data: doc_data, .. } => {
-                                                    let data_str = serde_json::to_string(&doc_data).unwrap_or_default();
-                                                    //info!("ReportList event with data: {}", data_str);
-                                                    yield Ok(Event::default().event("report_list").data(data_str));
-                                                }
-                                                StreamEvent::Description { data: desc_data, .. } => {
-                                                    let data_str = serde_json::to_string(&desc_data).unwrap_or_default();
-                                                    yield Ok(Event::default().event("description").data(data_str));
-                                                }
-                                                StreamEvent::Comparison { data: comp_data, .. } => {
-                                                    let data_str = serde_json::to_string(&comp_data).unwrap_or_default();
-                                                    yield Ok(Event::default().event("comparison").data(data_str));
-                                                }
-                                                StreamEvent::ContextRequest { prompt, suggestions, .. } => {
-                                                     let data = serde_json::to_string(&ContextRequest {
-                                                        prompt,
-                                                        suggestions,
-                                                        }).unwrap_or_default();
-                                                    leptos::logging::log!("ContextRequest event with data: {}", data);
-                                                    yield Ok(Event::default().event("context_request").data(data));
-/*                                                    let prompt = serde_json::to_string(&prompt).unwrap_or_default();
-                                                    let suggestions = serde_json::to_string(&suggestions).unwrap_or_default();
-                                                    yield Ok(Event::default().event("prompt").data(prompt));
-                                                    yield Ok(Event::default().event("suggestions").data(suggestions));
-*/                                                }
-                                                StreamEvent::Completed { total_time_ms, stats,.. } => {
-                                                    //info!("Stream completed in {}ms\n{:#?} ", total_time_ms, stats);
-                                                    info!("{}", format_stats_table(total_time_ms, &stats));
-                                                    //let final_result = serde_json::to_string(&stats).unwrap_or_default();
-                                                    //yield Ok(Event::default().event("completed").data(final_result));
-                                                    break 'outer FinishReason::Complete;
-                                                }
-                                                StreamEvent::Error { error, .. } => {
-                                                    tracing::error!("Agent error: {}", error);
-                                                    yield Ok(Event::default().event("error").data(error));
-                                                    break 'outer FinishReason::TransportError;
-                                                }
-                                                StreamEvent::Cancelled { reason, .. } => {
-                                                    warn!("Stream cancelled: {}", reason);
-                                                    yield Ok(Event::default().event("cancelled").data(reason));
-                                                    break 'outer FinishReason::Stopped;
-                                                }
-                                            }
+                                    // Extract data: from SSE
+                                    for line in sse_block.lines() {
+                                        if let Some(_evt) = line.strip_prefix("event: ") {
+                                            continue;
                                         }
-                                        Err(parse_err) => {
-                                            // If not StreamEvent, process as legacy format
-                                            tracing::debug!("Not a StreamEvent ({}), using legacy parsing", parse_err);
-                                            let chunks = assembler.push_sse_line(data);
-                                            for chunk in chunks {
-                                                match chunk {
-                                                    UiChunk::Text(text) => {
-                                                        token_counter += text.split_whitespace().count();
-                                                        local_cache.push(text.clone());
-                                                        yield Ok(Event::default().data(text));
+                                        if let Some(data) = line.strip_prefix("data: ") {
 
-                                                        if token_counter >= max_tokens {
-                                                            break 'outer FinishReason::MaxTokens;
+                                            match serde_json::from_str::<StreamEvent>(data) {
+                                                Ok(event) => {
+                                                    let request_id = match &event {
+                                                                    StreamEvent::Started { request_id, .. }
+                                                                    | StreamEvent::TextChunk { request_id, .. }
+                                                                    | StreamEvent::Progress { request_id, .. }
+                                                                    | StreamEvent::ObjectTree { request_id, .. }
+                                                                    | StreamEvent::ReportList { request_id, .. }
+                                                                    | StreamEvent::Description { request_id, .. }
+                                                                    | StreamEvent::Comparison { request_id, .. }
+                                                                    | StreamEvent::ContextRequest { request_id, .. }
+                                                                    | StreamEvent::Completed { request_id, .. }
+                                                                    | StreamEvent::Error { request_id, .. }
+                                                                    | StreamEvent::Cancelled { request_id, .. } => request_id,
+                                                                };
+
+                                                    {
+                                                            let mut sessions = state.chat_sessions.lock().await;
+                                                            if let Some(session) = sessions.get_mut(&session_id) {
+                                                                 let mut req_id = session.current_request_id.write().await;
+                                                                *req_id = Some(request_id.clone());
+                                                            }
+                                                    }
+
+                                                    match event {
+                                                        StreamEvent::TextChunk { chunk, .. } => {
+
+                                                            token_counter += chunk.split_whitespace().count();
+                                                            local_cache.push(chunk.clone());
+                                                            yield Ok(Event::default().data(chunk));
+
+                                                            if token_counter >= max_tokens {
+                                                                break 'outer FinishReason::MaxTokens;
+                                                            }
+                                                        }
+                                                        StreamEvent::Started { request_id, .. } => {
+                                                            tracing::debug!("Started request: {:?}", request_id);
+                                                            yield Ok(Event::default().event("started").data(data));
+                                                        }
+                                                        StreamEvent::Progress { message, .. } => {
+                                                            yield Ok(Event::default().event("progress").data(message));
+                                                        }
+                                                        StreamEvent::ObjectTree { data: obj_data, .. } => {
+                                                            let data_str = serde_json::to_string(&obj_data).unwrap_or_default();
+                                                            yield Ok(Event::default().event("object").data(data_str));
+                                                        }
+                                                        StreamEvent::ReportList { data: doc_data, .. } => {
+                                                            let data_str = serde_json::to_string(&doc_data).unwrap_or_default();
+                                                            yield Ok(Event::default().event("report_list").data(data_str));
+                                                        }
+                                                        StreamEvent::Description { data: desc_data, .. } => {
+                                                            let data_str = serde_json::to_string(&desc_data).unwrap_or_default();
+                                                            yield Ok(Event::default().event("description").data(data_str));
+                                                        }
+                                                        StreamEvent::Comparison { data: comp_data, .. } => {
+                                                            let data_str = serde_json::to_string(&comp_data).unwrap_or_default();
+                                                            yield Ok(Event::default().event("comparison").data(data_str));
+                                                        }
+                                                        StreamEvent::ContextRequest { prompt, suggestions, .. } => {
+                                                             let data = serde_json::to_string(&ContextRequest {
+                                                                prompt,
+                                                                suggestions,
+                                                                }).unwrap_or_default();
+                                                            debug!("ContextRequest event with data: {}", data);
+                                                            yield Ok(Event::default().event("context_request").data(data));
+                                                        }
+                                                        StreamEvent::Completed { total_time_ms, stats,.. } => {
+                                                            info!("{}", format_stats_table(total_time_ms, &stats));
+                                                            break 'outer FinishReason::Complete;
+                                                        }
+                                                        StreamEvent::Error { error, .. } => {
+                                                            tracing::error!("Agent error: {}", error);
+                                                            yield Ok(Event::default().event("error").data(error));
+                                                            break 'outer FinishReason::TransportError;
+                                                        }
+                                                        StreamEvent::Cancelled { reason, .. } => {
+                                                            warn!("Stream cancelled: {}", reason);
+                                                            yield Ok(Event::default().event("cancelled").data(reason));
+                                                            break 'outer FinishReason::Stopped;
                                                         }
                                                     }
-                                                    UiChunk::Markdown(md) => {
-                                                        token_counter += md.split_whitespace().count();
-                                                        local_cache.push(md.clone());
-                                                        yield Ok(Event::default().data(md));
+                                                }
+                                                Err(parse_err) => {
+                                                    // If not StreamEvent, process as legacy format
+                                                    tracing::debug!("Not a StreamEvent ({}), using legacy parsing", parse_err);
+                                                    let chunks = assembler.push_sse_line(data);
+                                                    for chunk in chunks {
+                                                        match chunk {
+                                                            UiChunk::Text(text) => {
+                                                                token_counter += text.split_whitespace().count();
+                                                                local_cache.push(text.clone());
+                                                                yield Ok(Event::default().data(text));
 
-                                                        if token_counter >= max_tokens {
-                                                            break 'outer FinishReason::MaxTokens;
+                                                                if token_counter >= max_tokens {
+                                                                    break 'outer FinishReason::MaxTokens;
+                                                                }
+                                                            }
+                                                            UiChunk::Markdown(md) => {
+                                                                token_counter += md.split_whitespace().count();
+                                                                local_cache.push(md.clone());
+                                                                yield Ok(Event::default().data(md));
+
+                                                                if token_counter >= max_tokens {
+                                                                    break 'outer FinishReason::MaxTokens;
+                                                                }
+                                                            }
+                                                            UiChunk::Json(val) => {
+                                                                let data_str = serde_json::to_string(&val).unwrap_or_default();
+                                                                yield Ok(Event::default().event("json").data(data_str));
+                                                                break 'outer FinishReason::Complete;
+                                                            }
                                                         }
-                                                    }
-                                                    UiChunk::Json(val) => {
-                                                        let data_str = serde_json::to_string(&val).unwrap_or_default();
-                                                        yield Ok(Event::default().event("json").data(data_str));
-                                                        break 'outer FinishReason::Complete;
                                                     }
                                                 }
                                             }
@@ -310,50 +300,48 @@ pub async fn chat_stream_handler(
                                 }
                             }
                         }
+                    };
+
+                    info!("Stream finished with reason: {:?}", finish_reason);
+
+                    match finish_reason {
+                        FinishReason::Complete => {
+                            yield Ok(Event::default().event("on_complete").data("ok"));
+                            break;
+                        }
+                        FinishReason::Stopped => {
+                            yield Ok(Event::default().event("on_stop").data("by_user"));
+                            break;
+                        }
+                        FinishReason::Timeout => {
+                            yield Ok(Event::default().event("on_stop").data("timeout"));
+                            break;
+                        }
+                        FinishReason::MaxTokens => {
+                            yield Ok(Event::default().event("on_stop").data("max_tokens"));
+                            break;
+                        }
+                        FinishReason::TransportError => {
+                            retries += 1;
+                            if retries <= max_retries {
+                                tokio::time::sleep(Duration::from_secs(1 << retries)).await;
+                                continue;
+                            } else {
+                                yield Ok(Event::default().event("on_stop").data("transport_error"));
+                                break;
+                            }
+                        }
                     }
                 }
+
+                let mut guard = state.chat_sessions.lock().await;
+                guard.remove(&session_id);
+                debug!("GC: ChatSession {} removed", session_id);
             };
-
-            info!("Stream finished with reason: {:?}", finish_reason);
-
-            match finish_reason {
-                FinishReason::Complete => {
-                    yield Ok(Event::default().event("on_complete").data("ok"));
-                    break;
-                }
-                FinishReason::Stopped => {
-                    yield Ok(Event::default().event("on_stop").data("by_user"));
-                    break;
-                }
-                FinishReason::Timeout => {
-                    yield Ok(Event::default().event("on_stop").data("timeout"));
-                    break;
-                }
-                FinishReason::MaxTokens => {
-                    yield Ok(Event::default().event("on_stop").data("max_tokens"));
-                    break;
-                }
-                FinishReason::TransportError => {
-                    retries += 1;
-                    if retries <= max_retries {
-                        tokio::time::sleep(Duration::from_secs(1 << retries)).await;
-                        continue;
-                    } else {
-                        yield Ok(Event::default().event("on_stop").data("transport_error"));
-                        break;
-                    }
-                }
-            }
-        }
-
-        let mut guard = state.chat_sessions.lock().await;
-        guard.remove(&session_id);
-        info!("GC: ChatSession {} removed", session_id);
-    };
 
     Ok(Sse::new(sse_stream).keep_alive(
         axum::response::sse::KeepAlive::new()
             .interval(Duration::from_secs(15))
-            .text("keepalive-text"),
+            .text(": keepalive"),
     ))
 }
