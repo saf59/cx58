@@ -12,13 +12,13 @@ pub(crate) mod sidebar;
 pub(crate) mod tree;
 pub(crate) mod user_info;
 
-pub(crate) mod show_comparison;
-pub(crate) mod show_context_request;
-pub(crate) mod chat_data;
-pub(crate) mod chat_types;
 pub(crate) mod chat;
 pub(crate) mod chat_client;
+pub(crate) mod chat_data;
+pub(crate) mod chat_types;
 pub(crate) mod message_renderer;
+pub(crate) mod show_comparison;
+pub(crate) mod show_context_request;
 
 // Builds a FluentValue args map from key => value pairs.
 // Usage: args!["error" => some_string, "status" => code]

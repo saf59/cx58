@@ -18,10 +18,10 @@ impl MessageRole {
     #[cfg(not(feature = "ssr"))]
     pub fn css_class(&self) -> &'static str {
         match self {
-            Self::User    => "message user",
-            Self::Llm     => "message bot balance",
-            Self::System  => "message system",
-            Self::Error   => "message error",
+            Self::User => "message user",
+            Self::Llm => "message bot balance",
+            Self::System => "message system",
+            Self::Error => "message error",
         }
     }
 }

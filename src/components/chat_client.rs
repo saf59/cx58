@@ -1,4 +1,9 @@
 #![cfg(not(feature = "ssr"))]
+use crate::components::args;
+use crate::components::chat_context::ChatContext;
+use crate::components::chat_data::{ComparisonData, ContextRequest, DescriptionData};
+use crate::components::chat_types::{Message, MessageContent, MessageRole};
+use crate::components::tree::NodeWithLeaf;
 use leptos::leptos_dom::log;
 use leptos::logging;
 use leptos::prelude::{GetUntracked, Set, Update, WriteSignal};
@@ -6,11 +11,6 @@ use leptos_fluent::I18n;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{ReadableStreamDefaultReader, RequestInit, Response};
-use crate::components::args;
-use crate::components::chat_context::ChatContext;
-use crate::components::chat_data::{ComparisonData, ContextRequest, DescriptionData};
-use crate::components::chat_types::{Message, MessageContent, MessageRole};
-use crate::components::tree::NodeWithLeaf;
 
 // Helpers
 #[allow(clippy::too_many_arguments)]
@@ -346,4 +346,3 @@ fn append_or_create_text_message(history: &mut Vec<Message>, content: String) {
     }
     history.push(Message::new_text(MessageRole::Llm, content));
 }
-

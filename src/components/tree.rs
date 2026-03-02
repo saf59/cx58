@@ -103,7 +103,6 @@ pub struct NodeInfo {
 }
 
 impl Tree {
-
     pub fn node_info(&self) -> NodeInfo {
         NodeInfo {
             id: self.id,

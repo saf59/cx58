@@ -1,4 +1,5 @@
 use crate::auth::Auth;
+use crate::components::chat::Chat;
 use crate::components::chat_context::ChatContext;
 use crate::components::lang::{I18nProvider, LanguageSelector, LanguageSwitcher};
 use crate::components::media_proxy_script::MediaProxyScript;
@@ -15,7 +16,6 @@ use leptos_router::components::ParentRoute;
 use leptos_router::components::{Route, Router, Routes};
 use leptos_router::nested_router::Outlet;
 use leptos_router::*;
-use crate::components::chat::Chat;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();

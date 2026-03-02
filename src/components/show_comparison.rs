@@ -1,10 +1,10 @@
 #![cfg(not(feature = "ssr"))]
+use crate::components::chat_data::ComparisonData;
 use crate::components::show_description::download_text_file;
 use leptos::prelude::{expect_context, ClassAttribute};
 use leptos::prelude::{ElementChild, GlobalAttributes, OnAttribute};
 use leptos::*;
 use leptos_fluent::{move_tr, I18n};
-use crate::components::chat_data::ComparisonData;
 
 /// Compact version without optional sections
 #[component]

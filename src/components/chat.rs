@@ -6,6 +6,8 @@ use crate::components::args;
 use crate::components::chat_client::{handle_stream, send_stop_beacon};
 use crate::components::chat_context::ChatContext;
 use crate::components::chat_types::{Message, MessageRole};
+#[cfg(not(feature = "ssr"))]
+use crate::components::message_renderer::MessageRenderer;
 use crate::components::node_info_display::NodeInfoDisplay;
 use crate::components::tree::NodeInfo;
 use leptos::prelude::*;
@@ -19,8 +21,6 @@ use leptos_fluent::I18n;
 use wasm_bindgen::JsCast;
 #[cfg(not(feature = "ssr"))]
 use web_sys::HtmlDivElement;
-#[cfg(not(feature = "ssr"))]
-use crate::components::message_renderer::MessageRenderer;
 
 #[component]
 pub fn Chat() -> impl IntoView {

@@ -1,8 +1,8 @@
 #![cfg(not(feature = "ssr"))]
+use crate::components::chat_data::{extract_name_pair, DescriptionData};
 use leptos::prelude::*;
 use leptos::*;
 use leptos_fluent::{move_tr, I18n};
-use crate::components::chat_data::{extract_name_pair, DescriptionData};
 
 /// Triggers a browser download of `content` as a text file with the given `filename`
 #[cfg(not(feature = "ssr"))]
@@ -117,4 +117,3 @@ pub fn DescriptionRendererCompact(data: DescriptionData) -> impl IntoView {
         </div>
     }
 }
-

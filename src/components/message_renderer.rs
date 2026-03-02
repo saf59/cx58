@@ -30,31 +30,30 @@ pub fn MessageRenderer(message: Message) -> impl IntoView {
                 />
             </div>
         }
-            .into_any(),
+        .into_any(),
         MessageContent::DocumentTree(data) => view! {
             <div class=css_class>
                 <CarouselRenderer data=data />
             </div>
         }
-            .into_any(),
+        .into_any(),
         MessageContent::Description(data) => view! {
             <div class=css_class>
                 <DescriptionListRenderer data=*data />
             </div>
         }
-            .into_any(),
+        .into_any(),
         MessageContent::Comparison(data) => view! {
             <div class=css_class>
                 <ComparisonRenderer data=data />
             </div>
         }
-            .into_any(),
+        .into_any(),
         MessageContent::ContextRequest(data) => view! {
             <div class=css_class>
                 <ContextRequestRenderer data=data.clone() />
             </div>
         }
-            .into_any(),
+        .into_any(),
     }
 }
-
