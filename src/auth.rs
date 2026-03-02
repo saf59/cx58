@@ -29,7 +29,8 @@ impl Auth {
     }
     pub fn email(&self) -> Option<String> {
         if let Auth::Authenticated(user) = self
-        && user.email.is_some() {
+            && user.email.is_some()
+        {
             user.email.clone()
         } else {
             None

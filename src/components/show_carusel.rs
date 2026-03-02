@@ -1,14 +1,15 @@
-﻿
-
+﻿#![cfg(not(feature = "ssr"))]
+use crate::components::args;
 use crate::components::chat_context::ChatContext;
 use crate::components::tree::{NodeData, NodeType, NodeWithLeaf};
 use leptos::context::use_context;
-use leptos::prelude::ClassAttribute;
 use leptos::prelude::ElementChild;
+use leptos::prelude::GlobalAttributes;
 use leptos::prelude::IntoAny;
 use leptos::prelude::OnAttribute;
-use leptos::prelude::GlobalAttributes;
+use leptos::prelude::{expect_context, ClassAttribute};
 use leptos::*;
+use leptos_fluent::{move_tr, I18n};
 use uuid::Uuid;
 
 /// Carousel renderer for a single Branch node with ImageLeaf children
@@ -16,6 +17,7 @@ use uuid::Uuid;
 #[component]
 pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
     use web_sys::window;
+    let i18n = expect_context::<I18n>();
 
     let media_proxy = window()
         .and_then(|w| {
@@ -30,8 +32,11 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
     match branches {
         Some(branch) => {
             let branch = branch.clone();
-            let mut images: Vec<NodeWithLeaf> = data.into_iter().filter(|n| n.node_type == NodeType::ImageLeaf).collect();
-            images.sort_by_key(|p| std::cmp::Reverse( p.updated_at.clone()));
+            let mut images: Vec<NodeWithLeaf> = data
+                .into_iter()
+                .filter(|n| n.node_type == NodeType::ImageLeaf)
+                .collect();
+            images.sort_by_key(|p| std::cmp::Reverse(p.updated_at.clone()));
             view! {
                 <div class="carousel-container">
                     <div class="node-info">
@@ -42,7 +47,7 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                 " "
                                 {images.len()}
                                 " "
-                                "reports"
+                                {move_tr!("carousel-reports-label")}
                             </span>
                         </div>
                     </div>
@@ -50,7 +55,7 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                     {if images.is_empty() {
                         view! {
                             <div class="no-images">
-                                <p>"No reports available"</p>
+                                <p>{move_tr!("carousel-no-reports")}</p>
                             </div>
                         }
                             .into_any()
@@ -81,12 +86,13 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                                 _ => String::new(),
                                             };
                                             let full_url = proxy_media(&media_proxy, &full_url);
-                                            let img_name = img
-                                                .name
-                                                .clone()
-                                                .unwrap_or_else(|| format!("Image {}", idx + 1));
+                                            let img_name = img.name.clone()
+                                                .unwrap_or_else(|| i18n.tr_with_args(
+                                                    "carousel-image-fallback",
+                                                    &args!["index" => (idx + 1).to_string()],
+                                                ));
                                             let popup_id = format!("popup-{}", Uuid::now_v7());
-                                            let popup_id_for_click = popup_id.clone();
+                                            //let popup_id_for_click = popup_id.clone();
                                             let img_clone_for_label = img.clone();
                                             let branch_clone_for_label = branch.clone();
                                             view! {
@@ -105,7 +111,7 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                                     </button>
                                                     <div
                                                         class="image-label"
-                                                        on:click=move |ev| {
+                                                        on:click=move |_ev| {
                                                             ctx.set_leaf(&img_clone_for_label, &branch_clone_for_label);
                                                         }
                                                     >
@@ -137,13 +143,12 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                 </div>
             }.into_any()
         }
-        None => {
-            view! {
-                <div class="carousel-container">
-                    <p>"No data available"</p>
-                </div>
-            }.into_any()
+        None => view! {
+            <div class="carousel-container">
+                <p>{move_tr!("carousel-no-data")}</p>
+            </div>
         }
+        .into_any(),
     }
 }
 fn proxy_media(rule: &str, value: &str) -> String {

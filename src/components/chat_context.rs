@@ -1,4 +1,6 @@
-use crate::components::tree::{NodeInfo, NodeWithLeaf};
+use crate::components::tree::NodeInfo;
+#[cfg(not(feature = "ssr"))]
+use crate::components::tree::NodeWithLeaf;
 use leptos::prelude::*;
 
 #[derive(Clone, Copy)]
@@ -31,9 +33,13 @@ impl ChatContext {
             self.prev_leaf.set(None);
             self.next_leaf.set(None);
         }
-        if let Some(next) = self.next_leaf.get()  && next.id == id {
+        if let Some(next) = self.next_leaf.get()
+            && next.id == id
+        {
             self.next_leaf.set(None);
-        } else if let Some(prev) = self.prev_leaf.get() && prev.id == id {
+        } else if let Some(prev) = self.prev_leaf.get()
+            && prev.id == id
+        {
             let new_prev = self.next_leaf.read().clone();
             self.next_leaf.set(None);
             self.prev_leaf.set(new_prev);
@@ -42,14 +48,15 @@ impl ChatContext {
 
     pub fn set_parent(&self, node_info: NodeInfo) {
         if let Some(parent) = &self.parent.get()
-            && parent.id == node_info.id {
-                return;
-            }
+            && parent.id == node_info.id
+        {
+            return;
+        }
         self.parent.set(Some(node_info));
         self.prev_leaf.set(None);
         self.next_leaf.set(None);
     }
-
+    #[cfg(not(feature = "ssr"))]
     pub fn set_leaf(&self, node_info: &NodeWithLeaf, parent_node: &NodeWithLeaf) {
         if let Some(parent) = &self.parent.get()
             && parent.id != parent_node.id
@@ -61,7 +68,7 @@ impl ChatContext {
         }
         self.set_one_leaf(node_info.clone().into())
     }
-    #[allow(dead_code)]
+    #[cfg(not(feature = "ssr"))]
     pub fn set_one_leaf(&self, new_node: NodeInfo) {
         if self.prev_leaf.get().is_none() {
             self.prev_leaf.set(Some(new_node));

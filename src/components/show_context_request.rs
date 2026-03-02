@@ -1,15 +1,10 @@
-use leptos_macro::{component, view};
-use serde::{Deserialize, Serialize};
-use leptos::IntoView;
-use leptos::prelude::{CollectView, IntoAny};
+#![cfg(not(feature = "ssr"))]
+use crate::components::chat_data::ContextRequest;
 use leptos::prelude::ElementChild;
-use leptos::prelude::ClassAttribute;
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ContextRequest {
-    pub prompt: String,
-    pub suggestions: Vec<String>,
-}
+use leptos::prelude::IntoAny;
+use leptos::prelude::*;
+use leptos::IntoView;
+use leptos_macro::{component, view};
 
 #[component]
 pub fn ContextRequestRenderer(data: ContextRequest) -> impl IntoView {

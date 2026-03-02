@@ -9,8 +9,8 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Redirect, Response},
 };
-use axum_extra::extract::{CookieJar, cookie::Cookie};
-use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
+use axum_extra::extract::{cookie::Cookie, CookieJar};
+use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use http::HeaderMap;
 use leptos::config::LeptosOptions;
 use leptos::context::provide_context;
@@ -30,7 +30,7 @@ use openidconnect::core::{
 use openidconnect::{
     AuthenticationFlow, EmptyAdditionalClaims, IssuerUrl, Nonce, OAuth2TokenResponse,
 };
-use serde::{Deserialize, de::Error};
+use serde::{de::Error, Deserialize};
 use serde_json::Value;
 use serde_urlencoded::de::Error as UrlError;
 use std::collections::{HashMap, HashSet};
@@ -233,7 +233,7 @@ pub async fn leptos_server_fn_handler(
     handle_server_fns_with_context(
         move || {
             let client_config = crate::state::ClientConfig {
-                media_proxy: state.http_client.config.media_proxy.clone()
+                media_proxy: state.http_client.config.media_proxy.clone(),
             };
             provide_context(client_config);
             provide_context(state.sessions.clone());
@@ -262,7 +262,7 @@ pub async fn leptos_main_handler(
     let handler = leptos_axum::render_app_to_stream_with_context(
         move || {
             let client_config = crate::state::ClientConfig {
-                media_proxy: state.http_client.config.media_proxy.clone()
+                media_proxy: state.http_client.config.media_proxy.clone(),
             };
             provide_context(client_config);
             provide_context(jar.clone());

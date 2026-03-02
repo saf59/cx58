@@ -1,5 +1,5 @@
 use leptos::prelude::{ClassAttribute, ElementChild};
-use leptos::{IntoView, component, view};
+use leptos::{component, view, IntoView};
 use leptos_fluent::move_tr;
 
 #[component]

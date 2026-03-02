@@ -1,6 +1,6 @@
 use crate::auth::AuthenticatedUser;
-use leptos::IntoView;
 use leptos::prelude::*;
+use leptos::IntoView;
 
 #[component]
 pub fn UserRolesDisplay(user: Option<AuthenticatedUser>) -> impl IntoView {

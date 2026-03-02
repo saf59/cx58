@@ -69,7 +69,7 @@ carousel-no-reports = No reports available
 carousel-image-fallback = Image { $index }
 carousel-no-data = No data available
 
-# --- Comparison component (show_comparsion.rs) ---
+# --- Comparison component (show_comparison) ---
 comparison-changes-from = Changes from
 comparison-changes-to = to
 
@@ -77,7 +77,7 @@ comparison-changes-to = to
 description-report-label = Report
 
 # --- Shared detail labels ---
-# Used in: show_comparsion.rs (ComparisonDetailItem) and show_description.rs (DetailItem)
+# Used in: show_comparison (ComparisonDetailItem) and show_description.rs (DetailItem)
 # Both files render Windows / Doors / Radiators / Openings — same domain, shared keys
 detail-label-windows = Windows:
 detail-label-doors = Doors:
@@ -85,7 +85,7 @@ detail-label-radiators = Radiators:
 detail-label-openings = Openings:
 
 # --- Shared download button tooltip ---
-# Used in: show_comparsion.rs and show_description.rs
+# Used in: show_comparison and show_description.rs
 download-as-markdown = Download as Markdown
 
 # --- Tree component (show_tree.rs) ---

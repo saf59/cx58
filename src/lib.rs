@@ -8,6 +8,8 @@ pub mod components;
 pub mod config;
 #[cfg(feature = "ssr")]
 pub mod llm_stream;
+#[cfg(feature = "ssr")]
+pub mod proxy_tree;
 pub mod server_fn;
 #[cfg(feature = "ssr")]
 pub mod ssr;
@@ -15,8 +17,6 @@ pub mod ssr;
 pub mod state;
 #[cfg(feature = "ssr")]
 pub mod stop;
-#[cfg(feature = "ssr")]
-pub mod proxy_tree;
 
 pub mod events;
 #[cfg(feature = "ssr")]

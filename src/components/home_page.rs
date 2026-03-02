@@ -1,6 +1,6 @@
+use crate::app::LogoutButton;
 use leptos::prelude::*;
 use leptos::{component, view, IntoView};
-use crate::app::LogoutButton;
 
 #[component]
 pub fn HomePage() -> impl IntoView {

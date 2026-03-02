@@ -11,7 +11,7 @@ pub struct AppState {
     pub sessions: Arc<Mutex<HashMap<String, SessionData>>>,
     pub async_http_client: reqwest::Client,
     pub chat_sessions: Arc<Mutex<HashMap<String, Arc<ChatSession>>>>,
-    pub agent_max_retries: usize
+    pub agent_max_retries: usize,
 }
 pub struct ChatSession {
     pub current_request_id: tokio::sync::RwLock<Option<String>>,
@@ -30,7 +30,8 @@ impl AppState {
         //let async_http_client = reqwest::Client::new();
         let async_http_client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
-            .build().expect("async_http_client build");
+            .build()
+            .expect("async_http_client build");
 
         // 2. Load Configuration and Options
         let conf = leptos::prelude::get_configuration(None)?;
@@ -53,7 +54,7 @@ impl AppState {
 
             chat_sessions: Arc::new(Mutex::new(HashMap::new())),
 
-            agent_max_retries: 1
+            agent_max_retries: 1,
         };
 
         Ok(state)

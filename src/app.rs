@@ -1,21 +1,21 @@
 use crate::auth::Auth;
-use crate::components::chat::Chat;
-use crate::components::chat_context::{ChatContext};
+use crate::components::chat_context::ChatContext;
 use crate::components::lang::{I18nProvider, LanguageSelector, LanguageSwitcher};
+use crate::components::media_proxy_script::MediaProxyScript;
 use crate::components::side_body::SideBody;
 use crate::components::side_top::SideTop;
 use crate::components::sidebar::SideBar;
 use crate::components::user_info::UserRolesDisplay;
-use crate::components::media_proxy_script::MediaProxyScript;
 use crate::server_fn::*;
-use leptos::IntoView;
 use leptos::prelude::*;
+use leptos::IntoView;
 use leptos_fluent::move_tr;
-use leptos_meta::{Link, MetaTags, Stylesheet, Title, provide_meta_context};
+use leptos_meta::{provide_meta_context, Link, MetaTags, Stylesheet, Title};
 use leptos_router::components::ParentRoute;
 use leptos_router::components::{Route, Router, Routes};
 use leptos_router::nested_router::Outlet;
 use leptos_router::*;
+use crate::components::chat::Chat;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();

@@ -3,14 +3,14 @@
 async fn main() {
     use axum::middleware;
     use axum::{
-        Router,
         routing::{get, post},
+        Router,
     }; //post
-    use gmr::stop::stop_handler;
     use gmr::proxy_tree::proxy_tree_handler;
+    use gmr::stop::stop_handler;
     use gmr::{app::*, llm_stream::*, ssr::*, state::AppState};
     use leptos_axum::file_and_error_handler;
-    use leptos_axum::{LeptosRoutes, generate_route_list};
+    use leptos_axum::{generate_route_list, LeptosRoutes};
     use tokio::net::TcpListener;
     use tower_cookies::CookieManagerLayer;
     use tracing::info;

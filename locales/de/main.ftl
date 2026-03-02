@@ -70,7 +70,7 @@ carousel-no-reports = Keine Berichte verfügbar
 carousel-image-fallback = Bild { $index }
 carousel-no-data = Keine Daten verfügbar
 
-# --- Comparison component (show_comparsion.rs) ---
+# --- Comparison component (show_comparison) ---
 comparison-changes-from = Änderungen von
 comparison-changes-to = bis
 
@@ -78,14 +78,14 @@ comparison-changes-to = bis
 description-report-label = Bericht
 
 # --- Shared detail labels ---
-# Used in: show_comparsion.rs (ComparisonDetailItem) and show_description.rs (DetailItem)
+# Used in: show_comparison (ComparisonDetailItem) and show_description.rs (DetailItem)
 detail-label-windows = Fenster:
 detail-label-doors = Türen:
 detail-label-radiators = Heizkörper:
 detail-label-openings = Öffnungen:
 
 # --- Shared download button tooltip ---
-# Used in: show_comparsion.rs and show_description.rs
+# Used in: show_comparison and show_description.rs
 download-as-markdown = Als Markdown herunterladen
 
 # --- Tree component (show_tree.rs) ---

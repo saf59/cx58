@@ -39,16 +39,18 @@ pub async fn proxy_tree_handler(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(serde_json::json!({
                         "error": format!("Failed to parse response: {}", e)
-                    }))
-                ).into_response(),
+                    })),
+                )
+                    .into_response(),
             }
         }
         Err(e) => (
             StatusCode::BAD_GATEWAY,
             Json(serde_json::json!({
                 "error": format!("Failed to fetch from backend: {}", e)
-            }))
-        ).into_response(),
+            })),
+        )
+            .into_response(),
     }
 }
 

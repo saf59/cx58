@@ -1,6 +1,5 @@
-use leptos::*;
-use leptos::prelude::*;
 use crate::components::tree::{NodeInfo, NodeType};
+use leptos::prelude::*;
 
 #[component]
 pub fn NodeInfoDisplay(

@@ -1,5 +1,3 @@
-
-
 use js_sys::Date;
 use leptos::prelude::{ClassAttribute, Get, IntoAny, Suspense};
 use leptos::prelude::{ElementChild, LocalResource};
@@ -105,13 +103,7 @@ pub struct NodeInfo {
 }
 
 impl Tree {
-    pub fn node_type_str(&self) -> &str {
-        match self.node_type {
-            NodeType::Root => "Root",
-            NodeType::Branch => "Branch",
-            NodeType::ImageLeaf => "ImageLeaf",
-        }
-    }
+
     pub fn node_info(&self) -> NodeInfo {
         NodeInfo {
             id: self.id,
@@ -126,7 +118,7 @@ pub fn parse_dt_or_default_ms(s: &str) -> i64 {
     // default: Unix epoch
     let default = 0.0;
     // 2026-01-09T18:00:00
-    let parts: Vec<&str> = s.split(['-','.','T',' ', ':']).collect();
+    let parts: Vec<&str> = s.split(['-', '.', 'T', ' ', ':']).collect();
     if parts.len() != 6 {
         return default as i64;
     }
