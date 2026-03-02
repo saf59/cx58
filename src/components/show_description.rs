@@ -11,7 +11,7 @@ pub fn download_text_file(filename: &str, content: &str) {
     let window = web_sys::window().expect("no window");
     let document = window.document().expect("no document");
 
-    // Build a Blob containing the markdown text
+    // Build a Blob containing the Markdown text
     let blob_parts = js_sys::Array::new();
     blob_parts.push(&wasm_bindgen::JsValue::from_str(content));
     let blob_options = web_sys::BlobPropertyBag::new();

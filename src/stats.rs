@@ -1,31 +1,13 @@
 pub fn format_stats_table(total_time_ms: u64, stats: &serde_json::Value) -> String {
     let fmt_num = |v: Option<&serde_json::Value>| -> String {
         match v.and_then(|v| v.as_u64()) {
-            Some(n) => {
-                let s = n.to_string();
-                let mut result = String::new();
-                for (i, c) in s.chars().rev().enumerate() {
-                    if i > 0 && i % 3 == 0 {
-                        result.push('_');
-                    }
-                    result.push(c);
-                }
-                result.chars().rev().collect()
-            }
+            Some(n) => { triple(n) }
             None => "-".to_string(),
         }
     };
 
     let fmt_u64 = |n: u64| -> String {
-        let s = n.to_string();
-        let mut result = String::new();
-        for (i, c) in s.chars().rev().enumerate() {
-            if i > 0 && i % 3 == 0 {
-                result.push('_');
-            }
-            result.push(c);
-        }
-        result.chars().rev().collect()
+        triple(n)
     };
 
     let w = (22, 10, 10, 8);
@@ -110,4 +92,16 @@ pub fn format_stats_table(total_time_ms: u64, stats: &serde_json::Value) -> Stri
 
     lines.push(bot);
     lines.join("\n")
+}
+
+fn triple(n: u64) -> String {
+    let s = n.to_string();
+    let mut result = String::new();
+    for (i, c) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            result.push('_');
+        }
+        result.push(c);
+    }
+    result.chars().rev().collect()
 }

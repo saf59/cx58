@@ -75,3 +75,21 @@ pub enum StreamEvent {
         reason: String,
     },
 }
+
+impl StreamEvent {
+    pub fn request_id(&self) -> &str {
+        match self {
+            StreamEvent::Started { request_id, .. }
+            | StreamEvent::TextChunk { request_id, .. }
+            | StreamEvent::Progress { request_id, .. }
+            | StreamEvent::ObjectTree { request_id, .. }
+            | StreamEvent::ReportList { request_id, .. }
+            | StreamEvent::Description { request_id, .. }
+            | StreamEvent::Comparison { request_id, .. }
+            | StreamEvent::ContextRequest { request_id, .. }
+            | StreamEvent::Completed { request_id, .. }
+            | StreamEvent::Error { request_id, .. }
+            | StreamEvent::Cancelled { request_id, .. } => request_id,
+        }
+    }
+}

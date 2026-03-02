@@ -117,7 +117,7 @@ codegen-units = 1
 panic = "abort"
 
 [package.metadata.leptos]
-bin-target-triple = "x86_64-pc-windows-msvc"
+# bin-target-triple = "x86_64-pc-windows-msvc"
 bin-target = "gmr"
 
 # The name used by wasm-bindgen/cargo-leptos for the JS/WASM bundle. Defaults to the crate name

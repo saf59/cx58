@@ -1,26 +1,26 @@
-#[cfg(not(feature = "ssr"))]
-use crate::auth::Auth;
-#[cfg(not(feature = "ssr"))]
-use crate::components::args;
-#[cfg(not(feature = "ssr"))]
-use crate::components::chat_client::{handle_stream, send_stop_beacon};
-use crate::components::chat_context::ChatContext;
-use crate::components::chat_types::{Message, MessageRole};
-#[cfg(not(feature = "ssr"))]
-use crate::components::message_renderer::MessageRenderer;
-use crate::components::node_info_display::NodeInfoDisplay;
-use crate::components::tree::NodeInfo;
+use crate::components::{
+    chat_context::ChatContext,
+    chat_types::{Message, MessageRole},
+    node_info_display::NodeInfoDisplay,
+    tree::NodeInfo,
+};
 use leptos::prelude::*;
-#[cfg(not(feature = "ssr"))]
-use leptos::reactive::spawn_local;
 use leptos::*;
 use leptos_fluent::move_tr;
+
 #[cfg(not(feature = "ssr"))]
-use leptos_fluent::I18n;
-#[cfg(not(feature = "ssr"))]
-use wasm_bindgen::JsCast;
-#[cfg(not(feature = "ssr"))]
-use web_sys::HtmlDivElement;
+use {
+    crate::auth::Auth,
+    crate::components::{
+        args,
+        chat_client::{handle_stream, send_stop_beacon},
+        message_renderer::MessageRenderer,
+    },
+    leptos::reactive::spawn_local,
+    leptos_fluent::I18n,
+    wasm_bindgen::JsCast,
+    web_sys::HtmlDivElement,
+};
 
 #[component]
 pub fn Chat() -> impl IntoView {
@@ -31,21 +31,21 @@ pub fn Chat() -> impl IntoView {
     let chat_history_ref = NodeRef::new();
     let form_ref = NodeRef::<html::Form>::new();
     #[cfg(not(feature = "ssr"))]
-    let chat_id = uuid::Uuid::now_v7().to_string();
-    #[cfg(not(feature = "ssr"))]
-    let i18n = expect_context::<I18n>();
-    #[cfg(not(feature = "ssr"))]
-    let auth_signal = use_context::<RwSignal<Auth>>().expect("Auth must be provided");
-    #[cfg(not(feature = "ssr"))]
-    let user_id = auth_signal
-        .get_untracked()
-        .email()
-        .unwrap_or("mock".to_string());
+    let (chat_id, i18n, user_id) = {
+        let chat_id = uuid::Uuid::now_v7().to_string();
+        let i18n = expect_context::<I18n>();
+        let auth_signal = use_context::<RwSignal<Auth>>().expect("Auth must be provided");
+        let user_id = auth_signal
+            .get_untracked()
+            .email()
+            .unwrap_or("mock".to_string());
+        (chat_id, i18n, user_id)
+    };
     let ctx = use_context::<ChatContext>().expect("ChatContext not provided");
     let delete_node_info =
         Callback::new(move |node_info: NodeInfo| ctx.delete_node_info(node_info));
 
-    // Subscribe to context
+    // Clear history handler
     Effect::new(move |_| {
         if ctx.clear_history.get() {
             set_history.set(Vec::new());
@@ -53,6 +53,7 @@ pub fn Chat() -> impl IntoView {
             ctx.clear_history.set(false);
         }
     });
+    // Insert text and submit handler
     Effect::new(move |_| {
         if let Some(text) = ctx.insert_and_enter.get() {
             set_input.set(text);
@@ -62,13 +63,13 @@ pub fn Chat() -> impl IntoView {
             }
         }
     });
+    // Insert text without submitting handler
     Effect::new(move |_| {
         if let Some(text) = ctx.insert_text.get() {
             set_input.set(text);
             ctx.insert_text.set(None);
         }
     });
-
     // Browser close handler
     #[cfg(not(feature = "ssr"))]
     {
@@ -90,7 +91,7 @@ pub fn Chat() -> impl IntoView {
             }
         });
     }
-    // Autoscroll when history changes
+    // Autoscroll when history changes handler
     #[cfg(not(feature = "ssr"))]
     {
         Effect::new(move |_| {
@@ -104,6 +105,7 @@ pub fn Chat() -> impl IntoView {
             }
         });
     }
+
     #[cfg(not(feature = "ssr"))]
     let owner = Owner::current();
     // Submit handler
@@ -163,7 +165,6 @@ pub fn Chat() -> impl IntoView {
             }
         }
     };
-
     // Stop handler
     let on_stop = move |_| {
         #[cfg(not(feature = "ssr"))]
@@ -176,6 +177,7 @@ pub fn Chat() -> impl IntoView {
         }
     };
 
+    // chat history and input UI
     view! {
         <div class="chat-container">
             <div class="chat-history" node_ref=chat_history_ref>
