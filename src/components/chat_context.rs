@@ -1,5 +1,4 @@
 use crate::components::tree::NodeInfo;
-#[cfg(not(feature = "ssr"))]
 use crate::components::tree::NodeWithLeaf;
 use leptos::prelude::*;
 
@@ -56,7 +55,7 @@ impl ChatContext {
         self.prev_leaf.set(None);
         self.next_leaf.set(None);
     }
-    #[cfg(not(feature = "ssr"))]
+
     pub fn set_leaf(&self, node_info: &NodeWithLeaf, parent_node: &NodeWithLeaf) {
         if let Some(parent) = &self.parent.get()
             && parent.id != parent_node.id
@@ -68,7 +67,7 @@ impl ChatContext {
         }
         self.set_one_leaf(node_info.clone().into())
     }
-    #[cfg(not(feature = "ssr"))]
+
     pub fn set_one_leaf(&self, new_node: NodeInfo) {
         if self.prev_leaf.get().is_none() {
             self.prev_leaf.set(Some(new_node));

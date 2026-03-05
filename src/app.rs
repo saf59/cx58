@@ -20,7 +20,7 @@ use leptos_router::*;
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     provide_meta_context();
     #[cfg(feature = "ssr")]
-    if let Some(client_config) = use_context::<crate::state::ClientConfig>() {
+    if let Some(client_config) = use_context::<crate::ClientConfig>() {
         provide_context(client_config);
     }
     view! {
@@ -29,8 +29,8 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
             <head>
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <Title text="CX58 AI agent" />
-                <AutoReload options=options.clone() />
+                <Title text=move_tr!("title") />
+                // <AutoReload options=options.clone() />
                 <Link rel="shortcut icon" type_="image/ico" href="/favicon.ico" />
                 <Stylesheet id="leptos" href="/pkg/cx58-client.css" />
                 <Stylesheet href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
@@ -71,26 +71,22 @@ pub fn AuthWrapper() -> impl IntoView {
     let initial_auth_resource = Resource::new(|| (), |_| async { get_auth().await });
 
     view! {
-        <Transition fallback=|| {
-            view! { <p>"Checking Auth Status..."</p> }
-        }>
-            {move || {
-                match initial_auth_resource.get() {
-                    Some(Ok(auth_state)) => {
+        <Transition fallback=|| view! { <p>"Checking Auth Status..."</p> }>
+            {move || Suspend::new(async move {
+                match initial_auth_resource.await {
+                    Ok(auth_state) => {
                         let auth_signal = RwSignal::new(auth_state.clone());
                         provide_context(auth_signal);
                         view! { <Outlet /> }.into_any()
                     }
-                    Some(Err(e)) => {
+                    Err(e) => {
                         view! {
                             <h1>"Authentication Error"</h1>
                             <p>{format!("{:?}", e)}</p>
-                        }
-                            .into_any()
+                        }.into_any()
                     }
-                    None => ().into_any(),
                 }
-            }}
+            })}
         </Transition>
     }
 }
@@ -126,7 +122,8 @@ fn RootPage() -> impl IntoView {
                         top=SideTop()
                         side_body=view! { <SideBody is_admin=auth.is_authenticated_admin() /> }
                     >
-                        <Chat />
+                    //<Fake0 />
+                    <Chat />
                     </SideBar>
                 }
                     .into_any()
@@ -134,7 +131,6 @@ fn RootPage() -> impl IntoView {
         }}
     }
 }
-
 #[component]
 fn PlayPage() -> impl IntoView {
     let auth_signal = use_context::<RwSignal<Auth>>()
@@ -252,3 +248,14 @@ fn NotFoundPage() -> impl IntoView {
         <p>{move_tr!("page-not-found")}</p>
     }
 }
+
+#[component]
+fn Fake0() -> impl IntoView {
+    view! {
+        <div class="centered bg_oidc">
+            <h1>"Fake Page"</h1>
+            <p>"This is a placeholder page."</p>
+        </div>
+    }
+}
+

@@ -3,10 +3,11 @@ use crate::components::{
     chat_types::{Message, MessageRole},
     node_info_display::NodeInfoDisplay,
     tree::NodeInfo,
+    message_renderer::MessageRenderer,
 };
 use leptos::prelude::*;
 use leptos::*;
-use leptos_fluent::move_tr;
+use leptos_fluent::{move_tr};
 
 #[cfg(not(feature = "ssr"))]
 use {
@@ -14,7 +15,6 @@ use {
     crate::components::{
         args,
         chat_client::{handle_stream, send_stop_beacon},
-        message_renderer::MessageRenderer,
     },
     leptos::reactive::spawn_local,
     leptos_fluent::I18n,
@@ -24,6 +24,7 @@ use {
 
 #[component]
 pub fn Chat() -> impl IntoView {
+    #[allow(unused)]
     let (history, set_history) = signal(Vec::<Message>::new());
     let (input, set_input) = signal(String::new());
     let (is_loading, set_is_loading) = signal(false);
@@ -73,38 +74,33 @@ pub fn Chat() -> impl IntoView {
     // Browser close handler
     #[cfg(not(feature = "ssr"))]
     {
-        Effect::new(move |_| {
-            if let Some(window) = web_sys::window() {
-                let closure = wasm_bindgen::closure::Closure::wrap(Box::new(
-                    move |_event: web_sys::BeforeUnloadEvent| {
-                        let _ = send_stop_beacon();
-                    },
-                )
-                    as Box<dyn FnMut(_)>);
-
-                let _ = window.add_event_listener_with_callback(
-                    "beforeunload",
-                    closure.as_ref().unchecked_ref(),
-                );
-
-                closure.forget();
-            }
-        });
+        if let Some(window) = web_sys::window() {
+            let closure = wasm_bindgen::closure::Closure::wrap(Box::new(
+                move |_event: web_sys::BeforeUnloadEvent| {
+                    let _ = send_stop_beacon();
+                },
+            ) as Box<dyn FnMut(_)>);
+            let _ = window.add_event_listener_with_callback(
+                "beforeunload",
+                closure.as_ref().unchecked_ref(),
+            );
+            closure.forget();
+        }
     }
     // Autoscroll when history changes handler
-    #[cfg(not(feature = "ssr"))]
-    {
-        Effect::new(move |_| {
-            history.track();
+    Effect::new(move |_| {
+        history.track();
+        #[cfg(not(feature = "ssr"))]
+        {
             let history_ref: Option<HtmlDivElement> = chat_history_ref.get();
             if let Some(el) = history_ref {
                 let _ = gloo_timers::callback::Timeout::new(100, move || {
                     el.set_scroll_top(el.scroll_height());
                 })
-                .forget();
+                    .forget();
             }
-        });
-    }
+        }
+    });
 
     #[cfg(not(feature = "ssr"))]
     let owner = Owner::current();
@@ -182,12 +178,12 @@ pub fn Chat() -> impl IntoView {
         <div class="chat-container">
             <div class="chat-history" node_ref=chat_history_ref>
                 {
-                    #[cfg(not(feature = "ssr"))]
                     move || {
                     history
                         .get()
                         .into_iter()
                         .map(|message| {
+                            //view! { <Fake /> }
                             view! { <MessageRenderer message=message /> }
                         })
                         .collect_view()
@@ -251,5 +247,15 @@ pub fn Chat() -> impl IntoView {
             </div>
         </div>
         <div class="sb-footer">{move_tr!("chat-footer")}</div>
+    }
+}
+
+#[component]
+fn Fake() -> impl IntoView {
+    view! {
+        <div class="centered bg_oidc">
+            <h1>"Fake Page"</h1>
+            <p>"This is a placeholder page."</p>
+        </div>
     }
 }

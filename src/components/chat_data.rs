@@ -28,7 +28,7 @@ pub struct DescriptionData {
     pub confidence: Option<f32>,
     pub created_at: String,
 }
-#[cfg(not(feature = "ssr"))]
+
 impl DescriptionData {
     /// Renders the description data as a Markdown string
     pub fn to_markdown(&self) -> String {
@@ -78,7 +78,7 @@ pub struct ComparisonData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub openings: Option<String>,
 }
-#[cfg(not(feature = "ssr"))]
+
 impl ComparisonData {
     /// Renders the comparison data as a Markdown string
     pub fn to_markdown(&self) -> String {
@@ -112,7 +112,7 @@ impl ComparisonData {
         format!("{}.md", sanitized)
     }
 }
-#[cfg(not(feature = "ssr"))]
+
 pub fn extract_name_pair(full_name: &str) -> (String, String) {
     let full_name = full_name.replace("Root/", "");
     let parts: Vec<&str> = full_name.split('/').collect();

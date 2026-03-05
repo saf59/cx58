@@ -16,10 +16,6 @@ pub struct AppState {
 pub struct ChatSession {
     pub current_request_id: tokio::sync::RwLock<Option<String>>,
 }
-#[derive(Clone, Debug)]
-pub struct ClientConfig {
-    pub media_proxy: String,
-}
 
 impl AppState {
     /// Initializes and returns the application state.
@@ -36,7 +32,6 @@ impl AppState {
         // 2. Load Configuration and Options
         let conf = leptos::prelude::get_configuration(None)?;
         let leptos_options = conf.leptos_options;
-
         // 3. Initialize OIDC Client
         let oidc_client = ISPOidcClient::new(&async_http_client).await?;
 

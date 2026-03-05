@@ -15,7 +15,7 @@ pub enum MessageRole {
 }
 
 impl MessageRole {
-    #[cfg(not(feature = "ssr"))]
+
     pub fn css_class(&self) -> &'static str {
         match self {
             Self::User => "message user",

@@ -1,4 +1,3 @@
-#![cfg(not(feature = "ssr"))]
 use crate::components::chat_context::ChatContext;
 use crate::components::chat_types::{Message, MessageContent};
 use crate::components::show_carusel::CarouselRenderer;

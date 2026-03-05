@@ -1,6 +1,7 @@
 # locales/en/main.ftl
 
 logo = CX-5.8
+title = CX-5.8 AI agent
 welcome-cx58 = Welcome  to CX-5.8!
 you-are-unauthenticated = You are unauthenticated!
 welcome-authenticated = Welcome! You are authenticated!
@@ -36,7 +37,7 @@ select-a-language = Select a language:
 language-selected-is = The selected language is { $lang }.
 
 # --- Chat UI (bottom footer) ---
-chat-footer = CX-58 is AI and can make mistakes.
+chat-footer = CX-5.8 is AI and can make mistakes.
 
 # --- Client-side error messages ---
 # Used in: handle_stream, process_stream (chat.rs)

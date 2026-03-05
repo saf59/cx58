@@ -22,7 +22,7 @@ pub(crate) mod show_context_request;
 
 // Builds a FluentValue args map from key => value pairs.
 // Usage: args!["error" => some_string, "status" => code]
-#[cfg(not(feature = "ssr"))]
+//#[cfg(not(feature = "ssr"))]
 macro_rules! args {
     ( $( $k:literal => $v:expr ),* $(,)? ) => {{
         use std::collections::HashMap;
@@ -33,5 +33,5 @@ macro_rules! args {
         ])
     }};
 }
-#[cfg(not(feature = "ssr"))]
+//#[cfg(not(feature = "ssr"))]
 pub(crate) use args;

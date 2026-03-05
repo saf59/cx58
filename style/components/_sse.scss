@@ -1,10 +1,10 @@
 /* Chat State Indicator */
 .chat-state {
     align-self: baseline;
-    //padding: 12px 16px;
+    padding-left: 5px;
     border-radius: 8px;
-    //margin: 8px 0;
     display: flex;
+    flex-shrink: 0;
     align-items: center;
     gap: 12px;
     font-size: 12px;

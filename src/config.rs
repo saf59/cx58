@@ -122,15 +122,20 @@ impl AppConfig {
             oidc_scopes: env::var("OIDC_SCOPES")
                 .unwrap_or_else(|_| "openid profile email groups".to_string()),
             cookie_config: cookie,
-            trust_data_list: env::var("TRUST_DATA_LIST").unwrap_or_else(|_| "".to_string()),
-            trust_connect_list: env::var("TRUST_CONNECT_LIST").unwrap_or_else(|_| "".to_string()),
-            media_proxy: env::var("MEDIA_PROXY").unwrap_or_else(|_| "".to_string()),
+            // Remove quotes if present
+            trust_data_list: env::var("TRUST_DATA_LIST").unwrap_or_else(|_| "".to_string()).replace('"', ""),
+            trust_connect_list: env::var("TRUST_CONNECT_LIST").unwrap_or_else(|_| "".to_string()).replace('"', ""),
+            media_proxy: env::var("MEDIA_PROXY").unwrap_or_else(|_| "".to_string()).replace('"', ""),
             chat_config,
             is_prod,
         })
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ClientConfig {
+    pub media_proxy: String,
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SameSiteConfig {

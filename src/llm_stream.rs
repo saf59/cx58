@@ -188,7 +188,7 @@ pub async fn chat_stream_handler(
                                             let mut sessions = state.chat_sessions.lock().await;
                                             if let Some(session) = sessions.get_mut(&session_id) {
                                                  let mut req_id = session.current_request_id.write().await;
-                                                *req_id = Some(request_id.clone());
+                                                *req_id = Some(request_id.to_string());
                                             }
                                         }
 

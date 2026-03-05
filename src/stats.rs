@@ -71,7 +71,7 @@ pub fn format_stats_table(total_time_ms: u64, stats: &serde_json::Value) -> Stri
             "router",
             fmt_num(obj.get("router_time")),
             fmt_num(obj.get("router_tokens")),
-            "-".into(),
+            "1".into(),
         ));
 
         if let Some(workers) = obj.get("workers").and_then(|w| w.as_array()) {

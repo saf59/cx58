@@ -70,8 +70,7 @@ pub async fn handle_stream(
         .await
         .map_err(|e| format!("Fetch error: {:?}", e))?;
 
-    let response: Response = resp_value
-        .dyn_into()
+    let response: Response = resp_value.dyn_into()
         .map_err(|_| "Invalid response".to_string())?;
 
     if !response.ok() {

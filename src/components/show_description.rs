@@ -1,11 +1,9 @@
-#![cfg(not(feature = "ssr"))]
 use crate::components::chat_data::{extract_name_pair, DescriptionData};
 use leptos::prelude::*;
 use leptos::*;
 use leptos_fluent::{move_tr, I18n};
 
 /// Triggers a browser download of `content` as a text file with the given `filename`
-#[cfg(not(feature = "ssr"))]
 pub fn download_text_file(filename: &str, content: &str) {
     use wasm_bindgen::JsCast;
     let window = web_sys::window().expect("no window");
@@ -31,7 +29,6 @@ pub fn download_text_file(filename: &str, content: &str) {
 
     a.set_href(&url);
     a.set_download(filename);
-    a.set_attribute("style", "display:none").ok();
     document.body().expect("no body").append_child(&a).ok();
     a.click();
     document.body().expect("no body").remove_child(&a).ok();
@@ -62,7 +59,7 @@ pub fn DescriptionListRenderer(
 fn DetailItem(label: String, value: String) -> impl IntoView {
     view! {
         <div class="detail-item">
-            <strong>{label}</strong>
+            <strong>{label}" "</strong>
             {value}
         </div>
     }
@@ -78,7 +75,6 @@ pub fn DescriptionRendererCompact(data: DescriptionData) -> impl IntoView {
     let filename = data.filename();
 
     let on_download = move |_| {
-        #[cfg(not(feature = "ssr"))]
         download_text_file(&filename, &markdown);
     };
 

@@ -24,6 +24,8 @@ pub mod hmac;
 #[cfg(feature = "ssr")]
 pub(crate) mod stats;
 
+use config::ClientConfig;
+
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn hydrate() {

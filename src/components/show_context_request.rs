@@ -1,4 +1,3 @@
-#![cfg(not(feature = "ssr"))]
 use crate::components::chat_data::ContextRequest;
 use leptos::prelude::ElementChild;
 use leptos::prelude::IntoAny;

@@ -1,4 +1,3 @@
-#![cfg(not(feature = "ssr"))]
 use crate::components::chat_data::ComparisonData;
 use crate::components::show_description::download_text_file;
 use leptos::prelude::{expect_context, ClassAttribute};
@@ -11,7 +10,7 @@ use leptos_fluent::{move_tr, I18n};
 fn ComparisonDetailItem(label: String, value: String) -> impl IntoView {
     view! {
         <div class="detail-item">
-            <strong>{label}</strong>
+            <strong>{label}" "</strong>
             {value}
         </div>
     }
@@ -25,7 +24,6 @@ pub fn ComparisonRenderer(data: ComparisonData) -> impl IntoView {
     let filename = data.filename();
 
     let on_download = move |_| {
-        #[cfg(not(feature = "ssr"))]
         download_text_file(&filename, &markdown);
     };
 

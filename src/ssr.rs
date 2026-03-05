@@ -79,7 +79,6 @@ impl ISPOidcClient {
 
         let inner = CoreClient::from_provider_metadata(provider_metadata, client_id, client_secret)
             .set_redirect_uri(redirect_uri);
-
         Ok(ISPOidcClient {
             client: inner,
             config,
@@ -232,7 +231,7 @@ pub async fn leptos_server_fn_handler(
     let auth_state = get_auth_state(state.clone(), headers).await;
     handle_server_fns_with_context(
         move || {
-            let client_config = crate::state::ClientConfig {
+            let client_config = crate::ClientConfig {
                 media_proxy: state.http_client.config.media_proxy.clone(),
             };
             provide_context(client_config);
@@ -261,7 +260,7 @@ pub async fn leptos_main_handler(
         .unwrap_or_else(leptos::nonce::Nonce::new);
     let handler = leptos_axum::render_app_to_stream_with_context(
         move || {
-            let client_config = crate::state::ClientConfig {
+            let client_config = crate::ClientConfig {
                 media_proxy: state.http_client.config.media_proxy.clone(),
             };
             provide_context(client_config);
@@ -487,9 +486,8 @@ pub async fn security_headers(
     // tracing::info!(">> security_headers called for {}", req.uri());
     let config = &app_state.http_client.config;
     let is_prod = config.is_prod;
-    let trust_data_list = &config.trust_data_list;
+    let trust_data_list = &config.trust_data_list.replace(",", " ");
     let trust_connect_list = &config.trust_connect_list;
-
     let nonce = leptos::nonce::Nonce::new(); //use_nonce().unwrap();
     req.extensions_mut().insert(nonce.clone());
     let mut res = next.run(req).await;
