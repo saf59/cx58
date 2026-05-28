@@ -9,8 +9,8 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Redirect, Response},
 };
-use axum_extra::extract::{cookie::Cookie, CookieJar};
-use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
+use axum_extra::extract::{CookieJar, cookie::Cookie};
+use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use http::HeaderMap;
 use leptos::config::LeptosOptions;
 use leptos::context::provide_context;
@@ -30,7 +30,7 @@ use openidconnect::core::{
 use openidconnect::{
     AuthenticationFlow, EmptyAdditionalClaims, IssuerUrl, Nonce, OAuth2TokenResponse,
 };
-use serde::{de::Error, Deserialize};
+use serde::{Deserialize, de::Error};
 use serde_json::Value;
 use serde_urlencoded::de::Error as UrlError;
 use std::collections::{HashMap, HashSet};
@@ -38,7 +38,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::Mutex;
 #[allow(unused_imports)]
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 #[allow(clippy::type_complexity)]
@@ -70,6 +70,13 @@ impl ISPOidcClient {
     pub async fn new(async_http_client: &reqwest::Client) -> anyhow::Result<Self> {
         let config = AppConfig::from_env().expect("Failed to load config");
         tracing::info!("issuer={:?}", &config.oidc_issuer_url);
+        tracing::debug!(
+            oidc_issuer_url = %config.oidc_issuer_url,
+            oidc_redirect_uri = %config.oidc_redirect_uri,
+            oidc_client_id = %config.oidc_client_id,
+            app_is_prod = config.is_prod,
+            "OIDC runtime config loaded"
+        );
         let issuer = IssuerUrl::new(config.oidc_issuer_url.clone())?;
         let provider_metadata =
             CoreProviderMetadata::discover_async(issuer, async_http_client).await?;
@@ -101,6 +108,7 @@ impl ISPOidcClient {
             .set_pkce_challenge(pkce_challenge)
             .url();
 
+        debug!(auth_url = %auth_url, "OIDC authorization URL generated");
         (auth_url, csrf_token, nonce, pkce_verifier)
     }
 
@@ -173,45 +181,52 @@ pub struct CallbackQuery {
 pub async fn logout_handler(State(state): State<AppState>, jar: CookieJar) -> impl IntoResponse {
     let mut post_logout_redirect_uri = "/".to_string();
     let mut rauthy_logout_url = None;
+    const LOGOUT_ID_TOKEN_MIN_TTL: Duration = Duration::from_secs(30);
 
     if let Some(cookie) = jar.get(SESSION_ID) {
         let session_id = cookie.value().to_string();
         let mut sessions = state.sessions.lock().await;
 
-        if let Some(session) = sessions.remove(&session_id)
-            && let Some(id_token) = session.id_token
-        {
-            let mut chat_sessions = state.chat_sessions.lock().await;
-            // Cancel active requests
-            if let Some(chat_session) = chat_sessions.get_mut(&session_id)
-                && let Some(request_id) = &chat_session.current_request_id.read().await.clone()
-            {
-                let client = state.async_http_client.clone();
-                let agent_api_url = state.http_client.config.chat_config.agent_api_url.clone();
-                crate::stop::cancel_agent_request(request_id, agent_api_url, client);
+        if let Some(session) = sessions.remove(&session_id) {
+            if session.id_token.is_some() {
+                let mut chat_sessions = state.chat_sessions.lock().await;
+                // Cancel active requests
+                if let Some(chat_session) = chat_sessions.get_mut(&session_id)
+                    && let Some(request_id) = &chat_session.current_request_id.read().await.clone()
+                {
+                    let client = state.async_http_client.clone();
+                    let agent_api_url = state.http_client.config.chat_config.agent_api_url.clone();
+                    crate::stop::cancel_agent_request(request_id, agent_api_url, client);
+                }
             }
 
-            let issuer_url = match std::env::var("OIDC_ISSUER_URL") {
-                Ok(url) => url,
-                Err(_) => {
-                    post_logout_redirect_uri = "/".to_string();
-                    return (jar, Redirect::to(&post_logout_redirect_uri)).into_response();
-                }
-            };
-            let base_logout_url = format!("{}/oidc/logout", issuer_url.trim_end_matches('/'));
+            if let Some(id_token) = session.id_token
+                && session
+                    .id_token_expires_at
+                    .is_some_and(|exp_at| exp_at > Instant::now() + LOGOUT_ID_TOKEN_MIN_TTL)
+            {
+                let issuer_url = match std::env::var("OIDC_ISSUER_URL") {
+                    Ok(url) => url,
+                    Err(_) => {
+                        post_logout_redirect_uri = "/".to_string();
+                        return (jar, Redirect::to(&post_logout_redirect_uri)).into_response();
+                    }
+                };
+                let base_logout_url = format!("{}/oidc/logout", issuer_url.trim_end_matches('/'));
 
-            post_logout_redirect_uri = state
-                .http_client
-                .config
-                .oidc_post_logout_redirect_uri
-                .clone();
-            let mut url = url::Url::parse(&base_logout_url).expect("Invalid base logout URL");
+                post_logout_redirect_uri = state
+                    .http_client
+                    .config
+                    .oidc_post_logout_redirect_uri
+                    .clone();
+                let mut url = url::Url::parse(&base_logout_url).expect("Invalid base logout URL");
 
-            url.query_pairs_mut()
-                .append_pair("id_token_hint", &id_token)
-                .append_pair("post_logout_redirect_uri", &post_logout_redirect_uri);
+                url.query_pairs_mut()
+                    .append_pair("id_token_hint", &id_token)
+                    .append_pair("post_logout_redirect_uri", &post_logout_redirect_uri);
 
-            rauthy_logout_url = Some(url.to_string());
+                rauthy_logout_url = Some(url.to_string());
+            }
         }
     }
 
@@ -279,6 +294,7 @@ pub async fn login_handler(State(state): State<AppState>, jar: CookieJar) -> imp
     let (auth_url, csrf_token, nonce, pkce_verifier) = state.http_client.authorize_url();
 
     let session_id = Uuid::now_v7().to_string();
+    debug!(session_id = %session_id, "login: creating pre-auth session");
 
     state.sessions.lock().await.insert(
         session_id.clone(),
@@ -325,12 +341,25 @@ async fn get_auth_state(state: AppState, headers: HeaderMap) -> Auth {
         });
 
     if let Some(id) = session_id {
+        debug!(session_id = %id, "get_auth_state: session cookie present");
         if let Some(data) = get_and_refresh_session(&state, &id).await {
+            debug!(
+                session_id = %id,
+                has_subject = data.subject.is_some(),
+                has_name = data.name.is_some(),
+                has_id_token = data.id_token.is_some(),
+                has_refresh_token = data.refresh_token.is_some(),
+                roles_count = data.roles.len(),
+                expires_at_present = data.id_token_expires_at.is_some(),
+                "get_auth_state: session data found"
+            );
             Auth::try_from(&data).unwrap_or(Auth::Unauthenticated)
         } else {
+            debug!(session_id = %id, "get_auth_state: session not found or expired");
             Auth::Unauthenticated
         }
     } else {
+        debug!("get_auth_state: no session cookie");
         Auth::Unauthenticated
     }
 }
@@ -362,24 +391,32 @@ pub async fn callback_handler(
     };
 
     let Some(session_cookie) = jar.get(SESSION_ID) else {
+        debug!("callback: missing session cookie");
         return (StatusCode::BAD_REQUEST, "Missing session cookie").into_response();
     };
 
     let session_id = session_cookie.value().to_string();
+    debug!(session_id = %session_id, "callback: session cookie present");
 
     let mut sessions = state.sessions.lock().await;
     let Some(session) = sessions.get_mut(&session_id) else {
+        debug!(session_id = %session_id, "callback: session not found in memory");
         return (StatusCode::BAD_REQUEST, "Invalid session").into_response();
     };
+    debug!(session_id = %session_id, "callback: session found in memory");
     let mut pkce_guard = session.pkce_verifier.lock().await;
     let pkce_verifier_to_check = pkce_guard.take();
 
     if session.csrf_token.secret() != &query.state {
+        debug!(session_id = %session_id, "callback: CSRF validation failed");
         return (StatusCode::BAD_REQUEST, "CSRF validation failed").into_response();
     };
     let pkce_verifier = match pkce_verifier_to_check {
         Some(verifier) => verifier,
-        None => return (StatusCode::BAD_REQUEST, "Missing PKCE verifier").into_response(),
+        None => {
+            debug!(session_id = %session_id, "callback: missing PKCE verifier");
+            return (StatusCode::BAD_REQUEST, "Missing PKCE verifier").into_response();
+        }
     };
 
     let code = AuthorizationCode::new(query.code.clone());
@@ -391,29 +428,56 @@ pub async fn callback_handler(
         .await
     {
         Ok(token_response) => {
+            debug!(session_id = %session_id, "callback: token exchange ok");
             let mut roles_extracted = false;
 
-            if let Some(id_token) = token_response.extra_fields().id_token()
-                && let Ok(claims) =
-                    id_token.claims(&state.http_client.id_token_verifier(), &session.nonce)
-            {
-                session.subject = Some(claims.subject().to_string());
+            if let Some(id_token) = token_response.extra_fields().id_token() {
+                debug!(session_id = %session_id, "callback: id_token present");
+                match id_token.claims(&state.http_client.id_token_verifier(), &session.nonce) {
+                    Ok(claims) => {
+                        debug!(
+                            session_id = %session_id,
+                            subject = ?claims.subject(),
+                            expires_at = %claims.expiration(),
+                            "callback: id_token claims validated"
+                        );
+                        session.subject = Some(claims.subject().to_string());
 
-                let expiry_datetime_utc = claims.expiration();
-                let expiry_system_time: SystemTime = expiry_datetime_utc.into();
-                let duration_until_expiry = expiry_system_time
-                    .duration_since(SystemTime::now())
-                    .unwrap_or(Duration::ZERO); // If time is out -> 0
-                session.id_token_expires_at = Some(Instant::now() + duration_until_expiry);
+                        let expiry_datetime_utc = claims.expiration();
+                        let expiry_system_time: SystemTime = expiry_datetime_utc.into();
+                        let duration_until_expiry = expiry_system_time
+                            .duration_since(SystemTime::now())
+                            .unwrap_or(Duration::ZERO); // If time is out -> 0
+                        session.id_token_expires_at = Some(Instant::now() + duration_until_expiry);
 
-                if let Ok(claims_json) = serde_json::to_value(claims) {
-                    session.roles = extract_roles_from_claims(&claims_json);
-                    // Name is also extracted here
-                    session.name = Some(extract_name_from_claims(&claims_json));
-                    session.email = extract_email_from_claims(&claims_json);
-                    roles_extracted = !session.roles.is_empty();
+                        if let Ok(claims_json) = serde_json::to_value(claims) {
+                            session.roles = extract_roles_from_claims(&claims_json);
+                            // Name is also extracted here
+                            session.name = Some(extract_name_from_claims(&claims_json));
+                            session.email = extract_email_from_claims(&claims_json);
+                            roles_extracted = !session.roles.is_empty();
+                            debug!(
+                                session_id = %session_id,
+                                has_name = session.name.is_some(),
+                                has_email = session.email.is_some(),
+                                roles_count = session.roles.len(),
+                                "callback: claims extracted into session"
+                            );
+                        } else {
+                            debug!(session_id = %session_id, "callback: failed to serialize claims");
+                        }
+                        session.id_token = Some(id_token.to_string());
+                    }
+                    Err(e) => {
+                        debug!(
+                            session_id = %session_id,
+                            error = ?e,
+                            "callback: id_token claims validation failed"
+                        );
+                    }
                 }
-                session.id_token = Some(id_token.to_string());
+            } else {
+                debug!(session_id = %session_id, "callback: id_token missing in token response");
             }
 
             // Fallback for roles and name if not extracted from ID token
@@ -430,14 +494,27 @@ pub async fn callback_handler(
             session.refresh_token = token_response
                 .refresh_token()
                 .map(|t| t.secret().to_string());
+            debug!(
+                session_id = %session_id,
+                authenticated_ready = session.subject.is_some() && session.name.is_some(),
+                has_refresh_token = session.refresh_token.is_some(),
+                "callback: session update complete"
+            );
 
             Redirect::to("/").into_response()
         }
-        Err(e) => (
-            StatusCode::BAD_REQUEST,
-            format!("Token exchange failed: {:?}", e),
-        )
-            .into_response(),
+        Err(e) => {
+            debug!(
+                session_id = %session_id,
+                error = ?e,
+                "callback: token exchange failed"
+            );
+            (
+                StatusCode::BAD_REQUEST,
+                format!("Token exchange failed: {:?}", e),
+            )
+                .into_response()
+        }
     }
 }
 

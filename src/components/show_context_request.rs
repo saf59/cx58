@@ -1,8 +1,8 @@
 use crate::components::chat_data::ContextRequest;
+use leptos::IntoView;
 use leptos::prelude::ElementChild;
 use leptos::prelude::IntoAny;
 use leptos::prelude::*;
-use leptos::IntoView;
 use leptos_macro::{component, view};
 
 #[component]

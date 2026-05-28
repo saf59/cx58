@@ -1,24 +1,24 @@
 use crate::auth::*;
 use crate::state::AppState;
 use axum::{
+    Error,
     extract::FromRequestParts,
     http::request::Parts,
     response::{IntoResponse, Redirect, Response},
-    Error,
 };
 use axum_extra::extract::CookieJar;
 use leptos::serde_json;
 use oauth2::{CsrfToken, PkceCodeVerifier, RefreshToken, TokenResponse};
 use openidconnect::{
-    core::{CoreIdToken, CoreIdTokenClaims},
     Nonce,
+    core::{CoreIdToken, CoreIdTokenClaims},
 };
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::Mutex;
-use tracing::info;
+use tracing::{debug, info};
 
 /// Only Server side
 #[derive(Debug, Clone)]
@@ -81,7 +81,11 @@ async fn save_session_data_in_store(
 pub async fn get_and_refresh_session(state: &AppState, session_id: &str) -> Option<SessionData> {
     let session_data = {
         let sessions = state.sessions.lock().await;
-        sessions.get(session_id).cloned()?
+        let Some(data) = sessions.get(session_id).cloned() else {
+            debug!(session_id = %session_id, "session refresh: session not found");
+            return None;
+        };
+        data
     };
 
     let now = Instant::now();
@@ -90,6 +94,7 @@ pub async fn get_and_refresh_session(state: &AppState, session_id: &str) -> Opti
         .id_token_expires_at
         .is_some_and(|exp_at| now >= exp_at)
     {
+        debug!(session_id = %session_id, "session refresh: id_token expired");
         return None;
     }
 
@@ -103,6 +108,7 @@ pub async fn get_and_refresh_session(state: &AppState, session_id: &str) -> Opti
     });
 
     if needs_refresh && session_data.refresh_token.is_some() {
+        debug!(session_id = %session_id, "session refresh: refresh needed");
         let mut is_refreshing_lock = session_data.is_refreshing.lock().await;
 
         if !*is_refreshing_lock {
@@ -124,6 +130,11 @@ pub async fn get_and_refresh_session(state: &AppState, session_id: &str) -> Opti
                     .await
                 {
                     Ok((new_id_token, new_refresh_token, new_expires_at)) => {
+                        debug!(
+                            session_id = %session_id_clone,
+                            has_refresh_token = new_refresh_token.is_some(),
+                            "session refresh: token refresh ok"
+                        );
                         let updated_session = {
                             let mut guard = session_store_clone.lock().await;
                             if let Some(current_data) = guard.get_mut(&session_id_clone) {
@@ -149,8 +160,12 @@ pub async fn get_and_refresh_session(state: &AppState, session_id: &str) -> Opti
                             .await;
                         }
                     }
-                    Err(_e) => {
-                        //tracing::error!("Token refresh failed for session {}: {:?}", session_id_clone, e);
+                    Err(e) => {
+                        debug!(
+                            session_id = %session_id_clone,
+                            error = ?e,
+                            "session refresh: token refresh failed"
+                        );
                         let guard = session_store_clone.lock().await;
                         if let Some(current_data) = guard.get(&session_id_clone) {
                             *current_data.is_refreshing.lock().await = false;

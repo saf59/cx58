@@ -15,7 +15,6 @@ pub enum MessageRole {
 }
 
 impl MessageRole {
-
     pub fn css_class(&self) -> &'static str {
         match self {
             Self::User => "message user",

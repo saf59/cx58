@@ -48,9 +48,7 @@ pub fn MediaProxyScript() -> impl IntoView {
     let client_config = use_context::<crate::ClientConfig>();
     let nonce = use_context::<leptos::nonce::Nonce>();
 
-    let media_proxy = client_config
-        .map(|c| c.media_proxy)
-        .unwrap_or_default();
+    let media_proxy = client_config.map(|c| c.media_proxy).unwrap_or_default();
 
     view! {
         <script nonce=nonce>

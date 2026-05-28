@@ -1,7 +1,7 @@
-use crate::components::chat_data::{extract_name_pair, DescriptionData};
+use crate::components::chat_data::{DescriptionData, extract_name_pair};
 use leptos::prelude::*;
 use leptos::*;
-use leptos_fluent::{move_tr, I18n};
+use leptos_fluent::{I18n, move_tr};
 
 /// Triggers a browser download of `content` as a text file with the given `filename`
 pub fn download_text_file(filename: &str, content: &str) {

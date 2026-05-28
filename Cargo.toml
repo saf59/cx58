@@ -31,7 +31,7 @@ tower-cookies = "0.11"
 console_error_panic_hook = { version = "0.1", optional = true }
 url = "2.5"
 uuid = { version = "1.21", features = ["v7", "rng-rand", "serde", "js"] }
-wasm-bindgen = { version = "0.2", features = [], optional = true }
+wasm-bindgen = { version = "0.2.117", features = [], optional = true }
 base64 = "0.22"
 cookie = "0.18"
 http = "1.4"
@@ -80,8 +80,10 @@ gloo-timers = "0.3"
 serde-wasm-bindgen = "0.6.5"
 fluent-templates = "0.13.3"
 
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.3.4", features = ["wasm_js"] }
+#getrandom = { version = "0.3.4", features = ["wasm_js"] }
 
 [dev-dependencies]
 tokio = { version = "1.49", features = ["rt-multi-thread", "macros"] }
@@ -115,7 +117,7 @@ codegen-units = 1
 panic = "abort"
 
 [package.metadata.leptos]
-# bin-target-triple = "x86_64-pc-windows-msvc"
+bin-target-triple = "x86_64-pc-windows-msvc"
 bin-target = "gmr"
 
 # The name used by wasm-bindgen/cargo-leptos for the JS/WASM bundle. Defaults to the crate name

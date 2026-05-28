@@ -49,7 +49,7 @@ impl AppState {
 
             chat_sessions: Arc::new(Mutex::new(HashMap::new())),
 
-            agent_max_retries: 1,
+            agent_max_retries: 0,
         };
 
         Ok(state)

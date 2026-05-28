@@ -1,9 +1,9 @@
 use crate::components::chat_data::ComparisonData;
 use crate::components::show_description::download_text_file;
-use leptos::prelude::{expect_context, ClassAttribute};
+use leptos::prelude::{ClassAttribute, expect_context};
 use leptos::prelude::{ElementChild, GlobalAttributes, OnAttribute};
 use leptos::*;
-use leptos_fluent::{move_tr, I18n};
+use leptos_fluent::{I18n, move_tr};
 
 /// Compact version without optional sections
 #[component]

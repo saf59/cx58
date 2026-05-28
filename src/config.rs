@@ -33,8 +33,8 @@ impl Default for ChatConfig {
             agent_api_url: "http://localhost:11434/api/generate".to_string(),
             agent_api_key: None,
             agent_model: "llava:latest".to_string(),
-            max_duration_sec: 120,
-            max_chat_tokens: 2000,
+            max_duration_sec: 600,
+            max_chat_tokens: 5000,
         }
     }
 }
@@ -123,9 +123,15 @@ impl AppConfig {
                 .unwrap_or_else(|_| "openid profile email groups".to_string()),
             cookie_config: cookie,
             // Remove quotes if present
-            trust_data_list: env::var("TRUST_DATA_LIST").unwrap_or_else(|_| "".to_string()).replace('"', ""),
-            trust_connect_list: env::var("TRUST_CONNECT_LIST").unwrap_or_else(|_| "".to_string()).replace('"', ""),
-            media_proxy: env::var("MEDIA_PROXY").unwrap_or_else(|_| "".to_string()).replace('"', ""),
+            trust_data_list: env::var("TRUST_DATA_LIST")
+                .unwrap_or_else(|_| "".to_string())
+                .replace('"', ""),
+            trust_connect_list: env::var("TRUST_CONNECT_LIST")
+                .unwrap_or_else(|_| "".to_string())
+                .replace('"', ""),
+            media_proxy: env::var("MEDIA_PROXY")
+                .unwrap_or_else(|_| "".to_string())
+                .replace('"', ""),
             chat_config,
             is_prod,
         })

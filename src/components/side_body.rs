@@ -3,8 +3,8 @@ use crate::components::chat_context::ChatContext;
 use crate::components::show_tree::DetailsTreeRendererWithContext;
 use crate::components::tree::TreeViewerResource;
 use leptos::prelude::*;
-use leptos::{component, view, IntoView};
-use leptos_fluent::{move_tr, I18n};
+use leptos::{IntoView, component, view};
+use leptos_fluent::{I18n, move_tr};
 
 #[component]
 pub fn SideBody(is_admin: bool) -> impl IntoView {

@@ -9,7 +9,7 @@ use crate::stats::format_stats_table;
 use async_stream::stream;
 use axum::{
     extract::State,
-    response::{sse::Event, IntoResponse, Response, Sse},
+    response::{IntoResponse, Response, Sse, sse::Event},
 };
 use axum_extra::extract::CookieJar;
 use futures::StreamExt;

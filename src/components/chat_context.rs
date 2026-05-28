@@ -23,6 +23,11 @@ impl ChatContext {
             next_leaf: RwSignal::new(None),
         }
     }
+    pub fn clear(&self) {
+        self.parent.set(None);
+        self.prev_leaf.set(None);
+        self.next_leaf.set(None);
+    }
     pub fn delete_node_info(&self, node_info: NodeInfo) {
         let id = node_info.id;
         if let Some(parent) = self.parent.get()

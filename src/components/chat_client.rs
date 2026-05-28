@@ -70,7 +70,8 @@ pub async fn handle_stream(
         .await
         .map_err(|e| format!("Fetch error: {:?}", e))?;
 
-    let response: Response = resp_value.dyn_into()
+    let response: Response = resp_value
+        .dyn_into()
         .map_err(|_| "Invalid response".to_string())?;
 
     if !response.ok() {
@@ -183,7 +184,7 @@ fn process_sse_event(
     set_chat_state: WriteSignal<String>,
     i18n: I18n,
 ) {
-    use crate::components::tree::{build_tree, TreeNode};
+    use crate::components::tree::{TreeNode, build_tree};
 
     match event.as_deref() {
         None | Some("chunk") | Some("replay") => {

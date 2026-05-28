@@ -1,13 +1,13 @@
 use crate::components::{
     chat_context::ChatContext,
     chat_types::{Message, MessageRole},
+    message_renderer::MessageRenderer,
     node_info_display::NodeInfoDisplay,
     tree::NodeInfo,
-    message_renderer::MessageRenderer,
 };
 use leptos::prelude::*;
 use leptos::*;
-use leptos_fluent::{move_tr};
+use leptos_fluent::{I18n, move_tr};
 
 #[cfg(not(feature = "ssr"))]
 use {
@@ -17,7 +17,6 @@ use {
         chat_client::{handle_stream, send_stop_beacon},
     },
     leptos::reactive::spawn_local,
-    leptos_fluent::I18n,
     wasm_bindgen::JsCast,
     web_sys::HtmlDivElement,
 };
@@ -31,16 +30,17 @@ pub fn Chat() -> impl IntoView {
     let (chat_state, set_chat_state) = signal(String::new());
     let chat_history_ref = NodeRef::new();
     let form_ref = NodeRef::<html::Form>::new();
+    let i18n = expect_context::<I18n>();
+
     #[cfg(not(feature = "ssr"))]
-    let (chat_id, i18n, user_id) = {
+    let (chat_id, user_id) = {
         let chat_id = uuid::Uuid::now_v7().to_string();
-        let i18n = expect_context::<I18n>();
         let auth_signal = use_context::<RwSignal<Auth>>().expect("Auth must be provided");
         let user_id = auth_signal
             .get_untracked()
             .email()
             .unwrap_or("mock".to_string());
-        (chat_id, i18n, user_id)
+        (chat_id, user_id)
     };
     let ctx = use_context::<ChatContext>().expect("ChatContext not provided");
     let delete_node_info =
@@ -51,6 +51,7 @@ pub fn Chat() -> impl IntoView {
         if ctx.clear_history.get() {
             set_history.set(Vec::new());
             set_chat_state.set(String::new());
+            ctx.clear();
             ctx.clear_history.set(false);
         }
     });
@@ -80,10 +81,8 @@ pub fn Chat() -> impl IntoView {
                     let _ = send_stop_beacon();
                 },
             ) as Box<dyn FnMut(_)>);
-            let _ = window.add_event_listener_with_callback(
-                "beforeunload",
-                closure.as_ref().unchecked_ref(),
-            );
+            let _ = window
+                .add_event_listener_with_callback("beforeunload", closure.as_ref().unchecked_ref());
             closure.forget();
         }
     }
@@ -97,7 +96,7 @@ pub fn Chat() -> impl IntoView {
                 let _ = gloo_timers::callback::Timeout::new(100, move || {
                     el.set_scroll_top(el.scroll_height());
                 })
-                    .forget();
+                .forget();
             }
         }
     });
@@ -209,6 +208,8 @@ pub fn Chat() -> impl IntoView {
                         }
                         placeholder=move_tr!("ask-me-anything")
                         class="input-zone"
+                        lang =move || i18n.language.get().id.to_string()
+                        spellcheck="false"
                         prop:disabled=is_loading
                     />
                     <div class="node-info-section">

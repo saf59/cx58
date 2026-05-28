@@ -1,14 +1,12 @@
 pub fn format_stats_table(total_time_ms: u64, stats: &serde_json::Value) -> String {
     let fmt_num = |v: Option<&serde_json::Value>| -> String {
         match v.and_then(|v| v.as_u64()) {
-            Some(n) => { triple(n) }
+            Some(n) => triple(n),
             None => "-".to_string(),
         }
     };
 
-    let fmt_u64 = |n: u64| -> String {
-        triple(n)
-    };
+    let fmt_u64 = |n: u64| -> String { triple(n) };
 
     let w = (22, 10, 10, 8);
     let top = format!(

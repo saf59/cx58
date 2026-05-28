@@ -5,10 +5,10 @@ use crate::components::show_comparison::ComparisonRenderer;
 use crate::components::show_context_request::ContextRequestRenderer;
 use crate::components::show_description::DescriptionListRenderer;
 use crate::components::show_tree::DetailsTreeRendererWithContext;
+use leptos::IntoView;
 use leptos::context::use_context;
 use leptos::html::InnerHtmlAttribute;
 use leptos::prelude::{ClassAttribute, ElementChild, IntoAny};
-use leptos::IntoView;
 use leptos_macro::{component, view};
 
 #[component]

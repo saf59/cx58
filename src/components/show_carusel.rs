@@ -1,4 +1,4 @@
-﻿use crate::components::args;
+use crate::components::args;
 use crate::components::chat_context::ChatContext;
 use crate::components::tree::{NodeData, NodeType, NodeWithLeaf};
 use leptos::context::use_context;
@@ -6,9 +6,9 @@ use leptos::prelude::ElementChild;
 use leptos::prelude::GlobalAttributes;
 use leptos::prelude::IntoAny;
 use leptos::prelude::OnAttribute;
-use leptos::prelude::{expect_context, ClassAttribute};
+use leptos::prelude::{ClassAttribute, expect_context};
 use leptos::*;
-use leptos_fluent::{move_tr, I18n};
+use leptos_fluent::{I18n, move_tr};
 use uuid::Uuid;
 
 /// Carousel renderer for a single Branch node with ImageLeaf children
