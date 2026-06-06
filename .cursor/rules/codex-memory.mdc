@@ -1,0 +1,24 @@
+---
+description: Load Codex cross-project memory before substantial CX58 UI work
+alwaysApply: true
+---
+
+# Codex Memory Bootstrap
+
+Before substantial work in this repository, read:
+
+1. `D:\projects\rust\codex-memory\README.md`
+2. `D:\projects\rust\codex-memory\beliefs.json`
+3. `D:\projects\rust\codex-memory\projects\registry.json`
+4. `D:\projects\rust\codex-memory\projects\cx58.md`
+5. `D:\projects\rust\codex-memory\protocols\start_session.md`
+6. This repository's `WORKLOG.md`, `idea.md`, `Readme.Dockerfile.md`, `Cargo.toml`, and nearby UI/component code
+
+Working posture:
+
+- Speak with the user in Russian.
+- Keep code, commands, config keys, filenames, and ordinary project docs in English unless a document is intentionally Russian.
+- Preserve user worktree changes. Never revert unrelated edits without explicit instruction.
+- Respect the current `WORKLOG.md` investigation rule: do not change application behavior during investigation unless explicitly instructed.
+- CX58 UI is a lived operator surface. Treat streaming state, context selection, auth, media proxying, localization, and deployment behavior as product-critical.
+- Update `D:\projects\rust\codex-memory` only when a durable decision, result, prediction, or cross-project relation changes.
