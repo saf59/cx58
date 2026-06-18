@@ -1,5 +1,6 @@
 use crate::auth::Auth;
 use crate::components::chat_context::ChatContext;
+use crate::components::model_settings_panel::ModelSettingsPanel;
 use crate::components::show_tree::DetailsTreeRendererWithContext;
 use crate::components::tree::TreeViewerResource;
 use leptos::prelude::*;
@@ -16,6 +17,7 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
         .collect::<Vec<String>>();
     let (faq_toggled, set_faq_toggled) = signal(true);
     let (obj_toggled, set_obj_toggled) = signal(true);
+    let (models_toggled, set_models_toggled) = signal(true);
     //let show_objects = move || obj_toggled.get();
     view! {
         <a on:click=move |_| ctx.clear_history.set(true)>
@@ -64,6 +66,17 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
             {().into_view()}
         </Show>
 
+        <a on:click=move |_| {
+            set_models_toggled.try_update(|value| *value = !*value);
+        }>
+            <i class="fas fa-sliders"></i>
+            <span>{move || move_tr!("models")}</span>
+        </a>
+
+        <Show when=move || models_toggled.get() fallback=|| view! { <Models /> }>
+            {().into_view()}
+        </Show>
+
         <hr />
 
         <a href="/">
@@ -93,6 +106,19 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
         }}
     }
 }
+
+#[component]
+fn Models() -> impl IntoView {
+    let auth_signal = use_context::<RwSignal<Auth>>().expect("Auth must be provided");
+
+    let email = auth_signal
+        .get_untracked()
+        .email()
+        .unwrap_or("mock".to_string());
+
+    view! { <ModelSettingsPanel user_id=email /> }
+}
+
 #[component]
 fn Objects() -> impl IntoView {
     let ctx = use_context::<ChatContext>().expect("ChatContext must be provided");

@@ -28,7 +28,8 @@
         text-align: left;
     }
     .obj-area,
-    .faq-area {
+    .faq-area,
+    .models-panel {
         padding-left: 20px;
         transition: all 0.5s ease;
         flex-direction: column;
@@ -42,6 +43,160 @@
         }
         .faq-question {
             text-align: left;
+        }
+    }
+
+    .models-panel {
+        padding-right: 10px;
+        padding-bottom: 8px;
+
+        .models-grid {
+            display: grid;
+            grid-template-columns: max-content minmax(0, 1fr);
+            column-gap: 8px;
+            row-gap: 5px;
+            align-items: center;
+        }
+
+        .models-row {
+            display: contents;
+        }
+
+        .models-row > label {
+            color: var(--4-color);
+            font-size: 12px;
+            line-height: 28px;
+            white-space: nowrap;
+        }
+
+        .models-control {
+            display: flex;
+            min-width: 0;
+            gap: 4px;
+        }
+
+        .models-control select {
+            width: 100%;
+            min-height: 28px;
+            min-width: 0;
+            box-sizing: border-box;
+            border: 1px solid var(--6-color);
+            border-radius: 4px;
+            background: var(--f0-color);
+            color: var(--4-color);
+            font-size: 12px;
+        }
+
+        .models-control select:disabled {
+            opacity: 0.65;
+        }
+
+        .models-link-toggle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 28px;
+            width: 28px;
+            min-height: 28px;
+            box-sizing: border-box;
+            border: 1px solid var(--6-color);
+            border-radius: 4px;
+            background: var(--f0-color);
+            color: var(--4-color);
+            cursor: pointer;
+        }
+
+        .models-link-toggle input {
+            display: none;
+        }
+
+        .models-link-toggle i {
+            margin: 0;
+            font-size: 12px;
+        }
+
+        .models-link-toggle.active,
+        .models-link-toggle:hover {
+            color: var(--d-color);
+            background: var(--6-color);
+        }
+
+        .models-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 7px;
+            padding-left: calc(44px + 8px);
+        }
+
+        .models-save,
+        .models-refresh {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 28px;
+            border: 1px solid var(--6-color);
+            border-radius: 4px;
+            background: var(--f0-color);
+            color: var(--4-color);
+            cursor: pointer;
+        }
+
+        .models-save {
+            gap: 6px;
+            padding: 0 8px;
+        }
+
+        .models-refresh {
+            width: 30px;
+        }
+
+        .models-save:hover,
+        .models-refresh:hover {
+            color: var(--d-color);
+            background: var(--6-color);
+        }
+
+        .models-save:disabled {
+            cursor: wait;
+            opacity: 0.7;
+        }
+
+        .models-status {
+            margin-top: 6px;
+            padding-left: calc(44px + 8px);
+            color: var(--4-color);
+            font-size: 11px;
+            line-height: 1.25;
+        }
+
+        .models-status.none {
+            display: none;
+        }
+
+        .models-status p {
+            margin: 0 0 4px;
+        }
+
+        .models-status ul {
+            margin: 0;
+            padding-left: 14px;
+        }
+
+        .models-status li {
+            margin: 2px 0;
+        }
+
+        .models-status li.rejected {
+            color: var(--d-color);
+        }
+
+        .models-status small {
+            display: block;
+        }
+
+        .models-error {
+            color: var(--d-color);
         }
     }
 }

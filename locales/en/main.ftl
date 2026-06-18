@@ -22,6 +22,16 @@ profile = Profile
 users = Users
 start = Start
 stop = Stop
+models = Models
+models-vision = Vision
+models-text = Text
+models-chat = Chat
+models-link-title = Use vision model where possible
+models-save = Save
+models-saving = Saving...
+models-saved = Saved
+models-loading = Loading models...
+models-refresh = Refresh models
 
 # FAQ
 q-1 = Show my objects

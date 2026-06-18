@@ -2,6 +2,7 @@ pub(crate) mod chat_context;
 pub(crate) mod home_page;
 pub(crate) mod lang;
 pub(crate) mod media_proxy_script;
+pub(crate) mod model_settings_panel;
 pub(crate) mod node_info_display;
 pub(crate) mod show_carusel;
 pub(crate) mod show_description;

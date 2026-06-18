@@ -146,8 +146,8 @@ pub async fn chat_stream_handler(
 
         let mut assembler = ChunkAssembler::new();
 
+        let mut buffer = String::new();
         let finish_reason = 'outer: loop {
-            let mut buffer = String::new();
             tokio::select! {
                 _ = tokio::time::sleep_until((start_at + max_duration).into()) => {
                     warn!("Stream timeout");

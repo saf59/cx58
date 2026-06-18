@@ -22,6 +22,7 @@ pub mod stop;
 pub mod events;
 #[cfg(feature = "ssr")]
 pub mod hmac;
+pub mod model_settings;
 #[cfg(feature = "ssr")]
 pub(crate) mod stats;
 
