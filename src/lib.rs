@@ -10,6 +10,8 @@ pub mod config;
 #[cfg(feature = "ssr")]
 pub mod llm_stream;
 #[cfg(feature = "ssr")]
+pub mod proxy_reports;
+#[cfg(feature = "ssr")]
 pub mod proxy_tree;
 pub mod server_fn;
 #[cfg(feature = "ssr")]

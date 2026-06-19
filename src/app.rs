@@ -3,6 +3,7 @@ use crate::components::chat::Chat;
 use crate::components::chat_context::ChatContext;
 use crate::components::lang::{I18nProvider, LanguageSelector, LanguageSwitcher};
 use crate::components::media_proxy_script::MediaProxyScript;
+use crate::components::reports_panel::ReportsPage;
 use crate::components::side_body::SideBody;
 use crate::components::side_top::SideTop;
 use crate::components::sidebar::SideBar;
@@ -58,6 +59,7 @@ pub fn App() -> impl IntoView {
                             <Route path=path!("") view=RootPage />
                             <Route path=path!("profile") view=ProfilePage />
                             <Route path=path!("play") view=PlayPage />
+                            <Route path=path!("reports") view=ReportsRoutePage />
                         </ParentRoute>
                     </Routes>
                 </main>
@@ -156,6 +158,30 @@ fn PlayPage() -> impl IntoView {
     }
 }
 
+#[component]
+fn ReportsRoutePage() -> impl IntoView {
+    let auth_signal = use_context::<RwSignal<Auth>>()
+        .expect("Auth context not found. Did you set up the provider?");
+
+    view! {
+        {move || {
+            let auth = auth_signal.get();
+            if !auth.is_authenticated() {
+                view! { <LoginPage /> }.into_any()
+            } else {
+                view! {
+                    <SideBar
+                        top=SideTop()
+                        side_body=view! { <SideBody is_admin=auth.is_authenticated_admin() /> }
+                    >
+                        <ReportsPage />
+                    </SideBar>
+                }
+                    .into_any()
+            }
+        }}
+    }
+}
 // Dummy components
 #[component]
 fn PublicLandingPage() -> impl IntoView {

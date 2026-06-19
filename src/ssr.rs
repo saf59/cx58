@@ -23,9 +23,9 @@ use oauth2::{
     Scope, StandardErrorResponse, StandardRevocableToken,
 };
 use openidconnect::core::{
-    CoreAuthDisplay, CoreAuthPrompt, CoreClient, CoreGenderClaim, CoreIdTokenVerifier,
-    CoreJsonWebKey, CoreJweContentEncryptionAlgorithm, CoreProviderMetadata, CoreResponseType,
-    CoreTokenIntrospectionResponse, CoreTokenResponse,
+    CoreAuthDisplay, CoreAuthPrompt, CoreClient, CoreGenderClaim, CoreIdTokenClaims,
+    CoreIdTokenVerifier, CoreJsonWebKey, CoreJweContentEncryptionAlgorithm, CoreProviderMetadata,
+    CoreResponseType, CoreTokenIntrospectionResponse, CoreTokenResponse,
 };
 use openidconnect::{
     AuthenticationFlow, EmptyAdditionalClaims, IssuerUrl, Nonce, OAuth2TokenResponse,
@@ -176,6 +176,49 @@ impl FromRef<AppState> for reqwest::Client {
 pub struct CallbackQuery {
     pub code: String,
     pub state: String,
+}
+
+fn apply_validated_id_token_claims(
+    session: &mut SessionData,
+    session_id: &str,
+    id_token: String,
+    claims: &CoreIdTokenClaims,
+) -> bool {
+    debug!(
+        session_id = %session_id,
+        subject = ?claims.subject(),
+        expires_at = %claims.expiration(),
+        "callback: id_token claims validated"
+    );
+    session.subject = Some(claims.subject().to_string());
+
+    let expiry_datetime_utc = claims.expiration();
+    let expiry_system_time: SystemTime = expiry_datetime_utc.into();
+    let duration_until_expiry = expiry_system_time
+        .duration_since(SystemTime::now())
+        .unwrap_or(Duration::ZERO); // If time is out -> 0
+    session.id_token_expires_at = Some(Instant::now() + duration_until_expiry);
+
+    let mut roles_extracted = false;
+    if let Ok(claims_json) = serde_json::to_value(claims) {
+        session.roles = extract_roles_from_claims(&claims_json);
+        // Name is also extracted here
+        session.name = Some(extract_name_from_claims(&claims_json));
+        session.email = extract_email_from_claims(&claims_json);
+        roles_extracted = !session.roles.is_empty();
+        debug!(
+            session_id = %session_id,
+            has_name = session.name.is_some(),
+            has_email = session.email.is_some(),
+            roles_count = session.roles.len(),
+            "callback: claims extracted into session"
+        );
+    } else {
+        debug!(session_id = %session_id, "callback: failed to serialize claims");
+    }
+    session.id_token = Some(id_token);
+
+    roles_extracted
 }
 
 pub async fn logout_handler(State(state): State<AppState>, jar: CookieJar) -> impl IntoResponse {
@@ -406,6 +449,7 @@ pub async fn callback_handler(
     debug!(session_id = %session_id, "callback: session found in memory");
     let mut pkce_guard = session.pkce_verifier.lock().await;
     let pkce_verifier_to_check = pkce_guard.take();
+    drop(pkce_guard);
 
     if session.csrf_token.secret() != &query.state {
         debug!(session_id = %session_id, "callback: CSRF validation failed");
@@ -435,45 +479,53 @@ pub async fn callback_handler(
                 debug!(session_id = %session_id, "callback: id_token present");
                 match id_token.claims(&state.http_client.id_token_verifier(), &session.nonce) {
                     Ok(claims) => {
-                        debug!(
-                            session_id = %session_id,
-                            subject = ?claims.subject(),
-                            expires_at = %claims.expiration(),
-                            "callback: id_token claims validated"
+                        roles_extracted = apply_validated_id_token_claims(
+                            session,
+                            &session_id,
+                            id_token.to_string(),
+                            claims,
                         );
-                        session.subject = Some(claims.subject().to_string());
-
-                        let expiry_datetime_utc = claims.expiration();
-                        let expiry_system_time: SystemTime = expiry_datetime_utc.into();
-                        let duration_until_expiry = expiry_system_time
-                            .duration_since(SystemTime::now())
-                            .unwrap_or(Duration::ZERO); // If time is out -> 0
-                        session.id_token_expires_at = Some(Instant::now() + duration_until_expiry);
-
-                        if let Ok(claims_json) = serde_json::to_value(claims) {
-                            session.roles = extract_roles_from_claims(&claims_json);
-                            // Name is also extracted here
-                            session.name = Some(extract_name_from_claims(&claims_json));
-                            session.email = extract_email_from_claims(&claims_json);
-                            roles_extracted = !session.roles.is_empty();
-                            debug!(
-                                session_id = %session_id,
-                                has_name = session.name.is_some(),
-                                has_email = session.email.is_some(),
-                                roles_count = session.roles.len(),
-                                "callback: claims extracted into session"
-                            );
-                        } else {
-                            debug!(session_id = %session_id, "callback: failed to serialize claims");
-                        }
-                        session.id_token = Some(id_token.to_string());
                     }
                     Err(e) => {
-                        debug!(
+                        warn!(
                             session_id = %session_id,
                             error = ?e,
-                            "callback: id_token claims validation failed"
+                            "callback: id_token claims validation failed; retrying with fresh OIDC discovery"
                         );
+                        match ISPOidcClient::new(&state.async_http_client).await {
+                            Ok(fresh_client) => {
+                                match id_token
+                                    .claims(&fresh_client.id_token_verifier(), &session.nonce)
+                                {
+                                    Ok(claims) => {
+                                        debug!(
+                                            session_id = %session_id,
+                                            "callback: id_token claims validated after fresh OIDC discovery"
+                                        );
+                                        roles_extracted = apply_validated_id_token_claims(
+                                            session,
+                                            &session_id,
+                                            id_token.to_string(),
+                                            claims,
+                                        );
+                                    }
+                                    Err(retry_error) => {
+                                        warn!(
+                                            session_id = %session_id,
+                                            error = ?retry_error,
+                                            "callback: id_token claims validation still failed after fresh OIDC discovery"
+                                        );
+                                    }
+                                }
+                            }
+                            Err(refresh_error) => {
+                                warn!(
+                                    session_id = %session_id,
+                                    error = ?refresh_error,
+                                    "callback: fresh OIDC discovery failed after claims validation error"
+                                );
+                            }
+                        }
                     }
                 }
             } else {
@@ -609,15 +661,7 @@ pub async fn security_headers(
     headers.insert("X-Frame-Options", HeaderValue::from_static("DENY"));
     headers.insert("Referrer-Policy", HeaderValue::from_static("no-referrer"));
     headers.insert(
-        "Cross-Origin-Embedder-Policy",
-        HeaderValue::from_static("require-corp"),
-    );
-    headers.insert(
         "Cross-Origin-Opener-Policy",
-        HeaderValue::from_static("same-origin"),
-    );
-    headers.insert(
-        "Cross-Origin-Resource-Policy",
         HeaderValue::from_static("same-origin"),
     );
 

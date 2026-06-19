@@ -7,10 +7,12 @@ where
     Top: IntoView + 'static,
     SideBody: IntoView + 'static,
 {
-    let (is_collapsed, set_is_collapsed) = signal(true);
-    let (is_pinned, set_is_pinned) = signal(false);
+    let initially_pinned = stored_sidebar_pinned();
+    let (is_collapsed, set_is_collapsed) = signal(false);
+    let (is_pinned, set_is_pinned) = signal(initially_pinned);
     view! {
         <div class="sb-wrapper" class:sb-collapsed=is_collapsed class:sb-pinned=is_pinned>
+            <div class="sb-hoverStrip" on:mouseenter=move |_| set_is_collapsed.set(false)></div>
             <div
                 class="sb-sidebar"
                 on:mouseleave=move |_| {
@@ -22,7 +24,11 @@ where
                 <header class="sb-sideHeader">
                     <button
                         class="tooltip sb-pin"
-                        on:click=move |_| set_is_pinned.set(true)
+                        on:click=move |_| {
+                            set_is_pinned.set(true);
+                            set_is_collapsed.set(false);
+                            store_sidebar_pinned(true);
+                        }
                         data-descr="Pin sidebar"
                     />
                     <div class="sb-side-top">{top.into_view()}</div>
@@ -30,6 +36,7 @@ where
                         class="tooltip sb-unpin"
                         on:click=move |_| {
                             set_is_pinned.set(false);
+                            store_sidebar_pinned(false);
                             set_is_collapsed.set(true)
                         }
                         data-descr="Hide sidebar"
@@ -42,8 +49,33 @@ where
                 {children()}
             </div>
         </div>
-        <div class="sb-hoverStrip" on:mouseenter=move |_| set_is_collapsed.set(false)></div>
         <LogoutButton />
         <LanguageSwitcher />
     }
 }
+
+#[cfg(target_arch = "wasm32")]
+fn stored_sidebar_pinned() -> bool {
+    web_sys::window()
+        .and_then(|window| window.local_storage().ok().flatten())
+        .and_then(|storage| storage.get_item("cx58-sidebar-pinned").ok().flatten())
+        .as_deref()
+        == Some("true")
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn stored_sidebar_pinned() -> bool {
+    false
+}
+
+#[cfg(target_arch = "wasm32")]
+fn store_sidebar_pinned(pinned: bool) {
+    if let Some(storage) =
+        web_sys::window().and_then(|window| window.local_storage().ok().flatten())
+    {
+        let _ = storage.set_item("cx58-sidebar-pinned", if pinned { "true" } else { "false" });
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn store_sidebar_pinned(_pinned: bool) {}

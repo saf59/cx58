@@ -102,3 +102,15 @@ download-as-markdown = Als Markdown herunterladen
 # --- Tree component (show_tree.rs) ---
 # Fallback label for nodes where name is None
 tree-node-unnamed = (unbenannt)
+
+reports = Berichte
+reports-select-object = Objekt auswählen, um Berichte anzuzeigen
+reports-loading = Berichte werden geladen...
+reports-empty = Noch keine Berichte
+reports-upload = Bericht hochladen
+reports-delete = Bericht löschen
+reports-image = Bericht
+reports-use-context = Diesen Bericht im Chat-Kontext verwenden
+reports-datetime = Datum und Uhrzeit des Berichts
+reports-file = Berichtsbild
+reports-save-date = Berichtsdatum speichern

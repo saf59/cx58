@@ -4,6 +4,7 @@ pub(crate) mod lang;
 pub(crate) mod media_proxy_script;
 pub(crate) mod model_settings_panel;
 pub(crate) mod node_info_display;
+pub(crate) mod reports_panel;
 pub(crate) mod show_carusel;
 pub(crate) mod show_description;
 pub(crate) mod show_tree;

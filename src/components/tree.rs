@@ -190,7 +190,7 @@ pub fn build_tree(nodes: Vec<TreeNode>) -> Vec<Tree> {
     ) -> Tree {
         let node = node_map.get(&node_id).unwrap();
 
-        let children = children_map
+        let mut children: Vec<Tree> = children_map
             .get(&Some(node_id))
             .map(|child_ids| {
                 child_ids
@@ -199,6 +199,7 @@ pub fn build_tree(nodes: Vec<TreeNode>) -> Vec<Tree> {
                     .collect()
             })
             .unwrap_or_default();
+        children.sort_by(compare_tree_name);
 
         let parsed_data = parse_node_data(node.node_type, &node.data);
 
@@ -226,10 +227,18 @@ pub fn build_tree(nodes: Vec<TreeNode>) -> Vec<Tree> {
         .collect();
 
     // Build trees for each top-level node
-    top_level_ids
+    let mut trees: Vec<Tree> = top_level_ids
         .into_iter()
         .map(|node_id| build_subtree(node_id, &node_map, &children_map))
-        .collect()
+        .collect();
+    trees.sort_by(compare_tree_name);
+    trees
+}
+
+fn compare_tree_name(a: &Tree, b: &Tree) -> std::cmp::Ordering {
+    let a_name = a.name.as_deref().unwrap_or("").to_lowercase();
+    let b_name = b.name.as_deref().unwrap_or("").to_lowercase();
+    a_name.cmp(&b_name).then_with(|| a.id.cmp(&b.id))
 }
 
 /// Fetch tree data from API and convert to hierarchical structure

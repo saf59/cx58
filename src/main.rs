@@ -1,12 +1,17 @@
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() {
+    use axum::extract::DefaultBodyLimit;
     use axum::middleware;
     use axum::{
         Router,
         routing::{get, post},
     }; //post
     use gmr::model_settings::{get_models_handler, update_models_handler};
+    use gmr::proxy_reports::{
+        proxy_delete_image_handler, proxy_reports_handler, proxy_update_report_handler,
+        proxy_upload_image_handler,
+    };
     use gmr::proxy_tree::proxy_tree_handler;
     use gmr::stop::stop_handler;
     use gmr::{app::*, llm_stream::*, ssr::*, state::AppState};
@@ -33,6 +38,18 @@ async fn main() {
         //.route("/api/get_media_proxy{_}", post(leptos_server_fn_handler))
         .route("/api/stop", post(stop_handler))
         .route("/api/proxy/tree/{user_id}", get(proxy_tree_handler))
+        .route(
+            "/api/proxy/reports/{node_id}",
+            get(proxy_reports_handler).put(proxy_update_report_handler),
+        )
+        .route(
+            "/api/proxy/images/upload/{parent_id}",
+            post(proxy_upload_image_handler).layer(DefaultBodyLimit::max(25 * 1024 * 1024)),
+        )
+        .route(
+            "/api/proxy/images/{node_id}",
+            axum::routing::delete(proxy_delete_image_handler),
+        )
         .route(
             "/api/models/{user_id}",
             get(get_models_handler).put(update_models_handler),
