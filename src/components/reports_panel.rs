@@ -2,7 +2,7 @@ use crate::auth::Auth;
 use crate::components::chat_context::ChatContext;
 use crate::components::show_tree::DetailsTreeRendererWithContext;
 use crate::components::tree::{NodeData, NodeInfo, NodeType, NodeWithLeaf, TreeViewerResource};
-use js_sys::Date;
+use js_sys::{Date, Reflect};
 use leptos::prelude::*;
 use leptos::wasm_bindgen::{JsCast, JsValue};
 use leptos::{IntoView, component, view};
@@ -74,6 +74,8 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
     let file_input_ref = NodeRef::<leptos::html::Input>::new();
     let datetime_input_ref = NodeRef::<leptos::html::Input>::new();
     let parent_id = node.id;
+    let has_selected_file = RwSignal::new(false);
+    let media_proxy = media_proxy_rule();
 
     let reload = Action::new_unsync(move |_: &()| async move {
         loading.set(true);
@@ -120,6 +122,7 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
                         let input: HtmlInputElement = input.unchecked_into();
                         input.set_value("");
                     }
+                    has_selected_file.set(false);
                     reload.dispatch(());
                 }
                 Err(e) => error.set(Some(e)),
@@ -131,18 +134,31 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
         <div class="reports-selected">
             <div class="reports-upload">
                 <input
+                    id="reports-upload-datetime"
+                    name="berlin_datetime"
                     type="text"
                     node_ref=datetime_input_ref
                     prop:value=current_datetime_agent()
                     aria-label=move || move_tr!("reports-datetime").get()
                 />
                 <input
+                    id="reports-upload-file"
+                    name="image"
                     type="file"
                     accept="image/*"
                     node_ref=file_input_ref
                     aria-label=move || move_tr!("reports-file").get()
+                    on:change=move |ev| {
+                        let input: HtmlInputElement = event_target(&ev);
+                        has_selected_file.set(input.files().is_some_and(|files| files.length() > 0));
+                    }
                 />
-                <button type="button" on:click=on_upload title=move || move_tr!("reports-upload").get()>
+                <button
+                    type="button"
+                    on:click=on_upload
+                    disabled=move || !has_selected_file.get()
+                    title=move || move_tr!("reports-upload").get()
+                >
                     <i class="fas fa-upload"></i>
                 </button>
             </div>
@@ -154,14 +170,18 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
             } else if reports.get().is_empty() {
                 view! { <div class="reports-status">{move_tr!("reports-empty")}</div> }.into_any()
             } else {
+                let media_proxy = media_proxy.clone();
                 view! {
                     <div class="reports-list">
                         <For
                             each=move || reports.get()
                             key=|report| report.id
                             children={
-                                move |report| view! {
-                                    <ReportItem report=report reload=reload />
+                                move |report| {
+                                    let media_proxy = media_proxy.clone();
+                                    view! {
+                                        <ReportItem report=report reload=reload media_proxy=media_proxy />
+                                    }
                                 }
                             }
                         />
@@ -173,85 +193,112 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
 }
 
 #[component]
-fn ReportItem(report: NodeWithLeaf, reload: Action<(), ()>) -> impl IntoView {
+fn ReportItem(report: NodeWithLeaf, reload: Action<(), ()>, media_proxy: String) -> impl IntoView {
     let report_id = report.id;
     let name = report
         .name
         .clone()
         .unwrap_or_else(|| move_tr!("reports-image").get());
-    let thumbnail = image_url(&report, true);
-    let full_url = image_url(&report, false);
+    let thumbnail = image_url(&report, true, &media_proxy);
+    let full_url = image_url(&report, false, &media_proxy);
     let popup_id = format!("report-popup-{}", Uuid::now_v7());
     let popup_target = popup_id.clone();
     let popup_close = popup_id.clone();
+    let date_input_id = format!("report-date-{report_id}");
     let edit_value = RwSignal::new(datetime_edit_value(&report));
     let update_error = RwSignal::new(None::<String>);
 
     view! {
-            <div class="reports-item">
-                <button type="button" popovertarget=popup_target class="reports-thumb">
-                    <img src=thumbnail alt=name.clone() loading="lazy" />
-                </button>
-                <div id=popup_id popover class="popup">
-                    <div class="popup-content">
-                        <button popovertarget=popup_close class="popup-close">"×"</button>
-                        <img src=full_url alt=name.clone() class="popup-image" />
-                    </div>
-                </div>
-    <input
-                    class="reports-date-edit"
-                    type="text"
-                    prop:value=move || edit_value.get()
-                    on:input=move |ev| edit_value.set(event_target_value(&ev))
-                />
-                <button
-                    type="button"
-                    class="reports-save-date"
-                    title=move || move_tr!("reports-save-date").get()
-                    on:click=move |_| {
-                        let datetime = edit_value.get();
-                        leptos::task::spawn_local(async move {
-                            match update_report_date(report_id, &datetime).await {
-                                Ok(()) => {
-                                    update_error.set(None);
-                                    reload.dispatch(());
-                                }
-                                Err(e) => update_error.set(Some(e)),
-                            }
-                        });
-                    }
-                >
-                    <i class="fas fa-save"></i>
-                </button>
-                <button
-                    type="button"
-                    class="reports-delete"
-                    title=move || move_tr!("reports-delete").get()
-                    on:click=move |_| {
-                        leptos::task::spawn_local(async move {
-                            let _ = delete_report(report_id).await;
-                            reload.dispatch(());
-                        });
-                    }
-                >
-                    <i class="fas fa-trash"></i>
-                </button>
-                <div class="reports-item-error" class:none=move || update_error.get().is_none()>
-                    {move || update_error.get().unwrap_or_default()}
+        <div class="reports-item">
+            <button type="button" popovertarget=popup_target class="reports-thumb">
+                <img crossorigin="anonymous" src=thumbnail alt=name.clone() loading="lazy" />
+            </button>
+            <div id=popup_id popover class="popup">
+                <div class="popup-content">
+                    <button popovertarget=popup_close class="popup-close">"×"</button>
+                    <img crossorigin="anonymous" src=full_url alt=name.clone() class="popup-image" />
                 </div>
             </div>
-        }
+            <input
+                id=date_input_id
+                name="berlin_datetime"
+                class="reports-date-edit"
+                type="text"
+                prop:value=move || edit_value.get()
+                on:input=move |ev| edit_value.set(event_target_value(&ev))
+            />
+            <button
+                type="button"
+                class="reports-save-date"
+                title=move || move_tr!("reports-save-date").get()
+                on:click=move |_| {
+                    let datetime = edit_value.get();
+                    leptos::task::spawn_local(async move {
+                        match update_report_date(report_id, &datetime).await {
+                            Ok(()) => {
+                                update_error.set(None);
+                                reload.dispatch(());
+                            }
+                            Err(e) => update_error.set(Some(e)),
+                        }
+                    });
+                }
+            >
+                <i class="fas fa-save"></i>
+            </button>
+            <button
+                type="button"
+                class="reports-delete"
+                title=move || move_tr!("reports-delete").get()
+                on:click=move |_| {
+                    leptos::task::spawn_local(async move {
+                        let _ = delete_report(report_id).await;
+                        reload.dispatch(());
+                    });
+                }
+            >
+                <i class="fas fa-trash"></i>
+            </button>
+            <div class="reports-item-error" class:none=move || update_error.get().is_none()>
+                {move || update_error.get().unwrap_or_default()}
+            </div>
+        </div>
+    }
 }
-fn image_url(report: &NodeWithLeaf, thumbnail: bool) -> String {
+fn image_url(report: &NodeWithLeaf, thumbnail: bool, media_proxy: &str) -> String {
     match &report.data {
-        NodeData::Image(data) if thumbnail => data
-            .thumbnail_url
-            .clone()
-            .or_else(|| data.url.clone())
-            .unwrap_or_default(),
-        NodeData::Image(data) => data.url.clone().unwrap_or_default(),
+        NodeData::Image(data) if thumbnail => proxy_media(
+            media_proxy,
+            &data
+                .thumbnail_url
+                .clone()
+                .or_else(|| data.url.clone())
+                .unwrap_or_default(),
+        ),
+        NodeData::Image(data) => proxy_media(media_proxy, &data.url.clone().unwrap_or_default()),
         _ => String::new(),
     }
+}
+
+fn media_proxy_rule() -> String {
+    window()
+        .and_then(|w| {
+            Reflect::get(&w, &JsValue::from_str("MEDIA_PROXY"))
+                .ok()
+                .and_then(|v| v.as_string())
+        })
+        .unwrap_or_default()
+}
+
+fn proxy_media(rule: &str, value: &str) -> String {
+    if rule.is_empty() {
+        return value.to_string();
+    }
+    let parts: Vec<&str> = rule.split(',').collect();
+    if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
+        return value.to_string();
+    }
+    value.replace(parts[0], parts[1])
 }
 
 async fn fetch_reports(node_id: Uuid) -> Result<Vec<NodeWithLeaf>, String> {

@@ -267,11 +267,13 @@
 
     .reports-upload input[type="file"] {
         padding-left: 6px;
+        cursor: pointer;
     }
 
     .reports-upload input[type="file"]::file-selector-button {
         height: 22px;
         margin: 3px 6px 3px 0;
+        cursor: pointer;
     }
 
     .reports-date-edit {
@@ -300,7 +302,12 @@
         cursor: pointer;
     }
 
-    .reports-upload button:hover,
+    .reports-upload button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+    }
+
+    .reports-upload button:not(:disabled):hover,
     .reports-delete:hover,
     .reports-save-date:hover {
         color: var(--d-color);
@@ -333,6 +340,7 @@
 
     .reports-thumb {
         grid-column: 1 / -1;
+        cursor: pointer;
         width: 100%;
         aspect-ratio: 4 / 3;
         padding: 0;
@@ -347,6 +355,10 @@
         height: 100%;
         object-fit: cover;
         display: block;
+    }
+
+    .popup-close {
+        cursor: pointer;
     }
 
     .reports-status {
