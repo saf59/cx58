@@ -7,9 +7,15 @@ where
     Top: IntoView + 'static,
     SideBody: IntoView + 'static,
 {
-    let initially_pinned = stored_sidebar_pinned();
     let (is_collapsed, set_is_collapsed) = signal(false);
-    let (is_pinned, set_is_pinned) = signal(initially_pinned);
+    let (is_pinned, set_is_pinned) = signal(false);
+
+    Effect::new(move |_| {
+        if stored_sidebar_pinned() {
+            set_is_pinned.set(true);
+        }
+    });
+
     view! {
         <div class="sb-wrapper" class:sb-collapsed=is_collapsed class:sb-pinned=is_pinned>
             <div class="sb-hoverStrip" on:mouseenter=move |_| set_is_collapsed.set(false)></div>

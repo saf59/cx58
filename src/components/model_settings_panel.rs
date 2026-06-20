@@ -317,6 +317,10 @@ fn models_for_role(models: &[OllamaModelInfo], role: &str) -> Vec<OllamaModelInf
 }
 
 fn supports_role(model: &OllamaModelInfo, role: &str) -> bool {
+    if role != "vision" && is_vision_only_model(model) {
+        return false;
+    }
+
     let required = match role {
         "vision" => "vision",
         "text" => "completion",
@@ -328,6 +332,20 @@ fn supports_role(model: &OllamaModelInfo, role: &str) -> bool {
         .capabilities
         .iter()
         .any(|capability| capability == required)
+}
+
+fn is_vision_only_model(model: &OllamaModelInfo) -> bool {
+    model
+        .capabilities
+        .iter()
+        .any(|capability| capability.eq_ignore_ascii_case("vision"))
+        || is_vision_model_label(&model.name)
+        || model.family.as_deref().is_some_and(is_vision_model_label)
+}
+
+fn is_vision_model_label(label: &str) -> bool {
+    let label = label.to_ascii_lowercase();
+    label.contains("-vl") || label.contains("vision") || label.contains("llava")
 }
 
 fn options_with_current(mut models: Vec<OllamaModelInfo>, current: String) -> Vec<OllamaModelInfo> {

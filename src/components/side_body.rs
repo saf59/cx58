@@ -17,24 +17,18 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
     let faq_questions = (1..=num_questions)
         .map(|i| format!("q-{}", i))
         .collect::<Vec<String>>();
-    let requested_panel = take_requested_panel();
-    let (faq_toggled, set_faq_toggled) = signal(requested_panel.as_deref() != Some("faq"));
-    let (obj_toggled, set_obj_toggled) = signal(requested_panel.as_deref() != Some("objects"));
-    let (models_toggled, set_models_toggled) = signal(requested_panel.as_deref() != Some("models"));
     let location = use_location();
     let navigate = use_navigate();
-    let reports_collapsed = requested_panel.as_deref() != Some("reports")
-        && location.pathname.get_untracked() != "/reports";
-    let (reports_toggled, _) = signal(reports_collapsed);
+    let current_panel = Memo::new(move |_| location.query.with(|query| query.get("panel")));
     let nav_new_chat = navigate.clone();
     let nav_faq = navigate.clone();
     let nav_objects = navigate.clone();
     let nav_models = navigate.clone();
+    let nav_home = navigate.clone();
     //let show_objects = move || obj_toggled.get();
     view! {
         <a href="/" on:click=move |ev| {
             ev.prevent_default();
-            clear_requested_panel();
             nav_new_chat("/", Default::default());
             ctx.clear_history.set(true);
         }>
@@ -42,16 +36,14 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
             <span>{move || move_tr!("new-chat")}</span>
         </a>
 
-        <a href="/" on:click=move |ev| {
+        <a href="/?panel=faq" on:click=move |ev| {
             ev.prevent_default();
-            store_requested_panel("faq");
-            nav_faq("/", Default::default());
-            set_faq_toggled.try_update(|value| *value = !*value);
+            nav_faq(&panel_target(current_panel.get(), "faq"), Default::default());
         }>
             <i class="fas fa-book"></i>
             <span>{move || move_tr!("faq")}</span>
         </a>
-        <div class="faq-area" class:none=move || faq_toggled.get()>
+        <div class="faq-area" class:none=move || current_panel.get().as_deref() != Some("faq")>
             {faq_questions
                 .into_iter()
                 .map(|key| {
@@ -75,31 +67,27 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
                 .collect_view()}
         </div>
 
-        <a href="/" on:click=move |ev| {
+        <a href="/?panel=objects" on:click=move |ev| {
             ev.prevent_default();
-            store_requested_panel("objects");
-            nav_objects("/", Default::default());
-            set_obj_toggled.try_update(|value| *value = !*value);
+            nav_objects(&panel_target(current_panel.get(), "objects"), Default::default());
         }>
             <i class="fas fa-building"></i>
             <span>{move || move_tr!("objects")}</span>
         </a>
 
-        <Show when=move || obj_toggled.get() fallback=|| view! { <Objects /> }>
+        <Show when=move || current_panel.get().as_deref() != Some("objects") fallback=|| view! { <Objects /> }>
             {().into_view()}
         </Show>
 
-        <a href="/" on:click=move |ev| {
+        <a href="/?panel=models" on:click=move |ev| {
             ev.prevent_default();
-            store_requested_panel("models");
-            nav_models("/", Default::default());
-            set_models_toggled.try_update(|value| *value = !*value);
+            nav_models(&panel_target(current_panel.get(), "models"), Default::default());
         }>
             <i class="fas fa-sliders"></i>
             <span>{move || move_tr!("models")}</span>
         </a>
 
-        <Show when=move || models_toggled.get() fallback=|| view! { <Models /> }>
+        <Show when=move || current_panel.get().as_deref() != Some("models") fallback=|| view! { <Models /> }>
             {().into_view()}
         </Show>
         <a href="/reports">
@@ -107,13 +95,16 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
             <span>{move || move_tr!("reports")}</span>
         </a>
 
-        <Show when=move || reports_toggled.get() fallback=|| view! { <Reports /> }>
+        <Show when=move || location.pathname.get() != "/reports" fallback=|| view! { <Reports /> }>
             {().into_view()}
         </Show>
 
         <hr />
 
-        <a href="/">
+        <a href="/" on:click=move |ev| {
+            ev.prevent_default();
+            nav_home("/", Default::default());
+        }>
             <i class="fas fa-home"></i>
             <span>{move || move_tr!("home")}</span>
         </a>
@@ -138,6 +129,14 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
         } else {
             ().into_any()
         }}
+    }
+}
+
+fn panel_target(current_panel: Option<String>, panel: &str) -> String {
+    if current_panel.as_deref() == Some(panel) {
+        "/".to_string()
+    } else {
+        format!("/?panel={panel}")
     }
 }
 
@@ -196,40 +195,3 @@ fn Objects() -> impl IntoView {
         </ErrorBoundary>
     }
 }
-
-#[cfg(target_arch = "wasm32")]
-fn take_requested_panel() -> Option<String> {
-    let storage = web_sys::window().and_then(|window| window.local_storage().ok().flatten())?;
-    let value = storage.get_item("cx58-sidebar-panel").ok().flatten();
-    let _ = storage.remove_item("cx58-sidebar-panel");
-    value
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn take_requested_panel() -> Option<String> {
-    None
-}
-
-#[cfg(target_arch = "wasm32")]
-fn store_requested_panel(panel: &str) {
-    if let Some(storage) =
-        web_sys::window().and_then(|window| window.local_storage().ok().flatten())
-    {
-        let _ = storage.set_item("cx58-sidebar-panel", panel);
-    }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn store_requested_panel(_panel: &str) {}
-
-#[cfg(target_arch = "wasm32")]
-fn clear_requested_panel() {
-    if let Some(storage) =
-        web_sys::window().and_then(|window| window.local_storage().ok().flatten())
-    {
-        let _ = storage.remove_item("cx58-sidebar-panel");
-    }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn clear_requested_panel() {}

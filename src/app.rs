@@ -35,6 +35,7 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
                 <Link rel="shortcut icon" type_="image/ico" href="/favicon.ico" />
                 <Stylesheet id="leptos" href="/pkg/cx58-client.css" />
                 <Stylesheet href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+                <LegacyStorageCleanupScript />
                 <HydrationScripts options />
                 <MetaTags />
                 <MediaProxyScript />
@@ -45,6 +46,18 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
         </html>
     }
 }
+
+#[component]
+fn LegacyStorageCleanupScript() -> impl IntoView {
+    let nonce = use_context::<leptos::nonce::Nonce>();
+
+    view! {
+        <script nonce=nonce>
+            "try { localStorage.removeItem('cx58-sidebar-panel'); } catch (_) {}"
+        </script>
+    }
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     let chat_context = ChatContext::new();
