@@ -1,5 +1,4 @@
 .carousel-container {
-  max-width: 1200px;
   margin: 0 auto;
   padding: 5px;
   width: auto;
@@ -44,7 +43,6 @@
   position: relative;
   overflow: hidden;
   border-radius: 8px;
-  max-width: calc(2 * 300px + 2rem);
 }
 
 .carousel {

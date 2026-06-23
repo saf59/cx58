@@ -114,3 +114,5 @@ reports-use-context = Diesen Bericht im Chat-Kontext verwenden
 reports-datetime = Datum und Uhrzeit des Berichts
 reports-file = Berichtsbild
 reports-save-date = Berichtsdatum speichern
+reports-prev-page = Vorherige Berichtsseite
+reports-next-page = Nächste Berichtsseite

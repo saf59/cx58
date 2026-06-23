@@ -11,6 +11,8 @@ use uuid::Uuid;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{FormData, HtmlInputElement, Request, RequestInit, RequestMode, Response, window};
 
+const REPORTS_PAGE_SIZE: usize = 10;
+
 #[component]
 pub fn ReportsObjectPicker() -> impl IntoView {
     let auth_signal = use_context::<RwSignal<Auth>>().expect("Auth must be provided");
@@ -75,6 +77,7 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
     let datetime_input_ref = NodeRef::<leptos::html::Input>::new();
     let parent_id = node.id;
     let has_selected_file = RwSignal::new(false);
+    let current_page = RwSignal::new(0usize);
     let media_proxy = media_proxy_rule();
 
     let reload = Action::new_unsync(move |_: &()| async move {
@@ -84,6 +87,12 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
             Ok(mut data) => {
                 data.retain(|item| item.node_type == NodeType::ImageLeaf);
                 data.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+                let max_page = max_page_index(data.len());
+                current_page.update(|page| {
+                    if *page > max_page {
+                        *page = max_page;
+                    }
+                });
                 reports.set(data);
             }
             Err(e) => error.set(Some(e)),
@@ -172,9 +181,10 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
             } else {
                 let media_proxy = media_proxy.clone();
                 view! {
+                    <ReportsPaginator reports=reports current_page=current_page />
                     <div class="reports-list">
                         <For
-                            each=move || reports.get()
+                            each=move || paged_reports(reports.get(), current_page.get())
                             key=|report| report.id
                             children={
                                 move |report| {
@@ -190,6 +200,77 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
             }}
         </div>
     }
+}
+
+#[component]
+fn ReportsPaginator(
+    reports: RwSignal<Vec<NodeWithLeaf>>,
+    current_page: RwSignal<usize>,
+) -> impl IntoView {
+    let total = move || reports.get().len();
+    let page_count = move || total().div_ceil(REPORTS_PAGE_SIZE).max(1);
+    let from = move || {
+        if total() == 0 {
+            0
+        } else {
+            current_page.get() * REPORTS_PAGE_SIZE + 1
+        }
+    };
+    let to = move || ((current_page.get() + 1) * REPORTS_PAGE_SIZE).min(total());
+
+    view! {
+        <Show when=move || { total() > REPORTS_PAGE_SIZE }>
+            <div class="reports-pagination">
+                <button
+                    type="button"
+                    class="reports-page-button"
+                    disabled=move || current_page.get() == 0
+                    title=move || move_tr!("reports-prev-page").get()
+                    aria-label=move || move_tr!("reports-prev-page").get()
+                    on:click=move |_| {
+                        current_page.update(|page| *page = page.saturating_sub(1));
+                    }
+                >
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <span class="reports-page-count">
+                    {move || format!("{}-{} / {}", from(), to(), total())}
+                </span>
+                <span class="reports-page-index">
+                    {move || format!("{}/{}", current_page.get() + 1, page_count())}
+                </span>
+                <button
+                    type="button"
+                    class="reports-page-button"
+                    disabled=move || current_page.get() + 1 >= page_count()
+                    title=move || move_tr!("reports-next-page").get()
+                    aria-label=move || move_tr!("reports-next-page").get()
+                    on:click=move |_| {
+                        current_page.update(|page| {
+                            let max_page = page_count().saturating_sub(1);
+                            if *page < max_page {
+                                *page += 1;
+                            }
+                        });
+                    }
+                >
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </Show>
+    }
+}
+
+fn paged_reports(reports: Vec<NodeWithLeaf>, current_page: usize) -> Vec<NodeWithLeaf> {
+    reports
+        .into_iter()
+        .skip(current_page * REPORTS_PAGE_SIZE)
+        .take(REPORTS_PAGE_SIZE)
+        .collect()
+}
+
+fn max_page_index(total: usize) -> usize {
+    total.saturating_sub(1) / REPORTS_PAGE_SIZE
 }
 
 #[component]

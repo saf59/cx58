@@ -327,6 +327,49 @@
         gap: 12px;
     }
 
+    .reports-pagination {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 32px;
+    }
+
+    .reports-page-button {
+        width: 32px;
+        height: 30px;
+        padding: 0;
+        border: 1px solid var(--6-color);
+        border-radius: 4px;
+        background: var(--f0-color);
+        color: var(--4-color);
+        cursor: pointer;
+    }
+
+    .reports-page-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+    }
+
+    .reports-page-button:not(:disabled):hover {
+        color: var(--d-color);
+        background: var(--6-color);
+    }
+
+    .reports-page-count,
+    .reports-page-index {
+        min-width: 74px;
+        color: var(--4-color);
+        font-size: 11px;
+        line-height: 30px;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .reports-page-index {
+        min-width: 44px;
+        color: var(--6-color);
+    }
+
     .reports-item {
         display: grid;
         grid-template-columns: minmax(0, 1fr) 32px 32px;

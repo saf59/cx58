@@ -31,7 +31,7 @@ tower-cookies = "0.11"
 console_error_panic_hook = { version = "0.1", optional = true }
 url = "2.5"
 uuid = { version = "1.21", features = ["v7", "rng-rand", "serde", "js"] }
-wasm-bindgen = { version = "0.2.117", features = [], optional = true }
+wasm-bindgen = { version = "0.2.125", features = [], optional = true }
 base64 = "0.22"
 cookie = "0.18"
 http = "1.4"
@@ -118,7 +118,7 @@ codegen-units = 1
 panic = "abort"
 
 [package.metadata.leptos]
-bin-target-triple = "x86_64-pc-windows-msvc"
+# bin-target-triple = "x86_64-pc-windows-msvc"
 bin-target = "gmr"
 
 # The name used by wasm-bindgen/cargo-leptos for the JS/WASM bundle. Defaults to the crate name

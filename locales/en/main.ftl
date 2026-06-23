@@ -114,3 +114,5 @@ reports-use-context = Use this report in chat context
 reports-datetime = Report date and time
 reports-file = Report image
 reports-save-date = Save report date
+reports-prev-page = Previous reports page
+reports-next-page = Next reports page

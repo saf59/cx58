@@ -609,6 +609,17 @@ pub async fn security_headers(
 ) -> impl IntoResponse {
     let uri = req.uri().path().to_string();
     // ❌ We do not add CSP for static or API
+    if is_static_asset(&uri) {
+        let mut res = next.run(req).await;
+        let headers = res.headers_mut();
+        headers.insert(
+            "Cache-Control",
+            HeaderValue::from_static("no-cache, no-store, must-revalidate"),
+        );
+        headers.insert("Pragma", HeaderValue::from_static("no-cache"));
+        headers.insert("Expires", HeaderValue::from_static("0"));
+        return res;
+    }
     if is_static(uri) {
         return next.run(req).await;
     }
@@ -684,14 +695,9 @@ pub async fn security_headers(
     res
 }
 
-fn is_static(uri: String) -> bool {
+fn is_static_asset(uri: &str) -> bool {
     uri.starts_with("/pkg")
         || uri.starts_with("/assets")
-        || uri.starts_with("/api")
-        || uri.starts_with("/login")
-        || uri.starts_with("/logout")
-        || uri.starts_with("/callback")
-        || uri.starts_with("/local")
         || uri.ends_with(".js")
         || uri.ends_with(".json")
         || uri.ends_with(".css")
@@ -699,4 +705,13 @@ fn is_static(uri: String) -> bool {
         || uri.ends_with(".map")
         || uri.ends_with(".ico")
         || uri.ends_with(".tfl")
+}
+
+fn is_static(uri: String) -> bool {
+    is_static_asset(&uri)
+        || uri.starts_with("/api")
+        || uri.starts_with("/login")
+        || uri.starts_with("/logout")
+        || uri.starts_with("/callback")
+        || uri.starts_with("/local")
 }
