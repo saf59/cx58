@@ -11,6 +11,7 @@ use axum::{
 };
 use axum_extra::extract::{CookieJar, cookie::Cookie};
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
+use cookie::time::Duration as CookieDuration;
 use http::HeaderMap;
 use leptos::config::LeptosOptions;
 use leptos::context::provide_context;
@@ -239,7 +240,19 @@ pub async fn logout_handler(State(state): State<AppState>, jar: CookieJar) -> im
                 {
                     let client = state.async_http_client.clone();
                     let agent_api_url = state.http_client.config.chat_config.agent_api_url.clone();
-                    crate::stop::cancel_agent_request(request_id, agent_api_url, client);
+                    let agent_secret = state
+                        .http_client
+                        .config
+                        .chat_config
+                        .agent_api_key
+                        .clone()
+                        .unwrap_or_default();
+                    crate::stop::cancel_agent_request(
+                        request_id,
+                        agent_api_url,
+                        agent_secret,
+                        client,
+                    );
                 }
             }
 
@@ -249,31 +262,42 @@ pub async fn logout_handler(State(state): State<AppState>, jar: CookieJar) -> im
                     .is_some_and(|exp_at| exp_at > Instant::now() + LOGOUT_ID_TOKEN_MIN_TTL)
             {
                 let issuer_url = match std::env::var("OIDC_ISSUER_URL") {
-                    Ok(url) => url,
+                    Ok(url) => Some(url),
                     Err(_) => {
                         post_logout_redirect_uri = "/".to_string();
-                        return (jar, Redirect::to(&post_logout_redirect_uri)).into_response();
+                        None
                     }
                 };
-                let base_logout_url = format!("{}/oidc/logout", issuer_url.trim_end_matches('/'));
+                if let Some(issuer_url) = issuer_url {
+                    let base_logout_url =
+                        format!("{}/oidc/logout", issuer_url.trim_end_matches('/'));
 
-                post_logout_redirect_uri = state
-                    .http_client
-                    .config
-                    .oidc_post_logout_redirect_uri
-                    .clone();
-                let mut url = url::Url::parse(&base_logout_url).expect("Invalid base logout URL");
+                    post_logout_redirect_uri = state
+                        .http_client
+                        .config
+                        .oidc_post_logout_redirect_uri
+                        .clone();
+                    let mut url =
+                        url::Url::parse(&base_logout_url).expect("Invalid base logout URL");
 
-                url.query_pairs_mut()
-                    .append_pair("id_token_hint", &id_token)
-                    .append_pair("post_logout_redirect_uri", &post_logout_redirect_uri);
+                    url.query_pairs_mut()
+                        .append_pair("id_token_hint", &id_token)
+                        .append_pair("post_logout_redirect_uri", &post_logout_redirect_uri);
 
-                rauthy_logout_url = Some(url.to_string());
+                    rauthy_logout_url = Some(url.to_string());
+                }
             }
         }
     }
 
-    let jar = jar.remove(Cookie::from(SESSION_ID));
+    let cookie_config = &state.http_client.config.cookie_config;
+    let jar = jar.remove(
+        Cookie::build(SESSION_ID)
+            .path(cookie_config.path.clone())
+            .http_only(cookie_config.http_only)
+            .secure(cookie_config.secure)
+            .same_site(cookie_config.same_site.clone().into()),
+    );
 
     match rauthy_logout_url {
         Some(url) => (jar, Redirect::to(&url)).into_response(),
@@ -356,12 +380,14 @@ pub async fn login_handler(State(state): State<AppState>, jar: CookieJar) -> imp
         },
     );
 
+    let cookie_config = &state.http_client.config.cookie_config;
     let jar = jar.add(
         Cookie::build((SESSION_ID, session_id))
-            .path("/")
-            .http_only(true)
-            // Recommended for OIDC flow
-            .same_site(axum_extra::extract::cookie::SameSite::Lax),
+            .path(cookie_config.path.clone())
+            .http_only(cookie_config.http_only)
+            .secure(cookie_config.secure)
+            .same_site(cookie_config.same_site.clone().into())
+            .max_age(CookieDuration::seconds(cookie_config.max_age_secs)),
     );
 
     (jar, Redirect::to(auth_url.as_str()))

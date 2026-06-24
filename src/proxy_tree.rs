@@ -1,11 +1,10 @@
-use crate::state::AppState;
+use crate::{hmac::build_hmac, state::AppState};
 use axum::{
     Json,
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
-use reqwest::Client;
 use serde_json::Value;
 
 /// Proxy handler for tree API
@@ -14,7 +13,9 @@ pub async fn proxy_tree_handler(
     Path(user_id): Path<String>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    let agent_api_url = &state.http_client.config.chat_config.agent_api_url;
+    let chat_config = &state.http_client.config.chat_config;
+    let agent_api_url = &chat_config.agent_api_url;
+    let agent_secret = chat_config.agent_api_key.clone().unwrap_or_default();
     // Extract query parameters (with_leafs)
     let with_leafs = headers
         .get("x-with-leafs")
@@ -28,9 +29,28 @@ pub async fn proxy_tree_handler(
         format!("{}/agent/tree/{}", agent_api_url, user_id)
     };
 
-    // Forward request to backend
-    let client = Client::new();
-    match client.get(&url).send().await {
+    let (timestamp, signature) = match build_hmac(&agent_secret, &[]) {
+        Ok(value) => value,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": format!("Failed to sign request: {}", e)
+                })),
+            )
+                .into_response();
+        }
+    };
+
+    match state
+        .async_http_client
+        .get(&url)
+        .header("X-Timestamp", timestamp.to_string())
+        .header("X-Signature", signature)
+        .header("Accept", "application/json")
+        .send()
+        .await
+    {
         Ok(response) => {
             let status = response.status();
             match response.json::<Value>().await {

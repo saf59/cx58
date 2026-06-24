@@ -348,7 +348,7 @@ pub async fn perform_token_refresh(
     } else {
         tracing::info!("Waiting {:?} before refreshing...", duration_to_wait);
     }
-    let new_expires_at = Instant::now() + duration_to_wait;
+    let new_expires_at = Instant::now() + time_until_expiry;
 
     Ok((
         id_token.to_string(),

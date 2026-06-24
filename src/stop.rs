@@ -1,5 +1,5 @@
-use crate::auth::SESSION_ID;
 use crate::state::AppState;
+use crate::{auth::SESSION_ID, hmac::build_hmac};
 use axum::{extract::State, response::IntoResponse};
 use axum_extra::extract::CookieJar;
 use reqwest::{Client, StatusCode};
@@ -24,8 +24,15 @@ pub async fn stop_handler(State(state): State<AppState>, jar: CookieJar) -> impl
         // Cancel on agent if active request exists
         if let Some(request_id) = &chat_session.current_request_id.read().await.clone() {
             let agent_api_url = state.http_client.config.chat_config.agent_api_url.clone();
+            let agent_secret = state
+                .http_client
+                .config
+                .chat_config
+                .agent_api_key
+                .clone()
+                .unwrap_or_default();
             let client = state.async_http_client.clone();
-            cancel_agent_request(request_id, agent_api_url, client);
+            cancel_agent_request(request_id, agent_api_url, agent_secret, client);
         }
 
         (StatusCode::OK, "stopped")
@@ -35,7 +42,12 @@ pub async fn stop_handler(State(state): State<AppState>, jar: CookieJar) -> impl
     }
 }
 
-pub fn cancel_agent_request(request_id: &String, agent_api_url: String, client: Client) {
+pub fn cancel_agent_request(
+    request_id: &String,
+    agent_api_url: String,
+    agent_secret: String,
+    client: Client,
+) {
     tracing::info!("Cancelling agent request: {}", request_id);
 
     let cancel_url = format!("{}/agent/chat/cancel/{}", agent_api_url, request_id);
@@ -43,8 +55,18 @@ pub fn cancel_agent_request(request_id: &String, agent_api_url: String, client: 
     let request_id = request_id.clone();
 
     tokio::spawn(async move {
+        let (timestamp, signature) = match build_hmac(&agent_secret, &[]) {
+            Ok(value) => value,
+            Err(e) => {
+                tracing::error!("Failed to sign agent cancel request: {}", e);
+                return;
+            }
+        };
+
         match client
             .delete(&cancel_url)
+            .header("X-Timestamp", timestamp.to_string())
+            .header("X-Signature", signature)
             .timeout(Duration::from_secs(2))
             .send()
             .await

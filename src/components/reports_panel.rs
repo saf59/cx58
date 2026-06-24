@@ -122,7 +122,7 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
                 input.value()
             })
             .filter(|value| !value.is_empty())
-            .unwrap_or_else(current_datetime_local);
+            .unwrap_or_else(current_datetime_berlin);
 
         leptos::task::spawn_local(async move {
             match upload_report(parent_id, &file, &datetime).await {
@@ -333,8 +333,13 @@ fn ReportItem(report: NodeWithLeaf, reload: Action<(), ()>, media_proxy: String)
                 title=move || move_tr!("reports-delete").get()
                 on:click=move |_| {
                     leptos::task::spawn_local(async move {
-                        let _ = delete_report(report_id).await;
-                        reload.dispatch(());
+                        match delete_report(report_id).await {
+                            Ok(()) => {
+                                update_error.set(None);
+                                reload.dispatch(());
+                            }
+                            Err(e) => update_error.set(Some(e)),
+                        }
                     });
                 }
             >
@@ -517,20 +522,76 @@ async fn send_request(method: &str, url: &str, body: Option<JsValue>) -> Result<
     Ok(resp)
 }
 
-fn current_datetime_local() -> String {
+fn current_datetime_berlin() -> String {
     let date = Date::new_0();
+    let offset_hours = berlin_utc_offset_hours(
+        date.get_utc_full_year(),
+        date.get_utc_month() + 1,
+        date.get_utc_date(),
+        date.get_utc_hours(),
+    );
+    let berlin_date = Date::new(&JsValue::from_f64(
+        date.get_time() + f64::from(offset_hours) * 60.0 * 60.0 * 1000.0,
+    ));
     format!(
         "{:04}-{:02}-{:02}T{:02}:{:02}",
-        date.get_full_year(),
-        date.get_month() + 1,
-        date.get_date(),
-        date.get_hours(),
-        date.get_minutes()
+        berlin_date.get_utc_full_year(),
+        berlin_date.get_utc_month() + 1,
+        berlin_date.get_utc_date(),
+        berlin_date.get_utc_hours(),
+        berlin_date.get_utc_minutes()
     )
 }
 
 fn current_datetime_agent() -> String {
-    datetime_for_agent(&current_datetime_local())
+    datetime_for_agent(&current_datetime_berlin())
+}
+
+fn berlin_utc_offset_hours(year: u32, month: u32, day: u32, hour_utc: u32) -> i32 {
+    let in_dst = match month {
+        4..=9 => true,
+        1 | 2 | 11 | 12 => false,
+        3 => {
+            let start_day = last_sunday_day(year as i32, 3);
+            day > start_day || (day == start_day && hour_utc >= 1)
+        }
+        10 => {
+            let end_day = last_sunday_day(year as i32, 10);
+            day < end_day || (day == end_day && hour_utc < 1)
+        }
+        _ => false,
+    };
+    if in_dst { 2 } else { 1 }
+}
+
+fn last_sunday_day(year: i32, month: u32) -> u32 {
+    let mut day = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if is_leap_year(year) => 29,
+        2 => 28,
+        _ => 30,
+    };
+    while day_of_week(year, month, day) != 0 {
+        day -= 1;
+    }
+    day
+}
+
+fn is_leap_year(year: i32) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+}
+
+fn day_of_week(year: i32, month: u32, day: u32) -> u32 {
+    let (month, year) = if month < 3 {
+        (month as i32 + 12, year - 1)
+    } else {
+        (month as i32, year)
+    };
+    let k = year % 100;
+    let j = year / 100;
+    let h = (day as i32 + (13 * (month + 1)) / 5 + k + k / 4 + j / 4 + 5 * j) % 7;
+    ((h + 6) % 7) as u32
 }
 
 fn validate_agent_datetime(datetime: &str) -> Result<(), String> {
