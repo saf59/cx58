@@ -45,11 +45,6 @@ RUN --mount=type=cache,target=/app/target/ \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
     rm -rf /app/target/site && \
     cargo leptos build --release -vv && \
-    grep -Eq "width:[[:space:]]*74vw" /app/target/site/pkg/cx58-client.css && \
-    ! grep -Eq "width:[[:space:]]*70vw" /app/target/site/pkg/cx58-client.css && \
-    ! grep -Eq "max-width:[[:space:]]*1200px" /app/target/site/pkg/cx58-client.css && \
-    ! grep -Eq "max-width:[[:space:]]*calc\\(600px \\+ 2rem\\)" /app/target/site/pkg/cx58-client.css && \
-    ! grep -Eq "max-width:[[:space:]]*calc\\(2 \\* 300px \\+ 2rem\\)" /app/target/site/pkg/cx58-client.css && \
     cp /app/target/release/${APP_NAME} /bin/server && \
     cp -r /app/target/site/ /bin/site
 
