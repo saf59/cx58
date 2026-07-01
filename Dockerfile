@@ -1,13 +1,13 @@
 ﻿# Get started with a build env with Rust nightly
 # FROM rustlang/rust:nightly-bookworm as builder
 
-ARG RUST_VERSION=1.96.0
+ARG RUST_VERSION=1.96.1
 ARG APP_NAME=gmr
 
 # If you’re using stable, use this instead
 FROM rust:${RUST_VERSION}-bookworm AS builder
 ARG APP_NAME
-ENV LEPTOS_WASM_BINDGEN_VERSION=0.2.125
+ENV LEPTOS_WASM_BINDGEN_VERSION=0.2.126
 
 # Install cargo-binstall, which makes it easier to install other
 # cargo extensions like cargo-leptos
@@ -30,7 +30,7 @@ RUN rustup target add wasm32-unknown-unknown
 RUN mkdir -p /app
 WORKDIR /app
 
-RUN cargo install wasm-bindgen-cli --version 0.2.125 --force
+RUN cargo install wasm-bindgen-cli --version 0.2.126 --force
 
 COPY src src/
 COPY style style/
@@ -69,7 +69,7 @@ COPY --from=builder /bin/site /app/site
 ENV RUST_LOG="info"
 ENV APP_ENV=PROD
 ENV RUST_BACKTRACE=full
-ENV LEPTOS_WASM_BINDGEN_VERSION=0.2.125
+ENV LEPTOS_WASM_BINDGEN_VERSION=0.2.126
 ENV LEPTOS_SITE_ADDR="0.0.0.0:3080"
 ENV LEPTOS_SITE_ROOT="site"
 EXPOSE 3080
