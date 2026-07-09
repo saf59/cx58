@@ -464,7 +464,8 @@ async fn send_json_request(method: &str, url: &str, body: &str) -> Result<Respon
 }
 
 fn datetime_edit_value(report: &NodeWithLeaf) -> String {
-    datetime_for_agent(&datetime_local_from_report(&report.updated_at))
+    datetime_utc_to_berlin_agent(&report.updated_at)
+        .unwrap_or_else(|| datetime_for_agent(&datetime_local_from_report(&report.updated_at)))
 }
 
 fn datetime_local_from_report(value: &str) -> String {
@@ -490,6 +491,56 @@ fn normalize_agent_datetime(value: &str) -> Option<String> {
         day, month, year, hour, minute, second
     ))
 }
+
+fn datetime_utc_to_berlin_agent(value: &str) -> Option<String> {
+    let (year, month, day, hour, minute, second) = parse_utc_datetime_parts(value)?;
+    let iso_utc = format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z");
+    let utc_date = Date::new(&JsValue::from_str(&iso_utc));
+    let time = utc_date.get_time();
+    if time.is_nan() {
+        return None;
+    }
+
+    let offset_hours = berlin_utc_offset_hours(
+        utc_date.get_utc_full_year(),
+        utc_date.get_utc_month() + 1,
+        utc_date.get_utc_date(),
+        utc_date.get_utc_hours(),
+    );
+    let berlin_date = Date::new(&JsValue::from_f64(
+        time + f64::from(offset_hours) * 60.0 * 60.0 * 1000.0,
+    ));
+
+    Some(format!(
+        "{:02}.{:02}.{:04} {:02}:{:02}:{:02}",
+        berlin_date.get_utc_date(),
+        berlin_date.get_utc_month() + 1,
+        berlin_date.get_utc_full_year(),
+        berlin_date.get_utc_hours(),
+        berlin_date.get_utc_minutes(),
+        berlin_date.get_utc_seconds()
+    ))
+}
+
+fn parse_utc_datetime_parts(value: &str) -> Option<(u32, u32, u32, u32, u32, u32)> {
+    let trimmed = value.trim().trim_end_matches('Z');
+    let mut parts = trimmed.split(['-', 'T', ' ', ':']);
+    let year = parts.next()?.parse().ok()?;
+    let month = parts.next()?.parse().ok()?;
+    let day = parts.next()?.parse().ok()?;
+    let hour = parts.next()?.parse().ok()?;
+    let minute = parts.next()?.parse().ok()?;
+    let second = parts
+        .next()
+        .unwrap_or("00")
+        .split('.')
+        .next()
+        .unwrap_or("00")
+        .parse()
+        .ok()?;
+    Some((year, month, day, hour, minute, second))
+}
+
 async fn delete_report(node_id: Uuid) -> Result<(), String> {
     let url = format!("/api/proxy/images/{}", node_id);
     let resp = send_request("DELETE", &url, None).await?;
