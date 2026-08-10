@@ -4,10 +4,10 @@ use crate::auth_ssr::*;
 use crate::config::AppConfig;
 use crate::state::AppState;
 use axum::{
-    extract::{FromRef, OriginalUri, State},
+    extract::{FromRef, OriginalUri, Query, State},
     http::{HeaderValue, StatusCode},
     middleware::Next,
-    response::{IntoResponse, Redirect, Response},
+    response::{Html, IntoResponse, Redirect, Response},
 };
 use axum_extra::extract::{CookieJar, cookie::Cookie};
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
@@ -41,6 +41,136 @@ use tokio::sync::Mutex;
 #[allow(unused_imports)]
 use tracing::{debug, info, warn};
 use uuid::Uuid;
+
+const SSO_PREFLIGHT_TIMEOUT: Duration = Duration::from_secs(5);
+const SSO_TOKEN_EXCHANGE_TIMEOUT: Duration = Duration::from_secs(15);
+const SSO_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(10);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AuthLanguage {
+    En,
+    De,
+}
+
+impl AuthLanguage {
+    fn from_hint(value: Option<&str>) -> Self {
+        match value.map(str::trim).map(str::to_ascii_lowercase).as_deref() {
+            Some(value) if value.starts_with("de") => Self::De,
+            _ => Self::En,
+        }
+    }
+
+    fn code(self) -> &'static str {
+        match self {
+            Self::En => "en",
+            Self::De => "de",
+        }
+    }
+}
+
+#[derive(Deserialize, Default)]
+pub struct LoginQuery {
+    lang: Option<String>,
+}
+
+struct ValidatedIdTokenData {
+    id_token: String,
+    subject: String,
+    expires_in: Duration,
+    roles: HashSet<Role>,
+    name: String,
+    email: Option<String>,
+}
+
+fn auth_language(jar: &CookieJar, query_language: Option<&str>) -> AuthLanguage {
+    let language_hint = query_language.or_else(|| jar.get("lf-lang").map(|cookie| cookie.value()));
+    AuthLanguage::from_hint(language_hint)
+}
+
+fn oidc_discovery_url(issuer_url: &str) -> String {
+    format!(
+        "{}/.well-known/openid-configuration",
+        issuer_url.trim_end_matches('/')
+    )
+}
+
+fn sso_unavailable_response(
+    language: AuthLanguage,
+    request_id: Uuid,
+    status: StatusCode,
+) -> Response {
+    let (title, message, retry, home) = match language {
+        AuthLanguage::En => (
+            "Sign-in service unavailable",
+            "The single sign-on service is currently unavailable. Please try again.",
+            "Repeat",
+            "Home",
+        ),
+        AuthLanguage::De => (
+            "Anmeldedienst nicht verfügbar",
+            "Der Single-Sign-on-Dienst ist derzeit nicht erreichbar. Bitte versuchen Sie es erneut.",
+            "Wiederholen",
+            "Startseite",
+        ),
+    };
+    let html = format!(
+        r#"<!doctype html>
+<html lang="{lang}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{title}</title>
+  <style>
+    body {{ margin: 0; font-family: system-ui, -apple-system, system-ui; background: #f6f4f0; color: #444; text-align: center; }}
+    main {{ box-sizing: border-box; display: flex; min-height: 100svh; width: 100%; padding: 2rem; flex-direction: column; justify-content: center; align-items: center; }}
+    h1 {{ margin: 0 0 1em; font-size: 1.17em; }}
+    p {{ margin: 0 0 1em; }}
+    .actions {{ display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center; }}
+    a {{ display: inline-block; padding: 0 5px; color: #444; line-height: 28px; border-radius: 5px; border: none; text-decoration: none; }}
+    a:hover {{ color: #40c0e7; background: #fff; }}
+    small {{ display: block; margin-top: 1.5rem; color: #777; overflow-wrap: anywhere; }}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>{title}</h1>
+    <p>{message}</p>
+    <div class="actions">
+      <a href="/login?lang={lang}">{retry}</a>
+      <a class="secondary" href="/">{home}</a>
+    </div>
+    <small>Reference: {request_id}</small>
+  </main>
+</body>
+</html>"#,
+        lang = language.code(),
+    );
+
+    (status, Html(html)).into_response()
+}
+
+fn validated_id_token_data(id_token: String, claims: &CoreIdTokenClaims) -> ValidatedIdTokenData {
+    let expiry_system_time: SystemTime = claims.expiration().into();
+    let expires_in = expiry_system_time
+        .duration_since(SystemTime::now())
+        .unwrap_or(Duration::ZERO);
+    let claims_json = serde_json::to_value(claims).ok();
+
+    ValidatedIdTokenData {
+        id_token,
+        subject: claims.subject().to_string(),
+        expires_in,
+        roles: claims_json
+            .as_ref()
+            .map(extract_roles_from_claims)
+            .unwrap_or_default(),
+        name: claims_json
+            .as_ref()
+            .map(extract_name_from_claims)
+            .unwrap_or_else(|| claims.subject().to_string()),
+        email: claims_json.as_ref().and_then(extract_email_from_claims),
+    }
+}
 
 #[allow(clippy::type_complexity)]
 #[derive(Clone)]
@@ -182,42 +312,28 @@ pub struct CallbackQuery {
 fn apply_validated_id_token_claims(
     session: &mut SessionData,
     session_id: &str,
-    id_token: String,
-    claims: &CoreIdTokenClaims,
+    validated: ValidatedIdTokenData,
 ) -> bool {
     debug!(
         session_id = %session_id,
-        subject = ?claims.subject(),
-        expires_at = %claims.expiration(),
+        subject = %validated.subject,
         "callback: id_token claims validated"
     );
-    session.subject = Some(claims.subject().to_string());
+    session.subject = Some(validated.subject);
+    session.id_token_expires_at = Some(Instant::now() + validated.expires_in);
+    session.roles = validated.roles;
+    session.name = Some(validated.name);
+    session.email = validated.email;
+    session.id_token = Some(validated.id_token);
 
-    let expiry_datetime_utc = claims.expiration();
-    let expiry_system_time: SystemTime = expiry_datetime_utc.into();
-    let duration_until_expiry = expiry_system_time
-        .duration_since(SystemTime::now())
-        .unwrap_or(Duration::ZERO); // If time is out -> 0
-    session.id_token_expires_at = Some(Instant::now() + duration_until_expiry);
-
-    let mut roles_extracted = false;
-    if let Ok(claims_json) = serde_json::to_value(claims) {
-        session.roles = extract_roles_from_claims(&claims_json);
-        // Name is also extracted here
-        session.name = Some(extract_name_from_claims(&claims_json));
-        session.email = extract_email_from_claims(&claims_json);
-        roles_extracted = !session.roles.is_empty();
-        debug!(
-            session_id = %session_id,
-            has_name = session.name.is_some(),
-            has_email = session.email.is_some(),
-            roles_count = session.roles.len(),
-            "callback: claims extracted into session"
-        );
-    } else {
-        debug!(session_id = %session_id, "callback: failed to serialize claims");
-    }
-    session.id_token = Some(id_token);
+    let roles_extracted = !session.roles.is_empty();
+    debug!(
+        session_id = %session_id,
+        has_name = session.name.is_some(),
+        has_email = session.email.is_some(),
+        roles_count = session.roles.len(),
+        "callback: claims extracted into session"
+    );
 
     roles_extracted
 }
@@ -357,7 +473,50 @@ pub async fn leptos_main_handler(
     handler(req).await.into_response()
 }
 
-pub async fn login_handler(State(state): State<AppState>, jar: CookieJar) -> impl IntoResponse {
+pub async fn login_handler(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Query(query): Query<LoginQuery>,
+) -> impl IntoResponse {
+    let request_id = Uuid::now_v7();
+    let language = auth_language(&jar, query.lang.as_deref());
+    let started_at = Instant::now();
+    let discovery_url = oidc_discovery_url(&state.http_client.config.oidc_issuer_url);
+    let sso_status = state
+        .async_http_client
+        .get(discovery_url)
+        .timeout(SSO_PREFLIGHT_TIMEOUT)
+        .send()
+        .await;
+
+    match sso_status {
+        Ok(response) if response.status().is_success() => {
+            info!(
+                request_id = %request_id,
+                elapsed_ms = started_at.elapsed().as_millis(),
+                "login: SSO preflight ok"
+            );
+        }
+        Ok(response) => {
+            warn!(
+                request_id = %request_id,
+                status = %response.status(),
+                elapsed_ms = started_at.elapsed().as_millis(),
+                "login: SSO preflight returned an error"
+            );
+            return sso_unavailable_response(language, request_id, StatusCode::SERVICE_UNAVAILABLE);
+        }
+        Err(error) => {
+            warn!(
+                request_id = %request_id,
+                error = ?error,
+                elapsed_ms = started_at.elapsed().as_millis(),
+                "login: SSO preflight failed"
+            );
+            return sso_unavailable_response(language, request_id, StatusCode::SERVICE_UNAVAILABLE);
+        }
+    }
+
     let (auth_url, csrf_token, nonce, pkce_verifier) = state.http_client.authorize_url();
 
     let session_id = Uuid::now_v7().to_string();
@@ -390,7 +549,7 @@ pub async fn login_handler(State(state): State<AppState>, jar: CookieJar) -> imp
             .max_age(CookieDuration::seconds(cookie_config.max_age_secs)),
     );
 
-    (jar, Redirect::to(auth_url.as_str()))
+    (jar, Redirect::to(auth_url.as_str())).into_response()
 }
 /// For both: leptos_main_handler and leptos_server_fn_handler
 async fn get_auth_state(state: AppState, headers: HeaderMap) -> Auth {
@@ -438,6 +597,9 @@ pub async fn callback_handler(
     jar: CookieJar,
     uri: OriginalUri,
 ) -> impl IntoResponse {
+    let request_id = Uuid::now_v7();
+    let language = auth_language(&jar, None);
+    let callback_started_at = Instant::now();
     let query_string = match uri.query() {
         Some(s) => s.to_string(),
         None => return (StatusCode::BAD_REQUEST, "Missing query string").into_response(),
@@ -465,26 +627,31 @@ pub async fn callback_handler(
     };
 
     let session_id = session_cookie.value().to_string();
-    debug!(session_id = %session_id, "callback: session cookie present");
+    debug!(request_id = %request_id, session_id = %session_id, "callback: session cookie present");
 
-    let mut sessions = state.sessions.lock().await;
-    let Some(session) = sessions.get_mut(&session_id) else {
-        debug!(session_id = %session_id, "callback: session not found in memory");
-        return (StatusCode::BAD_REQUEST, "Invalid session").into_response();
+    let (csrf_matches, nonce, pkce_verifier_slot) = {
+        let sessions = state.sessions.lock().await;
+        let Some(session) = sessions.get(&session_id) else {
+            debug!(request_id = %request_id, session_id = %session_id, "callback: session not found in memory");
+            return (StatusCode::BAD_REQUEST, "Invalid session").into_response();
+        };
+        (
+            session.csrf_token.secret() == &query.state,
+            session.nonce.clone(),
+            session.pkce_verifier.clone(),
+        )
     };
-    debug!(session_id = %session_id, "callback: session found in memory");
-    let mut pkce_guard = session.pkce_verifier.lock().await;
-    let pkce_verifier_to_check = pkce_guard.take();
-    drop(pkce_guard);
+    debug!(request_id = %request_id, session_id = %session_id, "callback: session found in memory");
 
-    if session.csrf_token.secret() != &query.state {
-        debug!(session_id = %session_id, "callback: CSRF validation failed");
+    if !csrf_matches {
+        debug!(request_id = %request_id, session_id = %session_id, "callback: CSRF validation failed");
         return (StatusCode::BAD_REQUEST, "CSRF validation failed").into_response();
-    };
-    let pkce_verifier = match pkce_verifier_to_check {
+    }
+
+    let pkce_verifier = match pkce_verifier_slot.lock().await.take() {
         Some(verifier) => verifier,
         None => {
-            debug!(session_id = %session_id, "callback: missing PKCE verifier");
+            debug!(request_id = %request_id, session_id = %session_id, "callback: missing PKCE verifier");
             return (StatusCode::BAD_REQUEST, "Missing PKCE verifier").into_response();
         }
     };
@@ -492,51 +659,77 @@ pub async fn callback_handler(
     let code = AuthorizationCode::new(query.code.clone());
     let http_client = &state.async_http_client;
 
-    match state
-        .http_client
-        .exchange_code(code, pkce_verifier, http_client)
-        .await
-    {
-        Ok(token_response) => {
-            debug!(session_id = %session_id, "callback: token exchange ok");
-            let mut roles_extracted = false;
+    let exchange_started_at = Instant::now();
+    let exchange_result = tokio::time::timeout(
+        SSO_TOKEN_EXCHANGE_TIMEOUT,
+        state
+            .http_client
+            .exchange_code(code, pkce_verifier, http_client),
+    )
+    .await;
+
+    match exchange_result {
+        Err(_) => {
+            warn!(
+                request_id = %request_id,
+                session_id = %session_id,
+                elapsed_ms = exchange_started_at.elapsed().as_millis(),
+                "callback: token exchange timed out"
+            );
+            sso_unavailable_response(language, request_id, StatusCode::GATEWAY_TIMEOUT)
+        }
+        Ok(Err(error)) => {
+            warn!(
+                request_id = %request_id,
+                session_id = %session_id,
+                error = ?error,
+                elapsed_ms = exchange_started_at.elapsed().as_millis(),
+                "callback: token exchange failed"
+            );
+            sso_unavailable_response(language, request_id, StatusCode::BAD_GATEWAY)
+        }
+        Ok(Ok(token_response)) => {
+            debug!(request_id = %request_id, session_id = %session_id, "callback: token exchange ok");
+            let mut validated_token = None;
+            let mut validation_failed = false;
 
             if let Some(id_token) = token_response.extra_fields().id_token() {
-                debug!(session_id = %session_id, "callback: id_token present");
-                match id_token.claims(&state.http_client.id_token_verifier(), &session.nonce) {
+                debug!(request_id = %request_id, session_id = %session_id, "callback: id_token present");
+                match id_token.claims(&state.http_client.id_token_verifier(), &nonce) {
                     Ok(claims) => {
-                        roles_extracted = apply_validated_id_token_claims(
-                            session,
-                            &session_id,
-                            id_token.to_string(),
-                            claims,
-                        );
+                        validated_token =
+                            Some(validated_id_token_data(id_token.to_string(), claims));
                     }
-                    Err(e) => {
+                    Err(error) => {
                         warn!(
+                            request_id = %request_id,
                             session_id = %session_id,
-                            error = ?e,
+                            error = ?error,
                             "callback: id_token claims validation failed; retrying with fresh OIDC discovery"
                         );
-                        match ISPOidcClient::new(&state.async_http_client).await {
-                            Ok(fresh_client) => {
-                                match id_token
-                                    .claims(&fresh_client.id_token_verifier(), &session.nonce)
-                                {
+                        match tokio::time::timeout(
+                            SSO_DISCOVERY_TIMEOUT,
+                            ISPOidcClient::new(&state.async_http_client),
+                        )
+                        .await
+                        {
+                            Ok(Ok(fresh_client)) => {
+                                match id_token.claims(&fresh_client.id_token_verifier(), &nonce) {
                                     Ok(claims) => {
                                         debug!(
+                                            request_id = %request_id,
                                             session_id = %session_id,
                                             "callback: id_token claims validated after fresh OIDC discovery"
                                         );
-                                        roles_extracted = apply_validated_id_token_claims(
-                                            session,
-                                            &session_id,
+                                        validated_token = Some(validated_id_token_data(
                                             id_token.to_string(),
                                             claims,
-                                        );
+                                        ));
                                     }
                                     Err(retry_error) => {
+                                        validation_failed = true;
                                         warn!(
+                                            request_id = %request_id,
                                             session_id = %session_id,
                                             error = ?retry_error,
                                             "callback: id_token claims validation still failed after fresh OIDC discovery"
@@ -544,21 +737,44 @@ pub async fn callback_handler(
                                     }
                                 }
                             }
-                            Err(refresh_error) => {
+                            Ok(Err(refresh_error)) => {
+                                validation_failed = true;
                                 warn!(
+                                    request_id = %request_id,
                                     session_id = %session_id,
                                     error = ?refresh_error,
                                     "callback: fresh OIDC discovery failed after claims validation error"
+                                );
+                            }
+                            Err(_) => {
+                                validation_failed = true;
+                                warn!(
+                                    request_id = %request_id,
+                                    session_id = %session_id,
+                                    elapsed_ms = callback_started_at.elapsed().as_millis(),
+                                    "callback: fresh OIDC discovery timed out"
                                 );
                             }
                         }
                     }
                 }
             } else {
-                debug!(session_id = %session_id, "callback: id_token missing in token response");
+                debug!(request_id = %request_id, session_id = %session_id, "callback: id_token missing in token response");
             }
 
-            // Fallback for roles and name if not extracted from ID token
+            if validation_failed {
+                return sso_unavailable_response(language, request_id, StatusCode::BAD_GATEWAY);
+            }
+
+            let mut sessions = state.sessions.lock().await;
+            let Some(session) = sessions.get_mut(&session_id) else {
+                warn!(request_id = %request_id, session_id = %session_id, "callback: session disappeared before update");
+                return (StatusCode::BAD_REQUEST, "Invalid session").into_response();
+            };
+            let roles_extracted = validated_token
+                .map(|validated| apply_validated_id_token_claims(session, &session_id, validated))
+                .unwrap_or(false);
+
             if !roles_extracted {
                 let access_token = token_response.access_token();
                 if let Some(access_token_claims) = extract_claims_from_access_token(access_token) {
@@ -573,26 +789,51 @@ pub async fn callback_handler(
                 .refresh_token()
                 .map(|t| t.secret().to_string());
             debug!(
+                request_id = %request_id,
                 session_id = %session_id,
                 authenticated_ready = session.subject.is_some() && session.name.is_some(),
                 has_refresh_token = session.refresh_token.is_some(),
+                elapsed_ms = callback_started_at.elapsed().as_millis(),
                 "callback: session update complete"
             );
 
             Redirect::to("/").into_response()
         }
-        Err(e) => {
-            debug!(
-                session_id = %session_id,
-                error = ?e,
-                "callback: token exchange failed"
-            );
-            (
-                StatusCode::BAD_REQUEST,
-                format!("Token exchange failed: {:?}", e),
-            )
-                .into_response()
-        }
+    }
+}
+
+#[cfg(test)]
+mod auth_reliability_tests {
+    use super::*;
+
+    #[test]
+    fn auth_language_accepts_german_variants() {
+        assert_eq!(AuthLanguage::from_hint(Some("de")), AuthLanguage::De);
+        assert_eq!(AuthLanguage::from_hint(Some("de-DE")), AuthLanguage::De);
+        assert_eq!(AuthLanguage::from_hint(Some("en")), AuthLanguage::En);
+        assert_eq!(AuthLanguage::from_hint(None), AuthLanguage::En);
+    }
+
+    #[test]
+    fn discovery_url_handles_trailing_slash() {
+        assert_eq!(
+            oidc_discovery_url("https://sso.example.test/"),
+            "https://sso.example.test/.well-known/openid-configuration"
+        );
+    }
+
+    #[test]
+    fn unavailable_page_is_html_with_requested_status() {
+        let response = sso_unavailable_response(
+            AuthLanguage::De,
+            Uuid::nil(),
+            StatusCode::SERVICE_UNAVAILABLE,
+        );
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            response.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            "text/html; charset=utf-8"
+        );
     }
 }
 

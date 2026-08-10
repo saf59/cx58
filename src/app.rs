@@ -11,7 +11,7 @@ use crate::components::user_info::UserRolesDisplay;
 use crate::server_fn::*;
 use leptos::IntoView;
 use leptos::prelude::*;
-use leptos_fluent::move_tr;
+use leptos_fluent::{I18n, move_tr};
 use leptos_meta::{Link, MetaTags, Stylesheet, Title, provide_meta_context};
 use leptos_router::components::ParentRoute;
 use leptos_router::components::{Route, Router, Routes};
@@ -249,9 +249,15 @@ fn ProfilePage() -> impl IntoView {
 }
 #[component]
 pub fn LoginButton() -> impl IntoView {
+    let i18n = expect_context::<I18n>();
+
     view! {
         // it is axum route - not leptos
-        <a href="/login" class="sign" rel="external">
+        <a
+            href=move || format!("/login?lang={}", i18n.language.get().id)
+            class="sign"
+            rel="external"
+        >
             <i class="fa fa-sign-in"></i>
             <span>{move_tr!("log-in")}</span>
         </a>

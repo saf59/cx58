@@ -137,6 +137,8 @@ impl ChunkAssembler {
 
 #[cfg(test)]
 mod tests {
+    use super::{ChunkAssembler, UiChunk};
+
     #[test]
     fn extract_text_from_incomplete_json() {
         let mut a = ChunkAssembler::new();

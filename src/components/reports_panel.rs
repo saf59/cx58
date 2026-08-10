@@ -132,6 +132,7 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
                         input.set_value("");
                     }
                     has_selected_file.set(false);
+                    current_page.set(0);
                     reload.dispatch(());
                 }
                 Err(e) => error.set(Some(e)),
@@ -190,7 +191,12 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
                                 move |report| {
                                     let media_proxy = media_proxy.clone();
                                     view! {
-                                        <ReportItem report=report reload=reload media_proxy=media_proxy />
+                                        <ReportItem
+                                            report=report
+                                            reload=reload
+                                            current_page=current_page
+                                            media_proxy=media_proxy
+                                        />
                                     }
                                 }
                             }
@@ -274,7 +280,12 @@ fn max_page_index(total: usize) -> usize {
 }
 
 #[component]
-fn ReportItem(report: NodeWithLeaf, reload: Action<(), ()>, media_proxy: String) -> impl IntoView {
+fn ReportItem(
+    report: NodeWithLeaf,
+    reload: Action<(), ()>,
+    current_page: RwSignal<usize>,
+    media_proxy: String,
+) -> impl IntoView {
     let report_id = report.id;
     let name = report
         .name
@@ -336,6 +347,7 @@ fn ReportItem(report: NodeWithLeaf, reload: Action<(), ()>, media_proxy: String)
                         match delete_report(report_id).await {
                             Ok(()) => {
                                 update_error.set(None);
+                                current_page.set(0);
                                 reload.dispatch(());
                             }
                             Err(e) => update_error.set(Some(e)),

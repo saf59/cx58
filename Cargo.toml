@@ -31,7 +31,7 @@ tower-cookies = "0.11"
 console_error_panic_hook = { version = "0.1", optional = true }
 url = "2.5"
 uuid = { version = "1.21", features = ["v7", "rng-rand", "serde", "js"] }
-wasm-bindgen = { version = "0.2.126", features = [], optional = true }
+wasm-bindgen = { version = "0.2.127", features = [] }
 base64 = "0.22"
 cookie = "0.18"
 http = "1.4"
@@ -93,7 +93,6 @@ tokio = { version = "1.49", features = ["rt-multi-thread", "macros"] }
 hydrate = [
     "leptos/hydrate",
     "dep:console_error_panic_hook",
-    "dep:wasm-bindgen",
 ]
 ssr = [
     "dep:axum",

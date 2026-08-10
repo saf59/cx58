@@ -41,6 +41,9 @@ pub async fn handle_stream(
     let parent = context.parent.get_untracked();
     let prev_leaf = context.prev_leaf.get_untracked();
     let next_leaf = context.next_leaf.get_untracked();
+    if prev_leaf.is_some() || next_leaf.is_some() {
+        context.mark_report_context_submitted();
+    }
 
     let mut body_map = serde_json::Map::new();
     body_map.insert("message".to_string(), json!(prompt));
