@@ -145,6 +145,41 @@ fn sso_unavailable_response(
             "Startseite",
         ),
     };
+    auth_error_response(language, request_id, status, title, message, retry, home)
+}
+
+fn callback_invalid_response(
+    language: AuthLanguage,
+    request_id: &str,
+    status: StatusCode,
+) -> Response {
+    let (title, message, retry, home) = match language {
+        AuthLanguage::En => (
+            "Sign-in could not be completed",
+            "The sign-in request is no longer valid. Please start sign-in again.",
+            "Start sign-in again",
+            "Home",
+        ),
+        AuthLanguage::De => (
+            "Anmeldung konnte nicht abgeschlossen werden",
+            "Die Anmeldeanfrage ist nicht mehr gültig. Bitte starten Sie die Anmeldung erneut.",
+            "Anmeldung erneut starten",
+            "Startseite",
+        ),
+    };
+    auth_error_response(language, request_id, status, title, message, retry, home)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn auth_error_response(
+    language: AuthLanguage,
+    request_id: &str,
+    status: StatusCode,
+    title: &str,
+    message: &str,
+    retry: &str,
+    home: &str,
+) -> Response {
     let html = format!(
         r#"<!doctype html>
 <html lang="{lang}">
@@ -698,7 +733,10 @@ pub async fn callback_handler(
     let callback_started_at = Instant::now();
     let query_string = match uri.query() {
         Some(s) => s.to_string(),
-        None => return (StatusCode::BAD_REQUEST, "Missing query string").into_response(),
+        None => {
+            warn!(request_id = %request_id, "callback: missing query string");
+            return callback_invalid_response(language, &request_id, StatusCode::BAD_REQUEST);
+        }
     };
 
     let query_result: Result<CallbackQuery, _> =
@@ -709,17 +747,14 @@ pub async fn callback_handler(
     let query: CallbackQuery = match query_result {
         Ok(q) => q,
         Err(_) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                "Invalid query parameters or task failed",
-            )
-                .into_response();
+            warn!(request_id = %request_id, "callback: invalid query parameters");
+            return callback_invalid_response(language, &request_id, StatusCode::BAD_REQUEST);
         }
     };
 
     let Some(session_cookie) = jar.get(SESSION_ID) else {
-        debug!("callback: missing session cookie");
-        return (StatusCode::BAD_REQUEST, "Missing session cookie").into_response();
+        warn!(request_id = %request_id, "callback: missing session cookie");
+        return callback_invalid_response(language, &request_id, StatusCode::BAD_REQUEST);
     };
 
     let session_id = session_cookie.value().to_string();
@@ -729,7 +764,7 @@ pub async fn callback_handler(
         let sessions = state.sessions.lock().await;
         let Some(session) = sessions.get(&session_id) else {
             debug!(request_id = %request_id, session_id = %session_id, "callback: session not found in memory");
-            return (StatusCode::BAD_REQUEST, "Invalid session").into_response();
+            return callback_invalid_response(language, &request_id, StatusCode::BAD_REQUEST);
         };
         (
             session.csrf_token.secret() == &query.state,
@@ -748,15 +783,15 @@ pub async fn callback_handler(
     );
 
     if !csrf_matches {
-        debug!(request_id = %request_id, session_id = %session_id, "callback: CSRF validation failed");
-        return (StatusCode::BAD_REQUEST, "CSRF validation failed").into_response();
+        warn!(request_id = %request_id, session_id = %session_id, "callback: CSRF validation failed");
+        return callback_invalid_response(language, &request_id, StatusCode::BAD_REQUEST);
     }
 
     let pkce_verifier = match pkce_verifier_slot.lock().await.take() {
         Some(verifier) => verifier,
         None => {
-            debug!(request_id = %request_id, session_id = %session_id, "callback: missing PKCE verifier");
-            return (StatusCode::BAD_REQUEST, "Missing PKCE verifier").into_response();
+            warn!(request_id = %request_id, session_id = %session_id, "callback: missing PKCE verifier");
+            return callback_invalid_response(language, &request_id, StatusCode::BAD_REQUEST);
         }
     };
 
@@ -933,6 +968,20 @@ mod auth_reliability_tests {
             StatusCode::SERVICE_UNAVAILABLE,
         );
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            response.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            "text/html; charset=utf-8"
+        );
+    }
+
+    #[test]
+    fn invalid_callback_page_is_localized_html() {
+        let response = callback_invalid_response(
+            AuthLanguage::De,
+            "proxy-request-123",
+            StatusCode::BAD_REQUEST,
+        );
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         assert_eq!(
             response.headers().get(http::header::CONTENT_TYPE).unwrap(),
             "text/html; charset=utf-8"
