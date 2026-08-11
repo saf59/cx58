@@ -13,7 +13,7 @@ use openidconnect::{
     Nonce,
     core::{CoreIdToken, CoreIdTokenClaims},
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
@@ -70,13 +70,8 @@ fn extract_auth_user(
     }
 }
 
-async fn save_session_data_in_store(
-    store: &Arc<Mutex<HashMap<String, SessionData>>>,
-    session_id: String,
-    data: SessionData,
-) {
-    let mut map_guard = store.lock().await;
-    map_guard.insert(session_id, data);
+fn refresh_token_after_rotation(current: String, rotated: Option<String>) -> String {
+    rotated.unwrap_or(current)
 }
 
 pub async fn get_and_refresh_session(state: &AppState, session_id: &str) -> Option<SessionData> {
@@ -116,6 +111,7 @@ pub async fn get_and_refresh_session(state: &AppState, session_id: &str) -> Opti
             *is_refreshing_lock = true;
             drop(is_refreshing_lock);
             let refresh_token = session_data.refresh_token.clone().unwrap();
+            let refresh_token_fallback = refresh_token.clone();
             let session_id_clone = session_id.to_owned();
             let session_store_clone = state.sessions.clone();
             let oidc_client_clone = state.http_client.clone();
@@ -136,29 +132,27 @@ pub async fn get_and_refresh_session(state: &AppState, session_id: &str) -> Opti
                             has_refresh_token = new_refresh_token.is_some(),
                             "session refresh: token refresh ok"
                         );
-                        let updated_session = {
+                        let refresh_flag = {
                             let mut guard = session_store_clone.lock().await;
                             if let Some(current_data) = guard.get_mut(&session_id_clone) {
                                 current_data.id_token = Some(new_id_token);
-                                current_data.refresh_token = new_refresh_token;
+                                let current_refresh_token = current_data
+                                    .refresh_token
+                                    .clone()
+                                    .unwrap_or(refresh_token_fallback);
+                                current_data.refresh_token = Some(refresh_token_after_rotation(
+                                    current_refresh_token,
+                                    new_refresh_token,
+                                ));
                                 current_data.id_token_expires_at = Some(new_expires_at);
-                                *current_data.is_refreshing.lock().await = false;
-
-                                //trace_time("Updated session ID Token expires at",&current_data.id_token_expires_at);
-
-                                Some(current_data.clone())
+                                Some(current_data.is_refreshing.clone())
                             } else {
                                 None
                             }
                         };
 
-                        if let Some(data) = updated_session {
-                            save_session_data_in_store(
-                                &session_store_clone,
-                                session_id_clone,
-                                data,
-                            )
-                            .await;
+                        if let Some(refresh_flag) = refresh_flag {
+                            *refresh_flag.lock().await = false;
                         }
                     }
                     Err(e) => {
@@ -167,9 +161,13 @@ pub async fn get_and_refresh_session(state: &AppState, session_id: &str) -> Opti
                             error = ?e,
                             "session refresh: token refresh failed"
                         );
-                        let guard = session_store_clone.lock().await;
-                        if let Some(current_data) = guard.get(&session_id_clone) {
-                            *current_data.is_refreshing.lock().await = false;
+                        let refresh_flag = session_store_clone
+                            .lock()
+                            .await
+                            .get(&session_id_clone)
+                            .map(|current_data| current_data.is_refreshing.clone());
+                        if let Some(refresh_flag) = refresh_flag {
+                            *refresh_flag.lock().await = false;
                         }
                     }
                 }
@@ -429,4 +427,21 @@ pub fn extract_email_from_claims(claims: &serde_json::Value) -> Option<String> {
         .or_else(|| claims.get("preferred_username").and_then(|v| v.as_str()))
         .or_else(|| claims.get("upn").and_then(|v| v.as_str()))
         .map(|s| s.to_string())
+}
+
+#[cfg(test)]
+mod refresh_tests {
+    use super::refresh_token_after_rotation;
+
+    #[test]
+    fn refresh_token_is_preserved_when_provider_does_not_rotate_it() {
+        assert_eq!(
+            refresh_token_after_rotation("current".to_string(), None),
+            "current"
+        );
+        assert_eq!(
+            refresh_token_after_rotation("current".to_string(), Some("rotated".to_string()),),
+            "rotated"
+        );
+    }
 }

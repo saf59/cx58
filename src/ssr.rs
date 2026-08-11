@@ -2,7 +2,7 @@ use crate::app::shell;
 use crate::auth::*;
 use crate::auth_ssr::*;
 use crate::config::AppConfig;
-use crate::state::AppState;
+use crate::state::{AppState, ChatSession};
 use axum::{
     Json,
     extract::{FromRef, OriginalUri, Query, State},
@@ -425,6 +425,21 @@ fn apply_validated_id_token_claims(
     roles_extracted
 }
 
+async fn take_logout_state(
+    sessions: &Arc<Mutex<HashMap<String, SessionData>>>,
+    chat_sessions: &Arc<Mutex<HashMap<String, Arc<ChatSession>>>>,
+    session_id: &str,
+) -> (Option<SessionData>, Option<String>) {
+    let session = sessions.lock().await.remove(session_id);
+    let chat_session = chat_sessions.lock().await.remove(session_id);
+    let request_id = match chat_session {
+        Some(chat_session) => chat_session.current_request_id.read().await.clone(),
+        None => None,
+    };
+
+    (session, request_id)
+}
+
 pub async fn logout_handler(State(state): State<AppState>, jar: CookieJar) -> impl IntoResponse {
     let mut post_logout_redirect_uri = "/".to_string();
     let mut rauthy_logout_url = None;
@@ -432,33 +447,23 @@ pub async fn logout_handler(State(state): State<AppState>, jar: CookieJar) -> im
 
     if let Some(cookie) = jar.get(SESSION_ID) {
         let session_id = cookie.value().to_string();
-        let mut sessions = state.sessions.lock().await;
+        let (session, request_id) =
+            take_logout_state(&state.sessions, &state.chat_sessions, &session_id).await;
 
-        if let Some(session) = sessions.remove(&session_id) {
-            if session.id_token.is_some() {
-                let mut chat_sessions = state.chat_sessions.lock().await;
-                // Cancel active requests
-                if let Some(chat_session) = chat_sessions.get_mut(&session_id)
-                    && let Some(request_id) = &chat_session.current_request_id.read().await.clone()
-                {
-                    let client = state.async_http_client.clone();
-                    let agent_api_url = state.http_client.config.chat_config.agent_api_url.clone();
-                    let agent_secret = state
-                        .http_client
-                        .config
-                        .chat_config
-                        .agent_api_key
-                        .clone()
-                        .unwrap_or_default();
-                    crate::stop::cancel_agent_request(
-                        request_id,
-                        agent_api_url,
-                        agent_secret,
-                        client,
-                    );
-                }
-            }
+        if let Some(request_id) = request_id {
+            let client = state.async_http_client.clone();
+            let agent_api_url = state.http_client.config.chat_config.agent_api_url.clone();
+            let agent_secret = state
+                .http_client
+                .config
+                .chat_config
+                .agent_api_key
+                .clone()
+                .unwrap_or_default();
+            crate::stop::cancel_agent_request(&request_id, agent_api_url, agent_secret, client);
+        }
 
+        if let Some(session) = session {
             if let Some(id_token) = session.id_token
                 && session
                     .id_token_expires_at
@@ -480,14 +485,18 @@ pub async fn logout_handler(State(state): State<AppState>, jar: CookieJar) -> im
                         .config
                         .oidc_post_logout_redirect_uri
                         .clone();
-                    let mut url =
-                        url::Url::parse(&base_logout_url).expect("Invalid base logout URL");
+                    match url::Url::parse(&base_logout_url) {
+                        Ok(mut url) => {
+                            url.query_pairs_mut()
+                                .append_pair("id_token_hint", &id_token)
+                                .append_pair("post_logout_redirect_uri", &post_logout_redirect_uri);
 
-                    url.query_pairs_mut()
-                        .append_pair("id_token_hint", &id_token)
-                        .append_pair("post_logout_redirect_uri", &post_logout_redirect_uri);
-
-                    rauthy_logout_url = Some(url.to_string());
+                            rauthy_logout_url = Some(url.to_string());
+                        }
+                        Err(error) => {
+                            warn!(error = ?error, "logout: invalid OIDC logout URL");
+                        }
+                    }
                 }
             }
         }
@@ -950,6 +959,23 @@ mod auth_reliability_tests {
         assert_eq!(AuthLanguage::from_hint(Some("de-DE")), AuthLanguage::De);
         assert_eq!(AuthLanguage::from_hint(Some("en")), AuthLanguage::En);
         assert_eq!(AuthLanguage::from_hint(None), AuthLanguage::En);
+    }
+
+    #[tokio::test]
+    async fn logout_removes_chat_state_even_without_oidc_session() {
+        let sessions = Arc::new(Mutex::new(HashMap::new()));
+        let chat_sessions = Arc::new(Mutex::new(HashMap::from([(
+            "session-1".to_string(),
+            Arc::new(ChatSession {
+                current_request_id: tokio::sync::RwLock::new(Some("request-1".to_string())),
+            }),
+        )])));
+
+        let (session, request_id) = take_logout_state(&sessions, &chat_sessions, "session-1").await;
+
+        assert!(session.is_none());
+        assert_eq!(request_id.as_deref(), Some("request-1"));
+        assert!(!chat_sessions.lock().await.contains_key("session-1"));
     }
 
     #[test]
