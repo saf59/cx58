@@ -1,6 +1,6 @@
 use crate::components::args;
 use crate::components::chat_context::ChatContext;
-use crate::components::tree::{NodeData, NodeType, NodeWithLeaf};
+use crate::components::tree::{NodeData, NodeType, NodeWithLeaf, proxy_media};
 use leptos::context::use_context;
 use leptos::prelude::ElementChild;
 use leptos::prelude::GlobalAttributes;
@@ -94,6 +94,7 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                             //let popup_id_for_click = popup_id.clone();
                                             let img_clone_for_label = img.clone();
                                             let branch_clone_for_label = branch.clone();
+                                            let media_proxy_for_label = media_proxy.clone();
                                             view! {
                                                 <div class="carousel-item">
                                                     <button
@@ -111,7 +112,11 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
                                                     <div
                                                         class="image-label"
                                                         on:click=move |_ev| {
-                                                            ctx.set_leaf(&img_clone_for_label, &branch_clone_for_label);
+                                                            ctx.set_leaf(
+                                                                &img_clone_for_label,
+                                                                &branch_clone_for_label,
+                                                                &media_proxy_for_label,
+                                                            );
                                                         }
                                                     >
                                                         {img_name.clone()}
@@ -149,16 +154,4 @@ pub fn CarouselRenderer(data: Vec<NodeWithLeaf>) -> impl IntoView {
         }
         .into_any(),
     }
-}
-fn proxy_media(rule: &str, value: &str) -> String {
-    if rule.is_empty() {
-        return value.to_string();
-    }
-    let parts: Vec<&str> = rule.split(',').collect();
-    if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
-        return value.to_string();
-    }
-    let old_value = parts[0];
-    let new_value = parts[1];
-    value.replace(old_value, new_value)
 }

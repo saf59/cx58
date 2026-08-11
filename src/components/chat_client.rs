@@ -3,7 +3,7 @@ use crate::components::args;
 use crate::components::chat_context::ChatContext;
 use crate::components::chat_data::{ComparisonData, ContextRequest, DescriptionData};
 use crate::components::chat_types::{Message, MessageContent, MessageRole};
-use crate::components::tree::NodeWithLeaf;
+use crate::components::tree::{NodeInfo, NodeType, NodeWithLeaf};
 use leptos::leptos_dom::log;
 use leptos::logging;
 use leptos::prelude::{GetUntracked, Set, Update, WriteSignal};
@@ -108,13 +108,22 @@ pub async fn handle_stream(
         .dyn_into()
         .map_err(|_| i18n.tr("chat-error-invalid-reader"))?;
 
-    process_stream(reader, set_history, set_is_loading, set_chat_state, i18n).await
+    process_stream(
+        reader,
+        set_history,
+        set_is_loading,
+        set_chat_state,
+        context,
+        i18n,
+    )
+    .await
 }
 async fn process_stream(
     reader: ReadableStreamDefaultReader,
     set_history: WriteSignal<Vec<Message>>,
     set_is_loading: WriteSignal<bool>,
     set_chat_state: WriteSignal<String>,
+    context: ChatContext,
     i18n: I18n,
 ) -> Result<(), String> {
     let mut current_event: Option<String> = None;
@@ -167,6 +176,7 @@ async fn process_stream(
                     set_history,
                     set_is_loading,
                     set_chat_state,
+                    context,
                     i18n,
                 );
                 current_event = None;
@@ -185,6 +195,7 @@ fn process_sse_event(
     set_history: WriteSignal<Vec<Message>>,
     set_is_loading: WriteSignal<bool>,
     set_chat_state: WriteSignal<String>,
+    context: ChatContext,
     i18n: I18n,
 ) {
     use crate::components::tree::{TreeNode, build_tree};
@@ -231,6 +242,25 @@ fn process_sse_event(
 
         Some("description") => match serde_json::from_str::<Vec<DescriptionData>>(data) {
             Ok(json_data) => {
+                let media_proxy = media_proxy_rule();
+                for description in &json_data {
+                    let Ok(id) = uuid::Uuid::parse_str(&description.date_id) else {
+                        continue;
+                    };
+                    let node = NodeInfo {
+                        id,
+                        parent_id: None,
+                        name: Some(description.date.clone()),
+                        node_type: NodeType::ImageLeaf,
+                        date_time: 0,
+                        thumbnail_url: description.thumbnail_url.clone(),
+                        full_url: description.full_url.clone(),
+                        mime_type: None,
+                        size: None,
+                    }
+                    .with_media_proxy(&media_proxy);
+                    context.remember_report_media(node);
+                }
                 set_history.update(|h| {
                     h.push(Message::new(
                         MessageRole::Llm,
@@ -326,6 +356,15 @@ fn process_sse_event(
 
         _ => {}
     }
+}
+
+fn media_proxy_rule() -> String {
+    web_sys::window()
+        .and_then(|window| {
+            js_sys::Reflect::get(&window, &wasm_bindgen::JsValue::from_str("MEDIA_PROXY")).ok()
+        })
+        .and_then(|value| value.as_string())
+        .unwrap_or_default()
 }
 
 // Stop request - session_id extracted from cookie on server

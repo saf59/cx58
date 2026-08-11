@@ -1,6 +1,8 @@
 use crate::components::tree::NodeInfo;
 use crate::components::tree::NodeWithLeaf;
 use leptos::prelude::*;
+use std::collections::HashMap;
+use uuid::Uuid;
 
 #[derive(Clone, Copy)]
 pub struct ChatContext {
@@ -10,6 +12,7 @@ pub struct ChatContext {
     pub parent: RwSignal<Option<NodeInfo>>,
     pub prev_leaf: RwSignal<Option<NodeInfo>>,
     pub next_leaf: RwSignal<Option<NodeInfo>>,
+    report_media: RwSignal<HashMap<Uuid, NodeInfo>>,
     report_context_submitted: RwSignal<bool>,
 }
 
@@ -22,6 +25,7 @@ impl ChatContext {
             parent: RwSignal::new(None),
             prev_leaf: RwSignal::new(None),
             next_leaf: RwSignal::new(None),
+            report_media: RwSignal::new(HashMap::new()),
             report_context_submitted: RwSignal::new(false),
         }
     }
@@ -29,6 +33,7 @@ impl ChatContext {
         self.parent.set(None);
         self.prev_leaf.set(None);
         self.next_leaf.set(None);
+        self.report_media.set(HashMap::new());
         self.report_context_submitted.set(false);
     }
     pub fn delete_node_info(&self, node_info: NodeInfo) {
@@ -68,7 +73,12 @@ impl ChatContext {
         self.report_context_submitted.set(false);
     }
 
-    pub fn set_leaf(&self, node_info: &NodeWithLeaf, parent_node: &NodeWithLeaf) {
+    pub fn set_leaf(
+        &self,
+        node_info: &NodeWithLeaf,
+        parent_node: &NodeWithLeaf,
+        media_proxy: &str,
+    ) {
         if let Some(parent) = &self.parent.get()
             && parent.id != parent_node.id
         {
@@ -77,10 +87,12 @@ impl ChatContext {
         if self.parent.get().is_none() {
             self.parent.set(Some(parent_node.clone().into()));
         }
-        self.set_one_leaf(node_info.clone().into())
+        self.set_one_leaf(NodeInfo::from(node_info.clone()).with_media_proxy(media_proxy))
     }
 
     pub fn set_one_leaf(&self, new_node: NodeInfo) {
+        self.remember_report_media(new_node.clone());
+
         if self.report_context_submitted.get_untracked() {
             self.prev_leaf.set(None);
             self.next_leaf.set(None);
@@ -106,6 +118,20 @@ impl ChatContext {
         }
     }
 
+    pub fn remember_report_media(&self, node: NodeInfo) {
+        if node.thumbnail_url.is_some() || node.full_url.is_some() {
+            self.report_media.update(|reports| {
+                reports.insert(node.id, node);
+            });
+        }
+    }
+
+    pub fn report_by_id(&self, report_id: &str) -> Option<NodeInfo> {
+        let id = Uuid::parse_str(report_id).ok()?;
+        self.report_media
+            .with_untracked(|reports| reports.get(&id).cloned())
+    }
+
     #[cfg(any(not(feature = "ssr"), test))]
     pub fn mark_report_context_submitted(&self) {
         if self.prev_leaf.get_untracked().is_some() || self.next_leaf.get_untracked().is_some() {
@@ -127,6 +153,10 @@ mod tests {
             name: Some(name.to_string()),
             node_type: NodeType::ImageLeaf,
             date_time,
+            thumbnail_url: Some(format!("https://example.test/{name}-thumb.jpg")),
+            full_url: Some(format!("https://example.test/{name}.jpg")),
+            mime_type: Some("image/jpeg".to_string()),
+            size: Some(1024),
         }
     }
 
@@ -159,6 +189,40 @@ mod tests {
             context.set_one_leaf(new_report.clone());
 
             assert_eq!(context.prev_leaf.get_untracked().unwrap().id, new_report.id);
+            assert!(context.next_leaf.get_untracked().is_none());
+        });
+    }
+
+    #[test]
+    fn remembered_report_remains_available_after_context_replacement() {
+        Owner::new().with(|| {
+            let context = ChatContext::new();
+            let old_report = report("22.05.2026 19:30:00", 1);
+            let old_id = old_report.id.to_string();
+            let new_report = report("30.08.2026 17:00:00", 2);
+
+            context.set_one_leaf(old_report.clone());
+            context.mark_report_context_submitted();
+            context.set_one_leaf(new_report);
+
+            assert_eq!(context.report_by_id(&old_id).unwrap().id, old_report.id);
+        });
+    }
+
+    #[test]
+    fn backend_resolved_report_media_can_be_remembered_without_selecting_it() {
+        Owner::new().with(|| {
+            let context = ChatContext::new();
+            let backend_report = report("24.05.2026 18:35:54", 1);
+            let report_id = backend_report.id.to_string();
+
+            context.remember_report_media(backend_report.clone());
+
+            assert_eq!(
+                context.report_by_id(&report_id).unwrap().id,
+                backend_report.id
+            );
+            assert!(context.prev_leaf.get_untracked().is_none());
             assert!(context.next_leaf.get_untracked().is_none());
         });
     }

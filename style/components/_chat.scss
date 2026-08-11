@@ -137,7 +137,54 @@
 
         .node-info-leafs {
             margin-left: 10px;
-            flex-direction: column;
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            gap: 6px;
+            min-width: 0;
+        }
+        .selected-report-item {
+            position: relative;
+            display: flex;
+            align-items: center;
+            max-width: 190px;
+            border: 1px solid #d8d8d8;
+            border-radius: 7px;
+            background: #f8f9fa;
+            overflow: hidden;
+        }
+        .selected-report-open {
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            padding: 2px 24px 2px 2px;
+            border: 0;
+            background: transparent;
+            color: inherit;
+            cursor: pointer;
+        }
+        .selected-report-open:disabled {
+            cursor: default;
+        }
+        .selected-report-open img {
+            width: 42px;
+            height: 34px;
+            flex: 0 0 auto;
+            border-radius: 5px;
+            object-fit: cover;
+        }
+        .selected-report-name {
+            overflow: hidden;
+            padding-left: 6px;
+            font-size: smaller;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .selected-report-remove {
+            position: absolute;
+            top: 3px;
+            right: 3px;
+            z-index: 1;
         }
         .delete-btn {
             margin: 0;
@@ -151,6 +198,19 @@
             margin-right: 4px;
         }
 
+    }
+}
+
+@media (max-width: 768px) {
+    .chat-input .node-info-section {
+        flex-direction: column;
+    }
+    .chat-input .node-info-section .node-info-leafs {
+        width: 100%;
+        margin-left: 0;
+    }
+    .chat-input .node-info-section .selected-report-item {
+        max-width: calc(50% - 3px);
     }
 }
 .tree-loader {

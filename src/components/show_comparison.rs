@@ -1,4 +1,6 @@
+use crate::components::chat_context::ChatContext;
 use crate::components::chat_data::ComparisonData;
+use crate::components::report_preview::ReportPreview;
 use crate::components::show_description::download_text_file;
 use leptos::prelude::{ClassAttribute, expect_context};
 use leptos::prelude::{ElementChild, GlobalAttributes, OnAttribute};
@@ -19,6 +21,9 @@ fn ComparisonDetailItem(label: String, value: String) -> impl IntoView {
 #[component]
 pub fn ComparisonRenderer(data: ComparisonData) -> impl IntoView {
     let i18n = expect_context::<I18n>();
+    let ctx = expect_context::<ChatContext>();
+    let previous_report = ctx.report_by_id(&data.prev_id);
+    let current_report = ctx.report_by_id(&data.next_id);
     // Clone what we need for the download closure
     let markdown = data.to_markdown();
     let filename = data.filename();
@@ -37,10 +42,10 @@ pub fn ComparisonRenderer(data: ComparisonData) -> impl IntoView {
                 <span class="compact-date">
                     <span class="right5">{move_tr!("comparison-changes-from")}" "</span>
                     <i class="fas fa-image right5"></i>
-                    {data.prev_date}
+                    <ReportPreview label=data.prev_date report=previous_report />
                     <span class="left5 right5">" "{move_tr!("comparison-changes-to")}" "</span>
                     <i class="fas fa-image right5"></i>
-                    {data.next_date}
+                    <ReportPreview label=data.next_date report=current_report />
                 </span>
             </div>
             <p class="compact-description">{data.description}</p>

@@ -83,12 +83,25 @@ pub struct NodeWithLeaf {
 
 impl From<NodeWithLeaf> for NodeInfo {
     fn from(node: NodeWithLeaf) -> Self {
+        let (thumbnail_url, full_url, mime_type, size) = match &node.data {
+            NodeData::Image(image) => (
+                image.thumbnail_url.clone().or_else(|| image.url.clone()),
+                image.url.clone(),
+                image.mime_type.clone(),
+                image.size,
+            ),
+            _ => (None, None, None, None),
+        };
         NodeInfo {
             id: node.id,
             parent_id: node.parent_id,
             name: node.name,
             node_type: node.node_type,
             date_time: parse_dt_or_default_ms(&node.updated_at),
+            thumbnail_url,
+            full_url,
+            mime_type,
+            size,
         }
     }
 }
@@ -100,6 +113,22 @@ pub struct NodeInfo {
     pub name: Option<String>,
     pub node_type: NodeType,
     pub date_time: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thumbnail_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub full_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mime_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
+}
+
+impl NodeInfo {
+    pub fn with_media_proxy(mut self, media_proxy: &str) -> Self {
+        self.thumbnail_url = self.thumbnail_url.map(|url| proxy_media(media_proxy, &url));
+        self.full_url = self.full_url.map(|url| proxy_media(media_proxy, &url));
+        self
+    }
 }
 
 impl Tree {
@@ -110,7 +139,46 @@ impl Tree {
             name: self.name.clone(),
             node_type: self.node_type,
             date_time: parse_dt_or_default_ms(&self.updated_at),
+            thumbnail_url: None,
+            full_url: None,
+            mime_type: None,
+            size: None,
         }
+    }
+}
+
+pub(crate) fn proxy_media(rule: &str, value: &str) -> String {
+    let mut parts = rule.split(',');
+    let (Some(old_value), Some(new_value), None) = (parts.next(), parts.next(), parts.next())
+    else {
+        return value.to_string();
+    };
+    if old_value.is_empty() || new_value.is_empty() {
+        return value.to_string();
+    }
+    value.replace(old_value, new_value)
+}
+
+#[cfg(test)]
+mod media_proxy_tests {
+    use super::proxy_media;
+
+    #[test]
+    fn proxy_media_rewrites_valid_two_part_rule() {
+        assert_eq!(
+            proxy_media(
+                "http://agent:3000,https://app.example.test/media",
+                "http://agent:3000/report.jpg",
+            ),
+            "https://app.example.test/media/report.jpg"
+        );
+    }
+
+    #[test]
+    fn proxy_media_preserves_value_for_malformed_rule() {
+        let value = "http://agent:3000/report.jpg";
+        assert_eq!(proxy_media("", value), value);
+        assert_eq!(proxy_media("from,to,extra", value), value);
     }
 }
 pub fn parse_dt_or_default_ms(s: &str) -> i64 {

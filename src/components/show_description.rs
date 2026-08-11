@@ -1,4 +1,6 @@
+use crate::components::chat_context::ChatContext;
 use crate::components::chat_data::{DescriptionData, extract_name_pair};
+use crate::components::report_preview::ReportPreview;
 use leptos::prelude::*;
 use leptos::*;
 use leptos_fluent::{I18n, move_tr};
@@ -68,7 +70,9 @@ fn DetailItem(label: String, value: String) -> impl IntoView {
 #[component]
 pub fn DescriptionRendererCompact(data: DescriptionData) -> impl IntoView {
     let i18n = expect_context::<I18n>();
+    let ctx = expect_context::<ChatContext>();
     let (object_name, report_name) = extract_name_pair(data.object.as_str());
+    let report = ctx.report_by_id(&data.date_id);
 
     // Prepare download payload before the view consumes `data`
     let markdown = data.to_markdown();
@@ -88,7 +92,7 @@ pub fn DescriptionRendererCompact(data: DescriptionData) -> impl IntoView {
                 <span class="compact-date">
                     <span class="right5">{move_tr!("description-report-label")}" "</span>
                     <i class="fas fa-image right5"></i>
-                    {report_name}
+                    <ReportPreview label=report_name report=report />
                 </span>
             </div>
             <p class="compact-description">{data.description}</p>

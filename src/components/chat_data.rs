@@ -10,11 +10,15 @@ pub struct ContextRequest {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DescriptionData {
     pub object: String,
-    #[serde(skip)]
-    pub object_id: String, // We skip serialization but keep for internal use
+    #[serde(default, skip_serializing)]
+    pub object_id: String,
     pub date: String,
-    #[serde(skip)]
-    pub date_id: String, // We skip serialization but keep for internal use
+    #[serde(default, skip_serializing)]
+    pub date_id: String,
+    #[serde(default, skip_serializing)]
+    pub thumbnail_url: Option<String>,
+    #[serde(default, skip_serializing)]
+    pub full_url: Option<String>,
     pub description: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub windows: Option<String>,
@@ -66,7 +70,11 @@ impl DescriptionData {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ComparisonData {
     pub object_name: String,
+    #[serde(default)]
+    pub prev_id: String,
     pub prev_date: String,
+    #[serde(default)]
+    pub next_id: String,
     pub next_date: String,
     pub description: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -121,4 +129,57 @@ pub fn extract_name_pair(full_name: &str) -> (String, String) {
     let object_name = parts[..parts.len().saturating_sub(1)].join(" - ");
 
     (object_name, report_name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ComparisonData, DescriptionData};
+
+    #[test]
+    fn description_deserialization_preserves_report_id() {
+        let data: DescriptionData = serde_json::from_str(
+            r#"{
+                "object":"Root/Building/22.05.2026 20:00:00",
+                "object_id":"object-id",
+                "date":"22.05.2026 20:00:00",
+                "date_id":"report-id",
+                "thumbnail_url":"https://example.test/report-thumb.jpg",
+                "full_url":"https://example.test/report.jpg",
+                "description":"Ready",
+                "model_name":"vision-model",
+                "confidence":null,
+                "created_at":"2026-05-22T18:00:00Z"
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(data.object_id, "object-id");
+        assert_eq!(data.date_id, "report-id");
+        assert_eq!(
+            data.thumbnail_url.as_deref(),
+            Some("https://example.test/report-thumb.jpg")
+        );
+        assert_eq!(
+            data.full_url.as_deref(),
+            Some("https://example.test/report.jpg")
+        );
+    }
+
+    #[test]
+    fn comparison_deserialization_preserves_report_ids() {
+        let data: ComparisonData = serde_json::from_str(
+            r#"{
+                "object_name":"Building",
+                "prev_id":"older-id",
+                "prev_date":"22.05.2026 19:30:00",
+                "next_id":"newer-id",
+                "next_date":"22.05.2026 20:00:00",
+                "description":"Changed"
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(data.prev_id, "older-id");
+        assert_eq!(data.next_id, "newer-id");
+    }
 }
