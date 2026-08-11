@@ -74,6 +74,22 @@ fn refresh_token_after_rotation(current: String, rotated: Option<String>) -> Str
     rotated.unwrap_or(current)
 }
 
+fn expiry_instant_from(
+    expiry: SystemTime,
+    system_now: SystemTime,
+    instant_now: Instant,
+) -> Instant {
+    instant_now + expiry.duration_since(system_now).unwrap_or(Duration::ZERO)
+}
+
+fn id_token_expiry_instant(claims: &CoreIdTokenClaims) -> Instant {
+    expiry_instant_from(
+        claims.expiration().into(),
+        SystemTime::now(),
+        Instant::now(),
+    )
+}
+
 pub async fn get_and_refresh_session(state: &AppState, session_id: &str) -> Option<SessionData> {
     let session_data = {
         let sessions = state.sessions.lock().await;
@@ -262,6 +278,7 @@ where
                             session.roles = roles.clone();
                             session.subject = Some(subject.clone());
                             session.name = Some(name.clone());
+                            session.id_token_expires_at = Some(id_token_expiry_instant(claims));
                             let email = claims
                                 .email()
                                 .map(|e| e.to_string())
@@ -333,12 +350,11 @@ pub async fn perform_token_refresh(
         )
         .map_err(|e| format!("ID Token validation failed after refresh: {:?}", e))?;
 
-    let exp_timestamp = claims.expiration().timestamp() as u64;
-
-    let expires_at_system_time = SystemTime::UNIX_EPOCH + Duration::from_secs(exp_timestamp);
-
+    let expires_at_system_time: SystemTime = claims.expiration().into();
+    let system_now = SystemTime::now();
+    let instant_now = Instant::now();
     let time_until_expiry = expires_at_system_time
-        .duration_since(SystemTime::now())
+        .duration_since(system_now)
         .unwrap_or(Duration::ZERO);
 
     let duration_to_wait = time_until_expiry.saturating_sub(REFRESH_THRESHOLD);
@@ -347,7 +363,7 @@ pub async fn perform_token_refresh(
     } else {
         tracing::info!("Waiting {:?} before refreshing...", duration_to_wait);
     }
-    let new_expires_at = Instant::now() + time_until_expiry;
+    let new_expires_at = expiry_instant_from(expires_at_system_time, system_now, instant_now);
 
     Ok((
         id_token.to_string(),
@@ -431,7 +447,8 @@ pub fn extract_email_from_claims(claims: &serde_json::Value) -> Option<String> {
 
 #[cfg(test)]
 mod refresh_tests {
-    use super::refresh_token_after_rotation;
+    use super::{expiry_instant_from, refresh_token_after_rotation};
+    use std::time::{Duration, Instant, SystemTime};
 
     #[test]
     fn refresh_token_is_preserved_when_provider_does_not_rotate_it() {
@@ -442,6 +459,25 @@ mod refresh_tests {
         assert_eq!(
             refresh_token_after_rotation("current".to_string(), Some("rotated".to_string()),),
             "rotated"
+        );
+    }
+
+    #[test]
+    fn refreshed_expiry_uses_actual_token_expiration() {
+        let system_now = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000);
+        let instant_now = Instant::now();
+
+        assert_eq!(
+            expiry_instant_from(
+                system_now + Duration::from_secs(600),
+                system_now,
+                instant_now,
+            ),
+            instant_now + Duration::from_secs(600)
+        );
+        assert_eq!(
+            expiry_instant_from(system_now - Duration::from_secs(1), system_now, instant_now,),
+            instant_now
         );
     }
 }
