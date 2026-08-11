@@ -19,10 +19,12 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::Mutex;
 use tracing::{debug, info};
+use uuid::Uuid;
 
 /// Only Server side
 #[derive(Debug, Clone)]
 pub struct SessionData {
+    pub auth_flow_id: Uuid,
     pub csrf_token: CsrfToken,
     pub nonce: Nonce,
     pub pkce_verifier: Arc<Mutex<Option<PkceCodeVerifier>>>,
@@ -118,7 +120,7 @@ pub async fn get_and_refresh_session(state: &AppState, session_id: &str) -> Opti
             let session_id_clone = session_id.to_owned();
             let session_store_clone = state.sessions.clone();
             let oidc_client_clone = state.http_client.clone();
-            let http_client_clone = state.async_http_client.clone();
+            let http_client_clone = state.sso_http_client.clone();
 
             tokio::spawn(async move {
                 tracing::info!(
@@ -221,7 +223,7 @@ where
         }
 
         let verifier = state.http_client.id_token_verifier();
-        let http_client = &state.async_http_client;
+        let http_client = &state.sso_http_client;
 
         if let Some(id_token_str) = &session.id_token {
             let id_token = match CoreIdToken::from_str(id_token_str) {

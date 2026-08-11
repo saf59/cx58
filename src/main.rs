@@ -31,6 +31,7 @@ async fn main() {
         .route("/callback", get(callback_handler))
         .route("/logout", get(logout_handler))
         .route("/api/health", get(|| async { "OK" }))
+        .route("/api/ready", get(readiness_handler))
         .route(
             "/api/get_auth{_}",
             post(leptos_server_fn_handler).get(leptos_server_fn_handler),

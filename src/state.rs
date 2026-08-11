@@ -3,6 +3,7 @@ use crate::ssr::ISPOidcClient;
 use leptos::config::LeptosOptions;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
 #[derive(Clone)]
 pub struct AppState {
@@ -10,6 +11,7 @@ pub struct AppState {
     pub http_client: Arc<ISPOidcClient>, // with config: AppConfig
     pub sessions: Arc<Mutex<HashMap<String, SessionData>>>,
     pub async_http_client: reqwest::Client,
+    pub sso_http_client: reqwest::Client,
     pub chat_sessions: Arc<Mutex<HashMap<String, Arc<ChatSession>>>>,
     pub agent_max_retries: usize,
 }
@@ -28,12 +30,18 @@ impl AppState {
             .danger_accept_invalid_certs(true)
             .build()
             .expect("async_http_client build");
+        let sso_http_client = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .connect_timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(15))
+            .build()
+            .expect("sso_http_client build");
 
         // 2. Load Configuration and Options
         let conf = leptos::prelude::get_configuration(None)?;
         let leptos_options = conf.leptos_options;
         // 3. Initialize OIDC Client
-        let oidc_client = ISPOidcClient::new(&async_http_client).await?;
+        let oidc_client = ISPOidcClient::new(&sso_http_client).await?;
 
         // 4. Construct AppState
         let state = AppState {
@@ -46,6 +54,7 @@ impl AppState {
             sessions: Arc::new(Mutex::new(HashMap::new())),
             // The reqwest::Client is typically cheap to clone for use in AppState.
             async_http_client: async_http_client.clone(),
+            sso_http_client,
 
             chat_sessions: Arc::new(Mutex::new(HashMap::new())),
 

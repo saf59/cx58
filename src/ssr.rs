@@ -4,6 +4,7 @@ use crate::auth_ssr::*;
 use crate::config::AppConfig;
 use crate::state::AppState;
 use axum::{
+    Json,
     extract::{FromRef, OriginalUri, Query, State},
     http::{HeaderValue, StatusCode},
     middleware::Next,
@@ -31,7 +32,7 @@ use openidconnect::core::{
 use openidconnect::{
     AuthenticationFlow, EmptyAdditionalClaims, IssuerUrl, Nonce, OAuth2TokenResponse,
 };
-use serde::{Deserialize, de::Error};
+use serde::{Deserialize, Serialize, de::Error};
 use serde_json::Value;
 use serde_urlencoded::de::Error as UrlError;
 use std::collections::{HashMap, HashSet};
@@ -45,6 +46,37 @@ use uuid::Uuid;
 const SSO_PREFLIGHT_TIMEOUT: Duration = Duration::from_secs(5);
 const SSO_TOKEN_EXCHANGE_TIMEOUT: Duration = Duration::from_secs(15);
 const SSO_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(10);
+
+#[derive(Serialize)]
+pub struct ReadinessStatus {
+    status: &'static str,
+    ui: &'static str,
+    sso: &'static str,
+    request_id: String,
+    elapsed_ms: u128,
+}
+
+fn readiness_status(
+    sso_available: bool,
+    request_id: Uuid,
+    elapsed_ms: u128,
+) -> (StatusCode, ReadinessStatus) {
+    let (http_status, status, sso) = if sso_available {
+        (StatusCode::OK, "ready", "available")
+    } else {
+        (StatusCode::SERVICE_UNAVAILABLE, "degraded", "unavailable")
+    };
+    (
+        http_status,
+        ReadinessStatus {
+            status,
+            ui: "available",
+            sso,
+            request_id: request_id.to_string(),
+            elapsed_ms,
+        },
+    )
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum AuthLanguage {
@@ -483,7 +515,7 @@ pub async fn login_handler(
     let started_at = Instant::now();
     let discovery_url = oidc_discovery_url(&state.http_client.config.oidc_issuer_url);
     let sso_status = state
-        .async_http_client
+        .sso_http_client
         .get(discovery_url)
         .timeout(SSO_PREFLIGHT_TIMEOUT)
         .send()
@@ -520,11 +552,12 @@ pub async fn login_handler(
     let (auth_url, csrf_token, nonce, pkce_verifier) = state.http_client.authorize_url();
 
     let session_id = Uuid::now_v7().to_string();
-    debug!(session_id = %session_id, "login: creating pre-auth session");
+    debug!(request_id = %request_id, session_id = %session_id, "login: creating pre-auth session");
 
     state.sessions.lock().await.insert(
         session_id.clone(),
         SessionData {
+            auth_flow_id: request_id,
             csrf_token,
             nonce,
             pkce_verifier: Arc::new(Mutex::new(Some(pkce_verifier))),
@@ -550,6 +583,39 @@ pub async fn login_handler(
     );
 
     (jar, Redirect::to(auth_url.as_str())).into_response()
+}
+
+pub async fn readiness_handler(State(state): State<AppState>) -> Response {
+    let request_id = Uuid::now_v7();
+    let started_at = Instant::now();
+    let discovery_url = oidc_discovery_url(&state.http_client.config.oidc_issuer_url);
+    let response = state.sso_http_client.get(discovery_url).send().await;
+
+    let sso_available = match response {
+        Ok(response) if response.status().is_success() => true,
+        Ok(response) => {
+            warn!(
+                request_id = %request_id,
+                status = %response.status(),
+                elapsed_ms = started_at.elapsed().as_millis(),
+                "readiness: SSO discovery returned an error"
+            );
+            false
+        }
+        Err(error) => {
+            warn!(
+                request_id = %request_id,
+                error = ?error,
+                elapsed_ms = started_at.elapsed().as_millis(),
+                "readiness: SSO discovery failed"
+            );
+            false
+        }
+    };
+    let (status, body) =
+        readiness_status(sso_available, request_id, started_at.elapsed().as_millis());
+
+    (status, Json(body)).into_response()
 }
 /// For both: leptos_main_handler and leptos_server_fn_handler
 async fn get_auth_state(state: AppState, headers: HeaderMap) -> Auth {
@@ -629,7 +695,7 @@ pub async fn callback_handler(
     let session_id = session_cookie.value().to_string();
     debug!(request_id = %request_id, session_id = %session_id, "callback: session cookie present");
 
-    let (csrf_matches, nonce, pkce_verifier_slot) = {
+    let (csrf_matches, nonce, pkce_verifier_slot, auth_flow_id) = {
         let sessions = state.sessions.lock().await;
         let Some(session) = sessions.get(&session_id) else {
             debug!(request_id = %request_id, session_id = %session_id, "callback: session not found in memory");
@@ -639,9 +705,17 @@ pub async fn callback_handler(
             session.csrf_token.secret() == &query.state,
             session.nonce.clone(),
             session.pkce_verifier.clone(),
+            session.auth_flow_id,
         )
     };
-    debug!(request_id = %request_id, session_id = %session_id, "callback: session found in memory");
+    let callback_request_id = request_id;
+    let request_id = auth_flow_id;
+    debug!(
+        request_id = %request_id,
+        callback_request_id = %callback_request_id,
+        session_id = %session_id,
+        "callback: session found in memory"
+    );
 
     if !csrf_matches {
         debug!(request_id = %request_id, session_id = %session_id, "callback: CSRF validation failed");
@@ -657,7 +731,7 @@ pub async fn callback_handler(
     };
 
     let code = AuthorizationCode::new(query.code.clone());
-    let http_client = &state.async_http_client;
+    let http_client = &state.sso_http_client;
 
     let exchange_started_at = Instant::now();
     let exchange_result = tokio::time::timeout(
@@ -709,7 +783,7 @@ pub async fn callback_handler(
                         );
                         match tokio::time::timeout(
                             SSO_DISCOVERY_TIMEOUT,
-                            ISPOidcClient::new(&state.async_http_client),
+                            ISPOidcClient::new(&state.sso_http_client),
                         )
                         .await
                         {
@@ -834,6 +908,18 @@ mod auth_reliability_tests {
             response.headers().get(http::header::CONTENT_TYPE).unwrap(),
             "text/html; charset=utf-8"
         );
+    }
+
+    #[test]
+    fn readiness_distinguishes_ui_from_sso_failure() {
+        let (status, body) = readiness_status(false, Uuid::nil(), 123);
+
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(body.status, "degraded");
+        assert_eq!(body.ui, "available");
+        assert_eq!(body.sso, "unavailable");
+        assert_eq!(body.request_id, Uuid::nil().to_string());
+        assert_eq!(body.elapsed_ms, 123);
     }
 }
 
