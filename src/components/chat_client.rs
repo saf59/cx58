@@ -315,6 +315,7 @@ fn process_sse_event(
                 "timeout" => i18n.tr("chat-stop-timeout"),
                 "max_tokens" => i18n.tr("chat-stop-max-tokens"),
                 "transport_error" => i18n.tr("chat-stop-transport-error"),
+                "stream_ended" => i18n.tr("chat-stop-stream-ended"),
                 other => other.to_string(),
             };
             set_history.update(|h| {

@@ -69,6 +69,7 @@ chat-stop-by-user = Vom Benutzer gestoppt
 chat-stop-timeout = Zeitüberschreitung der Antwort
 chat-stop-max-tokens = Token-Limit erreicht
 chat-stop-transport-error = Verbindung unterbrochen
+chat-stop-stream-ended = Die Agentenantwort wurde vorzeitig beendet. Bitte versuchen Sie es erneut.
 
 # --- Server SSE error payloads (if server migrates to key-based errors) ---
 # Used when server sends event: error / data: llm-error or transport-error

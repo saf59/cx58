@@ -18,6 +18,28 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, warn};
+
+#[derive(Debug, PartialEq, Eq)]
+enum FinishReason {
+    Complete,
+    StreamEndedEarly,
+    Stopped,
+    Timeout,
+    MaxTokens,
+    TransportError,
+}
+
+fn terminal_sse_event(reason: &FinishReason) -> Option<(&'static str, &'static str)> {
+    match reason {
+        FinishReason::Complete => Some(("on_complete", "ok")),
+        FinishReason::StreamEndedEarly => Some(("on_stop", "stream_ended")),
+        FinishReason::Stopped => Some(("on_stop", "by_user")),
+        FinishReason::Timeout => Some(("on_stop", "timeout")),
+        FinishReason::MaxTokens => Some(("on_stop", "max_tokens")),
+        FinishReason::TransportError => None,
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PromptRequest {
     pub message: String,
@@ -60,16 +82,6 @@ pub async fn chat_stream_handler(
     let mut token_counter: usize = 0;
     let agent_url = format!("{}/agent/chat", &chat_config.agent_api_url);
     let agent_secret = chat_config.agent_api_key.clone().unwrap_or_default();
-
-    #[derive(Debug)]
-    enum FinishReason {
-        Complete,
-        StreamEndedEarly,
-        Stopped,
-        Timeout,
-        MaxTokens,
-        TransportError,
-    }
 
     let client = state.async_http_client.clone();
 
@@ -158,7 +170,8 @@ pub async fn chat_stream_handler(
                         Some(Ok(bytes)) => bytes,
                         Some(Err(e)) => {
                             tracing::warn!("Stream error: {:#?}", e);
-                            yield Err(std::io::Error::other(e.to_string()));
+                            yield Ok::<Event, std::io::Error>(Event::default().event("error")
+                                .data(format!("transport-error|{}", e)));
                             break 'outer FinishReason::TransportError;
                         }
                         None => {
@@ -239,7 +252,6 @@ pub async fn chat_stream_handler(
                                             StreamEvent::Error { error, .. } => {
                                                 tracing::error!("Agent error: {}", error);
                                                 yield Ok(Event::default().event("error").data(error));
-                                                break 'outer FinishReason::TransportError;
                                             }
                                             StreamEvent::Cancelled { reason, .. } => {
                                                 warn!("Stream cancelled: {}", reason);
@@ -290,27 +302,12 @@ pub async fn chat_stream_handler(
 
         info!("Stream finished with reason: {:?}", finish_reason);
 
+        if let Some((event, data)) = terminal_sse_event(&finish_reason) {
+            yield Ok(Event::default().event(event).data(data));
+            break;
+        }
+
         match finish_reason {
-            FinishReason::Complete => {
-                yield Ok(Event::default().event("on_complete").data("ok"));
-                break;
-            }
-            FinishReason::StreamEndedEarly  => {
-                yield Ok(Event::default().event("on_complete").data("stream_ended"));
-                break;
-            }
-            FinishReason::Stopped => {
-                yield Ok(Event::default().event("on_stop").data("by_user"));
-                break;
-            }
-            FinishReason::Timeout => {
-                yield Ok(Event::default().event("on_stop").data("timeout"));
-                break;
-            }
-            FinishReason::MaxTokens => {
-                yield Ok(Event::default().event("on_stop").data("max_tokens"));
-                break;
-            }
             FinishReason::TransportError => {
                 retries += 1;
                 if retries <= max_retries {
@@ -321,6 +318,7 @@ pub async fn chat_stream_handler(
                     break;
                 }
             }
+            _ => unreachable!("non-transport finish reasons return above"),
         }
     }
 
@@ -334,4 +332,21 @@ pub async fn chat_stream_handler(
             .interval(Duration::from_secs(15))
             .text(": keepalive"),
     ))
+}
+
+#[cfg(test)]
+mod finish_reason_tests {
+    use super::{FinishReason, terminal_sse_event};
+
+    #[test]
+    fn early_eof_is_not_reported_as_success() {
+        assert_eq!(
+            terminal_sse_event(&FinishReason::StreamEndedEarly),
+            Some(("on_stop", "stream_ended"))
+        );
+        assert_eq!(
+            terminal_sse_event(&FinishReason::Complete),
+            Some(("on_complete", "ok"))
+        );
+    }
 }
