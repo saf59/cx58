@@ -128,12 +128,14 @@
     .node-info-section {
         display: flex;
         flex-shrink: 0;
+        width: 100%;
         margin-top: auto;
         flex-direction: row;
         align-items: flex-start;
         font: menu;
 		height: auto;
-        padding-bottom: 5px;
+        box-sizing: border-box;
+        padding: 0 34px 5px 0;
 
         .node-info-leafs {
             margin-left: 10px;

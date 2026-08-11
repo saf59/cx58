@@ -233,6 +233,8 @@ pub fn Chat() -> impl IntoView {
                         class=(["fa", "fa-stop-circle"], move || is_loading.get())
                         class=(["none"], move || !is_loading.get())
                         data-descr=move_tr!("stop")
+                        title=move_tr!("stop")
+                        aria-label=move_tr!("stop")
                     />
                     <button
                         type="submit"
@@ -243,6 +245,8 @@ pub fn Chat() -> impl IntoView {
                         )
                         class:none=move || is_loading.get() || input.get().is_empty()
                         data-descr=move_tr!("start")
+                        title=move_tr!("start")
+                        aria-label=move_tr!("start")
                     />
                 </form>
             </div>

@@ -84,3 +84,35 @@ fn render_language(lang: &'static Language) -> impl IntoView {
         </div>
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    fn message_ids(source: &str) -> BTreeSet<&str> {
+        source
+            .lines()
+            .filter_map(|line| {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') || line.starts_with('.') {
+                    return None;
+                }
+                let (id, _) = line.split_once('=')?;
+                let id = id.trim();
+                (!id.is_empty()
+                    && id
+                        .chars()
+                        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_')))
+                .then_some(id)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn english_and_german_message_ids_match() {
+        let english = message_ids(include_str!("../../locales/en/main.ftl"));
+        let german = message_ids(include_str!("../../locales/de/main.ftl"));
+
+        assert_eq!(english, german);
+    }
+}

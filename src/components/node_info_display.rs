@@ -96,6 +96,7 @@ pub fn NodeInfoDisplay(
                                     on_node_click.run(node_clone.clone());
                                 }
                                 title=move_tr!("selected-context-remove")
+                                aria-label=move_tr!("selected-context-remove")
                             >
                                 <i class="fas fa-times"></i>
                             </button>
