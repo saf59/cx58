@@ -153,10 +153,15 @@ pub(crate) fn proxy_media(rule: &str, value: &str) -> String {
     else {
         return value.to_string();
     };
+    let old_value = old_value.trim();
+    let new_value = new_value.trim();
     if old_value.is_empty() || new_value.is_empty() {
         return value.to_string();
     }
-    value.replace(old_value, new_value)
+    value
+        .strip_prefix(old_value)
+        .map(|suffix| format!("{new_value}{suffix}"))
+        .unwrap_or_else(|| value.to_string())
 }
 
 #[cfg(test)]
@@ -179,6 +184,16 @@ mod media_proxy_tests {
         let value = "http://agent:3000/report.jpg";
         assert_eq!(proxy_media("", value), value);
         assert_eq!(proxy_media("from,to,extra", value), value);
+    }
+
+    #[test]
+    fn proxy_media_only_rewrites_the_url_prefix() {
+        let rule = "http://agent:3000,https://app.example.test/media";
+        let already_proxied = "https://app.example.test/media/report.jpg";
+        let embedded_origin = "https://example.test/?next=http://agent:3000/report.jpg";
+
+        assert_eq!(proxy_media(rule, already_proxied), already_proxied);
+        assert_eq!(proxy_media(rule, embedded_origin), embedded_origin);
     }
 }
 pub fn parse_dt_or_default_ms(s: &str) -> i64 {
