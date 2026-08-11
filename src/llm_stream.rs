@@ -110,7 +110,7 @@ pub async fn chat_stream_handler(
                         .header("X-Timestamp", timestamp.to_string())
                         .header("X-Signature", signature)
                         .header("Content-Type", "application/json")
-                        .json(&req)
+                        .body(req_bytes)
                 }
                 Err(e) => {
                     tracing::warn!("Transport error: {:#?}", e);
