@@ -77,6 +77,7 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
     let datetime_input_ref = NodeRef::<leptos::html::Input>::new();
     let parent_id = node.id;
     let has_selected_file = RwSignal::new(false);
+    let uploading = RwSignal::new(false);
     let current_page = RwSignal::new(0usize);
     let media_proxy = media_proxy_rule();
 
@@ -105,6 +106,9 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
     });
 
     let on_upload = move |_| {
+        if uploading.get_untracked() {
+            return;
+        }
         let Some(input) = file_input_ref.get() else {
             return;
         };
@@ -124,6 +128,7 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
             .filter(|value| !value.is_empty())
             .unwrap_or_else(current_datetime_berlin);
 
+        uploading.set(true);
         leptos::task::spawn_local(async move {
             match upload_report(parent_id, &file, &datetime).await {
                 Ok(()) => {
@@ -137,6 +142,7 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
                 }
                 Err(e) => error.set(Some(e)),
             }
+            uploading.set(false);
         });
     };
 
@@ -166,7 +172,7 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
                 <button
                     type="button"
                     on:click=on_upload
-                    disabled=move || !has_selected_file.get()
+                    disabled=move || !has_selected_file.get() || uploading.get()
                     title=move || move_tr!("reports-upload").get()
                 >
                     <i class="fas fa-upload"></i>
@@ -299,6 +305,7 @@ fn ReportItem(
     let date_input_id = format!("report-date-{report_id}");
     let edit_value = RwSignal::new(datetime_edit_value(&report));
     let update_error = RwSignal::new(None::<String>);
+    let mutating = RwSignal::new(false);
 
     view! {
         <div class="reports-item">
@@ -323,8 +330,13 @@ fn ReportItem(
                 type="button"
                 class="reports-save-date"
                 title=move || move_tr!("reports-save-date").get()
+                disabled=move || mutating.get()
                 on:click=move |_| {
+                    if mutating.get_untracked() {
+                        return;
+                    }
                     let datetime = edit_value.get();
+                    mutating.set(true);
                     leptos::task::spawn_local(async move {
                         match update_report_date(report_id, &datetime).await {
                             Ok(()) => {
@@ -333,6 +345,7 @@ fn ReportItem(
                             }
                             Err(e) => update_error.set(Some(e)),
                         }
+                        mutating.set(false);
                     });
                 }
             >
@@ -342,7 +355,12 @@ fn ReportItem(
                 type="button"
                 class="reports-delete"
                 title=move || move_tr!("reports-delete").get()
+                disabled=move || mutating.get()
                 on:click=move |_| {
+                    if mutating.get_untracked() {
+                        return;
+                    }
+                    mutating.set(true);
                     leptos::task::spawn_local(async move {
                         match delete_report(report_id).await {
                             Ok(()) => {
@@ -352,6 +370,7 @@ fn ReportItem(
                             }
                             Err(e) => update_error.set(Some(e)),
                         }
+                        mutating.set(false);
                     });
                 }
             >
@@ -432,7 +451,7 @@ async fn upload_report(
     if resp.ok() {
         Ok(())
     } else {
-        Err(format!("Upload failed: HTTP {}", resp.status()))
+        Err(response_error(&resp).await)
     }
 }
 
@@ -447,7 +466,7 @@ async fn update_report_date(node_id: Uuid, datetime_local: &str) -> Result<(), S
     if resp.ok() {
         Ok(())
     } else {
-        Err(format!("Update failed: HTTP {}", resp.status()))
+        Err(response_error(&resp).await)
     }
 }
 
@@ -559,7 +578,42 @@ async fn delete_report(node_id: Uuid) -> Result<(), String> {
     if resp.ok() {
         Ok(())
     } else {
-        Err(format!("Delete failed: HTTP {}", resp.status()))
+        Err(response_error(&resp).await)
+    }
+}
+
+async fn response_error(response: &Response) -> String {
+    let status = response.status();
+    let body = match response.text() {
+        Ok(promise) => JsFuture::from(promise)
+            .await
+            .ok()
+            .and_then(|value| value.as_string())
+            .unwrap_or_default(),
+        Err(_) => String::new(),
+    };
+    response_error_message(status, &body)
+}
+
+fn response_error_message(status: u16, body: &str) -> String {
+    let detail = serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|json| {
+            json.get("error")
+                .and_then(|error| {
+                    error
+                        .as_str()
+                        .or_else(|| error.get("message").and_then(|value| value.as_str()))
+                })
+                .or_else(|| json.get("message").and_then(|value| value.as_str()))
+                .map(str::trim)
+                .filter(|message| !message.is_empty())
+                .map(str::to_string)
+        });
+
+    match detail {
+        Some(detail) => format!("{detail} (HTTP {status})"),
+        None => format!("HTTP {status}"),
     }
 }
 
@@ -659,16 +713,37 @@ fn day_of_week(year: i32, month: u32, day: u32) -> u32 {
 
 fn validate_agent_datetime(datetime: &str) -> Result<(), String> {
     let mut parts = datetime.split(['.', ' ', ':']);
-    let _day = parts.next().ok_or_else(|| "Invalid datetime".to_string())?;
-    let _month = parts.next().ok_or_else(|| "Invalid datetime".to_string())?;
-    let year = parts
-        .next()
-        .ok_or_else(|| "Invalid datetime".to_string())?
-        .parse::<i32>()
-        .map_err(|_| "Invalid datetime year".to_string())?;
-    if !(2000..=2100).contains(&year) {
-        return Err("Invalid datetime year".to_string());
+    let parse_part = |part: Option<&str>| {
+        part.ok_or_else(|| "Invalid datetime".to_string())?
+            .parse::<u32>()
+            .map_err(|_| "Invalid datetime".to_string())
+    };
+    let day = parse_part(parts.next())?;
+    let month = parse_part(parts.next())?;
+    let year = parse_part(parts.next())?;
+    let hour = parse_part(parts.next())?;
+    let minute = parse_part(parts.next())?;
+    let second = parse_part(parts.next())?;
+    if parts.next().is_some()
+        || !(2000..=2100).contains(&year)
+        || hour > 23
+        || minute > 59
+        || second > 59
+    {
+        return Err("Invalid datetime".to_string());
     }
+
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if is_leap_year(year as i32) => 29,
+        2 => 28,
+        _ => return Err("Invalid datetime".to_string()),
+    };
+    if day == 0 || day > days_in_month {
+        return Err("Invalid datetime".to_string());
+    }
+
     Ok(())
 }
 fn datetime_for_agent(datetime_value: &str) -> String {
@@ -683,4 +758,37 @@ fn datetime_for_agent(datetime_value: &str) -> String {
     let hour = parts.next().unwrap_or("00");
     let minute = parts.next().unwrap_or("00");
     format!("{}.{}.{} {}:{}:00", day, month, year, hour, minute)
+}
+
+#[cfg(test)]
+mod report_operation_error_tests {
+    use super::{response_error_message, validate_agent_datetime};
+
+    #[test]
+    fn extracts_nested_agent_error_message() {
+        let body = r#"{"error":{"code":"BAD_REQUEST","message":"Invalid Berlin datetime"}}"#;
+        assert_eq!(
+            response_error_message(400, body),
+            "Invalid Berlin datetime (HTTP 400)"
+        );
+    }
+
+    #[test]
+    fn extracts_proxy_error_message_and_falls_back_to_status() {
+        assert_eq!(
+            response_error_message(502, r#"{"error":"Agent unavailable"}"#),
+            "Agent unavailable (HTTP 502)"
+        );
+        assert_eq!(response_error_message(500, "not-json"), "HTTP 500");
+    }
+
+    #[test]
+    fn validates_full_berlin_datetime_before_sending() {
+        assert!(validate_agent_datetime("29.02.2028 23:59:59").is_ok());
+        assert!(validate_agent_datetime("29.02.2026 12:00:00").is_err());
+        assert!(validate_agent_datetime("31.04.2026 12:00:00").is_err());
+        assert!(validate_agent_datetime("01.13.2026 12:00:00").is_err());
+        assert!(validate_agent_datetime("01.12.2026 24:00:00").is_err());
+        assert!(validate_agent_datetime("01.12.2026 12:60:00").is_err());
+    }
 }
