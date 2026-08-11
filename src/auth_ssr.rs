@@ -19,12 +19,11 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::Mutex;
 use tracing::{debug, info};
-use uuid::Uuid;
 
 /// Only Server side
 #[derive(Debug, Clone)]
 pub struct SessionData {
-    pub auth_flow_id: Uuid,
+    pub auth_flow_id: String,
     pub csrf_token: CsrfToken,
     pub nonce: Nonce,
     pub pkce_verifier: Arc<Mutex<Option<PkceCodeVerifier>>>,

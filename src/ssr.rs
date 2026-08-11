@@ -128,7 +128,7 @@ fn oidc_discovery_url(issuer_url: &str) -> String {
 
 fn sso_unavailable_response(
     language: AuthLanguage,
-    request_id: Uuid,
+    request_id: &str,
     status: StatusCode,
 ) -> Response {
     let (title, message, retry, home) = match language {
@@ -179,6 +179,26 @@ fn sso_unavailable_response(
     );
 
     (status, Html(html)).into_response()
+}
+
+fn correlation_id(headers: &HeaderMap) -> String {
+    ["x-request-id", "x-correlation-id"]
+        .into_iter()
+        .find_map(|name| {
+            headers
+                .get(name)
+                .and_then(|value| value.to_str().ok())
+                .map(str::trim)
+                .filter(|value| {
+                    !value.is_empty()
+                        && value.len() <= 128
+                        && value
+                            .bytes()
+                            .all(|byte| byte.is_ascii_alphanumeric() || b"-_.:".contains(&byte))
+                })
+                .map(str::to_string)
+        })
+        .unwrap_or_else(|| Uuid::now_v7().to_string())
 }
 
 fn validated_id_token_data(id_token: String, claims: &CoreIdTokenClaims) -> ValidatedIdTokenData {
@@ -507,10 +527,11 @@ pub async fn leptos_main_handler(
 
 pub async fn login_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
     jar: CookieJar,
     Query(query): Query<LoginQuery>,
 ) -> impl IntoResponse {
-    let request_id = Uuid::now_v7();
+    let request_id = correlation_id(&headers);
     let language = auth_language(&jar, query.lang.as_deref());
     let started_at = Instant::now();
     let discovery_url = oidc_discovery_url(&state.http_client.config.oidc_issuer_url);
@@ -536,7 +557,11 @@ pub async fn login_handler(
                 elapsed_ms = started_at.elapsed().as_millis(),
                 "login: SSO preflight returned an error"
             );
-            return sso_unavailable_response(language, request_id, StatusCode::SERVICE_UNAVAILABLE);
+            return sso_unavailable_response(
+                language,
+                &request_id,
+                StatusCode::SERVICE_UNAVAILABLE,
+            );
         }
         Err(error) => {
             warn!(
@@ -545,7 +570,11 @@ pub async fn login_handler(
                 elapsed_ms = started_at.elapsed().as_millis(),
                 "login: SSO preflight failed"
             );
-            return sso_unavailable_response(language, request_id, StatusCode::SERVICE_UNAVAILABLE);
+            return sso_unavailable_response(
+                language,
+                &request_id,
+                StatusCode::SERVICE_UNAVAILABLE,
+            );
         }
     }
 
@@ -660,10 +689,11 @@ async fn get_auth_state(state: AppState, headers: HeaderMap) -> Auth {
 
 pub async fn callback_handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
     jar: CookieJar,
     uri: OriginalUri,
 ) -> impl IntoResponse {
-    let request_id = Uuid::now_v7();
+    let request_id = correlation_id(&headers);
     let language = auth_language(&jar, None);
     let callback_started_at = Instant::now();
     let query_string = match uri.query() {
@@ -705,7 +735,7 @@ pub async fn callback_handler(
             session.csrf_token.secret() == &query.state,
             session.nonce.clone(),
             session.pkce_verifier.clone(),
-            session.auth_flow_id,
+            session.auth_flow_id.clone(),
         )
     };
     let callback_request_id = request_id;
@@ -750,7 +780,7 @@ pub async fn callback_handler(
                 elapsed_ms = exchange_started_at.elapsed().as_millis(),
                 "callback: token exchange timed out"
             );
-            sso_unavailable_response(language, request_id, StatusCode::GATEWAY_TIMEOUT)
+            sso_unavailable_response(language, &request_id, StatusCode::GATEWAY_TIMEOUT)
         }
         Ok(Err(error)) => {
             warn!(
@@ -760,7 +790,7 @@ pub async fn callback_handler(
                 elapsed_ms = exchange_started_at.elapsed().as_millis(),
                 "callback: token exchange failed"
             );
-            sso_unavailable_response(language, request_id, StatusCode::BAD_GATEWAY)
+            sso_unavailable_response(language, &request_id, StatusCode::BAD_GATEWAY)
         }
         Ok(Ok(token_response)) => {
             debug!(request_id = %request_id, session_id = %session_id, "callback: token exchange ok");
@@ -837,7 +867,7 @@ pub async fn callback_handler(
             }
 
             if validation_failed {
-                return sso_unavailable_response(language, request_id, StatusCode::BAD_GATEWAY);
+                return sso_unavailable_response(language, &request_id, StatusCode::BAD_GATEWAY);
             }
 
             let mut sessions = state.sessions.lock().await;
@@ -879,7 +909,6 @@ pub async fn callback_handler(
 #[cfg(test)]
 mod auth_reliability_tests {
     use super::*;
-
     #[test]
     fn auth_language_accepts_german_variants() {
         assert_eq!(AuthLanguage::from_hint(Some("de")), AuthLanguage::De);
@@ -900,7 +929,7 @@ mod auth_reliability_tests {
     fn unavailable_page_is_html_with_requested_status() {
         let response = sso_unavailable_response(
             AuthLanguage::De,
-            Uuid::nil(),
+            &Uuid::nil().to_string(),
             StatusCode::SERVICE_UNAVAILABLE,
         );
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
@@ -908,6 +937,16 @@ mod auth_reliability_tests {
             response.headers().get(http::header::CONTENT_TYPE).unwrap(),
             "text/html; charset=utf-8"
         );
+    }
+
+    #[test]
+    fn correlation_id_accepts_safe_proxy_value_and_rejects_unsafe_input() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-request-id", HeaderValue::from_static("caddy-123.trace"));
+        assert_eq!(correlation_id(&headers), "caddy-123.trace");
+
+        headers.insert("x-request-id", HeaderValue::from_static("unsafe/value"));
+        assert!(Uuid::parse_str(&correlation_id(&headers)).is_ok());
     }
 
     #[test]
