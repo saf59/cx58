@@ -58,10 +58,12 @@ pub fn DescriptionListRenderer(
 
 /// Compact version without optional sections
 #[component]
-fn DetailItem(label: String, value: String) -> impl IntoView {
+fn DetailItem(#[prop(into)] label_key: String, value: String) -> impl IntoView {
+    let i18n = expect_context::<I18n>();
+
     view! {
         <div class="detail-item">
-            <strong>{label}" "</strong>
+            <strong>{move || i18n.tr(&label_key)}" "</strong>
             {value}
         </div>
     }
@@ -69,7 +71,6 @@ fn DetailItem(label: String, value: String) -> impl IntoView {
 
 #[component]
 pub fn DescriptionRendererCompact(data: DescriptionData) -> impl IntoView {
-    let i18n = expect_context::<I18n>();
     let ctx = expect_context::<ChatContext>();
     let (object_name, report_name) = extract_name_pair(data.object.as_str());
     let report = ctx.report_by_id(&data.date_id);
@@ -98,10 +99,10 @@ pub fn DescriptionRendererCompact(data: DescriptionData) -> impl IntoView {
             <p class="compact-description">{data.description}</p>
 
             <div class="compact-details">
-                {data.windows.map(|v| view! { <DetailItem label=i18n.tr("detail-label-windows") value=v /> })}
-                {data.doors.map(|v| view! { <DetailItem label=i18n.tr("detail-label-doors") value=v /> })}
-                {data.radiators.map(|v| view! { <DetailItem label=i18n.tr("detail-label-radiators") value=v /> })}
-                {data.openings.map(|v| view! { <DetailItem label=i18n.tr("detail-label-openings") value=v /> })}
+                {data.windows.map(|v| view! { <DetailItem label_key="detail-label-windows" value=v /> })}
+                {data.doors.map(|v| view! { <DetailItem label_key="detail-label-doors" value=v /> })}
+                {data.radiators.map(|v| view! { <DetailItem label_key="detail-label-radiators" value=v /> })}
+                {data.openings.map(|v| view! { <DetailItem label_key="detail-label-openings" value=v /> })}
             </div>
 
             // Download button anchored to the bottom-right of the card

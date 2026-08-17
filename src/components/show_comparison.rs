@@ -9,10 +9,12 @@ use leptos_fluent::{I18n, move_tr};
 
 /// Compact version without optional sections
 #[component]
-fn ComparisonDetailItem(label: String, value: String) -> impl IntoView {
+fn ComparisonDetailItem(#[prop(into)] label_key: String, value: String) -> impl IntoView {
+    let i18n = expect_context::<I18n>();
+
     view! {
         <div class="detail-item">
-            <strong>{label}" "</strong>
+            <strong>{move || i18n.tr(&label_key)}" "</strong>
             {value}
         </div>
     }
@@ -20,7 +22,6 @@ fn ComparisonDetailItem(label: String, value: String) -> impl IntoView {
 
 #[component]
 pub fn ComparisonRenderer(data: ComparisonData) -> impl IntoView {
-    let i18n = expect_context::<I18n>();
     let ctx = expect_context::<ChatContext>();
     let previous_report = ctx.report_by_id(&data.prev_id);
     let current_report = ctx.report_by_id(&data.next_id);
@@ -52,13 +53,13 @@ pub fn ComparisonRenderer(data: ComparisonData) -> impl IntoView {
 
             <div class="compact-details">
                 {data.windows.map(|v| view! {
-                    <ComparisonDetailItem label=i18n.tr("detail-label-windows") value=v />})}
+                    <ComparisonDetailItem label_key="detail-label-windows" value=v />})}
                 {data.doors.map(|v| view! {
-                    <ComparisonDetailItem label=i18n.tr("detail-label-doors") value=v />})}
+                    <ComparisonDetailItem label_key="detail-label-doors" value=v />})}
                 {data.radiators.map(|v| view! {
-                    <ComparisonDetailItem label=i18n.tr("detail-label-radiators") value=v />})}
+                    <ComparisonDetailItem label_key="detail-label-radiators" value=v />})}
                 {data.openings.map(|v| view! {
-                    <ComparisonDetailItem label=i18n.tr("detail-label-openings") value=v />})}
+                    <ComparisonDetailItem label_key="detail-label-openings" value=v />})}
             </div>
 
             // Download button anchored to the bottom-right of the card
