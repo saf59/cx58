@@ -1,5 +1,26 @@
 # Worklog
 
+## 2026-09-14: Rust 1.98.1 dependency-update build repair
+
+The updated dependency graph resolves wasm-bindgen 0.2.128 and web-sys 0.3.105.
+Three independent build failures were reproduced:
+
+- sccache 0.17.0 fails to spawn rustc for web-sys on Windows with os error 206 (command line too long), including with a fresh server.
+- The installed wasm-bindgen CLI 0.2.126 rejects the WASM schema produced by wasm-bindgen 0.2.128.
+- The global Cargo build target is Windows MSVC, but cargo-leptos expects target/debug/gmr.exe when bin-target-triple is omitted.
+
+Local `.cargo/config.toml` disables the inherited rustc wrapper so Cargo can use response files.
+Cargo.toml now explicitly selects the Windows server target so cargo-leptos locates the compiled executable.
+Docker removes that local target from its copied manifest before compiling for the container host.
+Docker retains its explicit sccache wrapper and already selects wasm-bindgen 0.2.128.
+The local Cargo configuration is ignored by the existing dotfile rules.
+Update the CLI with `cargo install wasm-bindgen-cli --version 0.2.128 --locked --force`.
+Application behavior and the user's dependency/Dockerfile changes are preserved.
+The CLI was successfully upgraded to 0.2.128.
+Validation: full `cargo leptos build` passed, including client compilation, JS/WASM generation, styles, and server compilation.
+Evidence: `target/gmr-build-final.log` and `target/sccache-diagnostic.log`.
+Docker source configuration was reviewed; no image build or deployment was performed.
+
 ## Current rule
 
 The reliability audit is accepted for fixes as of 2026-06-24.

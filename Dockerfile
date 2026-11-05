@@ -1,13 +1,24 @@
 ﻿# Get started with a build env with Rust nightly
 # FROM rustlang/rust:nightly-bookworm as builder
 
-ARG RUST_VERSION=1.97.1
+ARG RUST_VERSION=1.99
 ARG APP_NAME=gmr
+ARG SCCACHE_VERSION=0.17.0
 
 # If you’re using stable, use this instead
 FROM rust:${RUST_VERSION}-bookworm AS builder
 ARG APP_NAME
-ENV LEPTOS_WASM_BINDGEN_VERSION=0.2.127
+ARG SCCACHE_VERSION
+ENV LEPTOS_WASM_BINDGEN_VERSION=0.2.130
+ENV RUSTC_WRAPPER=/usr/local/bin/sccache
+ENV SCCACHE_DIR=/var/cache/sccache
+
+RUN wget -qO /tmp/sccache.tar.gz \
+      "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+    && tar -xzf /tmp/sccache.tar.gz -C /tmp \
+    && mv "/tmp/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache" /usr/local/bin/sccache \
+    && chmod +x /usr/local/bin/sccache \
+    && rm -rf /tmp/sccache.tar.gz "/tmp/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl"
 
 # Install cargo-binstall, which makes it easier to install other
 # cargo extensions like cargo-leptos
@@ -37,16 +48,20 @@ COPY style style/
 COPY public public/
 COPY locales locales/
 COPY Cargo.toml Cargo.toml
+# Build the server for the container host instead of the local Windows target.
+RUN sed -i '/^bin-target-triple = "x86_64-pc-windows-msvc"$/d' Cargo.toml
 COPY Cargo.lock Cargo.lock
 # Build the app
 ##RUN cargo leptos build --release -vv
 RUN --mount=type=cache,target=/app/target/ \
+    --mount=type=cache,target=/var/cache/sccache \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
     rm -rf /app/target/site && \
     cargo leptos build --release -vv && \
     cp /app/target/release/${APP_NAME} /bin/server && \
-    cp -r /app/target/site/ /bin/site
+    cp -r /app/target/site/ /bin/site && \
+    sccache --show-stats
 
 FROM debian:bookworm-slim AS runtime
 WORKDIR /app
@@ -69,7 +84,7 @@ COPY --from=builder /bin/site /app/site
 ENV RUST_LOG="info"
 ENV APP_ENV=PROD
 ENV RUST_BACKTRACE=full
-ENV LEPTOS_WASM_BINDGEN_VERSION=0.2.127
+ENV LEPTOS_WASM_BINDGEN_VERSION=0.2.130
 ENV LEPTOS_SITE_ADDR="0.0.0.0:3080"
 ENV LEPTOS_SITE_ROOT="site"
 EXPOSE 3080

@@ -1,0 +1,170 @@
+[package]
+name = "gmr"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+anyhow = "1.0"
+axum = { version = "0.8", optional = true, features = ["macros"] }
+axum-extra ={ version= "0.12", features = ["cookie"] }
+dotenvy = "0.15"
+leptos_axum = { version = "0.8", optional = true }
+leptos = { version = "0.8", features = ["nonce"] }
+leptos_router = { version = "0.8", features = [] }
+leptos_meta = { version = "0.8" }
+leptos_macro = "0.8"
+oauth2 = { version = "5.0",optional = true }
+openidconnect = { version = "4.0",optional = true }
+tokio = { version = "1.48", features = ["macros","rt-multi-thread"], optional = true }
+reqwest = { version = "0.12", features = ["json", "stream", "multipart", "rustls-tls"]}
+serde = { version = "1.0", features = ["derive"] }
+serde_urlencoded = "0.7"
+tracing-subscriber = "0.3"
+tracing = "0.1"
+tower-cookies = "0.11"
+console_error_panic_hook = { version = "0.1", optional = true }
+url = "2.5"
+uuid = { version = "1.19", features = ["v7", "rng-rand", "serde", "js"] }
+wasm-bindgen = { version = "0.2", features = [], optional = true }
+base64 = "0.22"
+cookie = "0.18"
+http = "1.4"
+chrono = { version = "0.4",optional = true }
+tokio-util = { version = "0.7", features = ["io"], optional = true }
+serde_json = "1.0"
+wasm-bindgen-futures = { version = "0.4"}
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+    "Window",
+    "Document",
+    "Element",
+    "HtmlElement",
+    "HtmlDivElement",
+    "ScrollIntoViewOptions",
+    "ScrollBehavior",
+    "Node",
+
+    "File",
+    "FileList",
+    "FormData",
+    "EventSource",
+    "MessageEvent",
+    "Navigator",
+    "Headers",
+    "Request",
+    "RequestInit",
+    "RequestMode",
+    "RequestCredentials",
+    "Response",
+    "Blob",
+    "BlobPropertyBag",
+    "BeforeUnloadEvent",
+] }
+
+# Hashing
+sha2 = "0.10"
+hex = "0.4"
+hmac = "0.12"
+
+async-stream = "0.3"
+futures = "0.3"
+gloo-timers = "0.3"
+leptos-fluent = {version = "0.3.1", features = ["yaml"]}
+serde-wasm-bindgen = "0.6.5"
+
+[dev-dependencies]
+tokio = { version = "1.48", features = ["rt-multi-thread", "macros"] }
+
+[features]
+hydrate = [
+    "leptos/hydrate",
+    "dep:console_error_panic_hook",
+    "dep:wasm-bindgen",
+]
+ssr = [
+    "dep:axum",
+    "dep:tokio",
+    "dep:leptos_axum",
+    "dep:tokio-util",
+    "dep:chrono",
+    "dep:oauth2",
+    "dep:openidconnect",
+    "leptos/ssr",
+    "leptos_meta/ssr",
+    "leptos_router/ssr",
+    "leptos-fluent/ssr",
+    "leptos-fluent/axum",
+]
+
+#[target.wasm32-unknown-unknown]
+#rustflags = ["--cfg", "erase_components", ]
+
+# Defines a size-optimized profile for the WASM bundle in release mode
+[profile.wasm-release]
+inherits = "release"
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[package.metadata.leptos]
+# The name used by wasm-bindgen/cargo-leptos for the JS/WASM bundle. Defaults to the crate name
+output-name = "cx58-client"
+
+# The site root folder is where cargo-leptos generate all output. WARNING: all content of this folder will be erased on a rebuild. Use it in your server setup.
+site-root = "target/site"
+
+# The site-root relative folder where all compiled output (JS, WASM and CSS) is written
+# Defaults to pkg
+site-pkg-dir = "pkg"
+
+# [Optional] The source CSS file. If it ends with .sass or .scss then it will be compiled by dart-sass into CSS. The CSS is optimized by Lightning CSS before being written to <site-root>/<site-pkg>/app.css
+style-file = "style/main.scss"
+# Assets source dir. All files found here will be copied and synchronized to site-root.
+# The assets-dir cannot have a sub directory with the same name/path as site-pkg-dir.
+#
+# Optional. Env: LEPTOS_ASSETS_DIR.
+assets-dir = "public"
+
+# The IP and port (ex: 127.0.0.1:3080) where the server serves the content. Use it in your server setup.
+site-addr = "127.0.0.1:3080"
+
+# The port to use for automatic reload monitoring
+reload-port = 3001
+
+# [Optional] Command to use when running end2end tests. It will run in the end2end dir.
+#   [Windows] for non-WSL use "npx.cmd playwright test"
+#   This binary name can be checked in Powershell with Get-Command npx
+end2end-cmd = "npx playwright test"
+end2end-dir = "end2end"
+
+#  The browserlist query used for optimizing the CSS.
+browserquery = "defaults"
+
+# The environment Leptos will run in, usually either "DEV" or "PROD"
+env = "DEV"
+
+# The features to use when compiling the bin target
+# Optional. Can be over-ridden with the command line parameter --bin-features
+bin-features = ["ssr"]
+
+# If the --no-default-features flag should be used when compiling the bin target
+# Optional. Defaults to false.
+bin-default-features = false
+
+# The features to use when compiling the lib target
+# Optional. Can be over-ridden with the command line parameter --lib-features
+lib-features = ["hydrate"]
+
+# If the --no-default-features flag should be used when compiling the lib target
+# Optional. Defaults to false.
+lib-default-features = false
+
+# The profile to use for the lib target when compiling for release
+# Optional. Defaults to "release".
+lib-profile-release = "wasm-release"
+
+watch-additional-files = ["locales"]
