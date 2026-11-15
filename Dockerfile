@@ -1,7 +1,7 @@
 ﻿# Get started with a build env with Rust nightly
 # FROM rustlang/rust:nightly-bookworm as builder
 
-ARG RUST_VERSION=1.99
+ARG RUST_VERSION=1.100.0
 ARG APP_NAME=gmr
 ARG SCCACHE_VERSION=0.17.0
 
