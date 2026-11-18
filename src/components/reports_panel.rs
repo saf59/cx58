@@ -1,9 +1,12 @@
 use crate::auth::Auth;
 use crate::components::chat_context::ChatContext;
+use crate::components::cx_id_editor::CxIdEditor;
 use crate::components::show_tree::DetailsTreeRendererWithContext;
 use crate::components::tree::{NodeData, NodeInfo, NodeType, NodeWithLeaf, TreeViewerResource};
+use crate::cx_id::use_cx_ids;
 use js_sys::{Date, Reflect};
 use leptos::prelude::*;
+use leptos::reactive::actions::ActionAbortHandle;
 use leptos::wasm_bindgen::{JsCast, JsValue};
 use leptos::{IntoView, component, view};
 use leptos_fluent::move_tr;
@@ -22,7 +25,6 @@ pub fn ReportsObjectPicker() -> impl IntoView {
         .get_untracked()
         .email()
         .unwrap_or("mock".to_string());
-    let selected_node = RwSignal::new(None::<NodeInfo>);
 
     view! {
         <div class="reports-picker">
@@ -34,8 +36,7 @@ pub fn ReportsObjectPicker() -> impl IntoView {
                         <DetailsTreeRendererWithContext
                             tree=tree
                             on_node_click=move |node_info| {
-                                ctx.set_parent(node_info.clone());
-                                selected_node.set(Some(node_info));
+                                ctx.set_parent(node_info);
                             }
                         />
                     }
@@ -80,29 +81,54 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
     let uploading = RwSignal::new(false);
     let current_page = RwSignal::new(0usize);
     let media_proxy = media_proxy_rule();
+    let cx_ids = use_cx_ids(move || {
+        reports.with(|reports| {
+            std::iter::once(parent_id)
+                .chain(
+                    reports
+                        .iter()
+                        .skip(current_page.get() * REPORTS_PAGE_SIZE)
+                        .take(REPORTS_PAGE_SIZE)
+                        .map(|report| report.id),
+                )
+                .collect()
+        })
+    });
+    let object_cx_id = Signal::derive(move || cx_ids.run(parent_id));
 
-    let reload = Action::new_unsync(move |_: &()| async move {
-        loading.set(true);
-        error.set(None);
+    let load_reports = Action::new_unsync(move |_: &()| async move {
+        loading.try_set(true);
+        error.try_set(None);
         match fetch_reports(parent_id).await {
             Ok(mut data) => {
                 data.retain(|item| item.node_type == NodeType::ImageLeaf);
                 data.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
                 let max_page = max_page_index(data.len());
-                current_page.update(|page| {
+                current_page.try_update(|page| {
                     if *page > max_page {
                         *page = max_page;
                     }
                 });
-                reports.set(data);
+                reports.try_set(data);
             }
-            Err(e) => error.set(Some(e)),
+            Err(e) => {
+                error.try_set(Some(e));
+            }
         }
-        loading.set(false);
+        loading.try_set(false);
+    });
+    let load_handle = StoredValue::new(None::<ActionAbortHandle>);
+    let reload = Callback::new(move |()| {
+        load_handle.try_update_value(|handle| {
+            if let Some(previous) = handle.take() {
+                previous.abort();
+            }
+            *handle = Some(load_reports.dispatch(()));
+        });
     });
 
     Effect::new(move |_| {
-        reload.dispatch(());
+        reload.run(());
     });
 
     let on_upload = move |_| {
@@ -138,7 +164,7 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
                     }
                     has_selected_file.set(false);
                     current_page.set(0);
-                    reload.dispatch(());
+                    reload.run(());
                 }
                 Err(e) => error.set(Some(e)),
             }
@@ -148,6 +174,9 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
 
     view! {
         <div class="reports-selected">
+            <div class="reports-cx-id">
+                <CxIdEditor node_id=parent_id cx_id=object_cx_id object=true />
+            </div>
             <div class="reports-upload">
                 <input
                     id="reports-upload-datetime"
@@ -196,12 +225,15 @@ fn SelectedReports(node: NodeInfo) -> impl IntoView {
                             children={
                                 move |report| {
                                     let media_proxy = media_proxy.clone();
+                                    let report_id = report.id;
+                                    let cx_id = Signal::derive(move || cx_ids.run(report_id));
                                     view! {
                                         <ReportItem
                                             report=report
                                             reload=reload
                                             current_page=current_page
                                             media_proxy=media_proxy
+                                            cx_id=cx_id
                                         />
                                     }
                                 }
@@ -229,6 +261,7 @@ fn ReportsPaginator(
         }
     };
     let to = move || ((current_page.get() + 1) * REPORTS_PAGE_SIZE).min(total());
+    let is_last_page = move || current_page.get() + 1 >= page_count();
 
     view! {
         <Show when=move || { total() > REPORTS_PAGE_SIZE }>
@@ -254,7 +287,7 @@ fn ReportsPaginator(
                 <button
                     type="button"
                     class="reports-page-button"
-                    disabled=move || current_page.get() + 1 >= page_count()
+                    disabled=is_last_page
                     title=move || move_tr!("reports-next-page").get()
                     aria-label=move || move_tr!("reports-next-page").get()
                     on:click=move |_| {
@@ -288,9 +321,10 @@ fn max_page_index(total: usize) -> usize {
 #[component]
 fn ReportItem(
     report: NodeWithLeaf,
-    reload: Action<(), ()>,
+    reload: Callback<()>,
     current_page: RwSignal<usize>,
     media_proxy: String,
+    cx_id: Signal<Option<String>>,
 ) -> impl IntoView {
     let report_id = report.id;
     let name = report
@@ -341,7 +375,7 @@ fn ReportItem(
                         match update_report_date(report_id, &datetime).await {
                             Ok(()) => {
                                 update_error.set(None);
-                                reload.dispatch(());
+                                reload.run(());
                             }
                             Err(e) => update_error.set(Some(e)),
                         }
@@ -366,7 +400,7 @@ fn ReportItem(
                             Ok(()) => {
                                 update_error.set(None);
                                 current_page.set(0);
-                                reload.dispatch(());
+                                reload.run(());
                             }
                             Err(e) => update_error.set(Some(e)),
                         }
@@ -378,6 +412,9 @@ fn ReportItem(
             </button>
             <div class="reports-item-error" class:none=move || update_error.get().is_none()>
                 {move || update_error.get().unwrap_or_default()}
+            </div>
+            <div class="reports-cx-id">
+                <CxIdEditor node_id=report_id cx_id=cx_id />
             </div>
         </div>
     }

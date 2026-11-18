@@ -640,7 +640,7 @@ pub async fn login_handler(
             name: None,
             roles: HashSet::new(),
             id_token_expires_at: None,
-            is_refreshing: Mutex::new(false).into(),
+            refresh_lock: Mutex::new(()).into(),
             email: None,
         },
     );

@@ -175,9 +175,14 @@
             border-radius: 5px;
             object-fit: cover;
         }
-        .selected-report-name {
-            overflow: hidden;
+        .selected-report-label {
+            min-width: 0;
             padding-left: 6px;
+            text-align: left;
+        }
+        .selected-report-name {
+            display: block;
+            overflow: hidden;
             font-size: smaller;
             text-overflow: ellipsis;
             white-space: nowrap;

@@ -13,6 +13,7 @@ pub struct ChatContext {
     pub prev_leaf: RwSignal<Option<NodeInfo>>,
     pub next_leaf: RwSignal<Option<NodeInfo>>,
     report_media: RwSignal<HashMap<Uuid, NodeInfo>>,
+    cx_id_edits: RwSignal<HashMap<Uuid, Option<String>>>,
     report_context_submitted: RwSignal<bool>,
 }
 
@@ -26,6 +27,7 @@ impl ChatContext {
             prev_leaf: RwSignal::new(None),
             next_leaf: RwSignal::new(None),
             report_media: RwSignal::new(HashMap::new()),
+            cx_id_edits: RwSignal::new(HashMap::new()),
             report_context_submitted: RwSignal::new(false),
         }
     }
@@ -35,6 +37,14 @@ impl ChatContext {
         self.next_leaf.set(None);
         self.report_media.set(HashMap::new());
         self.report_context_submitted.set(false);
+    }
+    pub(crate) fn edited_cx_id(&self, id: Uuid) -> Option<Option<String>> {
+        self.cx_id_edits.with(|values| values.get(&id).cloned())
+    }
+
+    pub(crate) fn remember_cx_id_edit(&self, id: Uuid, value: Option<String>) {
+        self.cx_id_edits
+            .try_update(|values| values.insert(id, value));
     }
     pub fn delete_node_info(&self, node_info: NodeInfo) {
         let id = node_info.id;

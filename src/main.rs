@@ -38,7 +38,17 @@ async fn main() {
         )
         //.route("/api/get_media_proxy{_}", post(leptos_server_fn_handler))
         .route("/api/stop", post(stop_handler))
+        .route(
+            "/api/cx-id/{node_id}",
+            get(gmr::cx_id::proxy::read).put(gmr::cx_id::proxy::write),
+        )
+        .route("/api/cx-ids", post(gmr::cx_id::proxy::read_batch))
         .route("/api/proxy/tree/{user_id}", get(proxy_tree_handler))
+        .route(
+            "/api/report-export",
+            post(gmr::report_export::proxy::download)
+                .layer(DefaultBodyLimit::max(256 * 1024)),
+        )
         .route(
             "/api/proxy/reports/{node_id}",
             get(proxy_reports_handler).put(proxy_update_report_handler),

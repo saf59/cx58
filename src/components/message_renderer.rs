@@ -38,13 +38,13 @@ pub fn MessageRenderer(message: Message) -> impl IntoView {
         .into_any(),
         MessageContent::Description(data) => view! {
             <div class=css_class>
-                <DescriptionListRenderer data=*data />
+                <DescriptionListRenderer data=*data request=message.report_request />
             </div>
         }
         .into_any(),
         MessageContent::Comparison(data) => view! {
             <div class=css_class>
-                <ComparisonRenderer data=data />
+                <ComparisonRenderer data=data request=message.report_request />
             </div>
         }
         .into_any(),

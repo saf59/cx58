@@ -95,10 +95,23 @@ detail-label-windows = Windows:
 detail-label-doors = Doors:
 detail-label-radiators = Radiators:
 detail-label-openings = Openings:
+detail-label-power-outlets = Fully installed wall outlets:
+detail-label-power-outlets-comparison = Fully installed wall outlets (earlier → later):
+detail-outlet-uncertain = unclear candidates excluded
+detail-outlet-unavailable = not assessed
 
 # --- Shared download button tooltip ---
 # Used in: show_comparison and show_description.rs
 download-as-markdown = Download as Markdown
+download-as-pdf = Download as PDF
+download-as-json = Download as JSON
+report-export-working = Preparing report…
+report-export-session-error = Your session has expired or is unavailable. Sign in again to download the report.
+report-export-access-error = This report is unavailable. Check your report access.
+report-export-size-error = The report is too large to export.
+report-export-busy = Exports are busy. Try again in a moment.
+report-export-photo-error = The report or its photos are temporarily unavailable. Try again.
+report-export-error = The download failed. Try again.
 
 # --- Tree component (show_tree.rs) ---
 # Fallback label for nodes where name is None
@@ -122,3 +135,16 @@ selected-context-remove = Remove selected object
 selected-report-open = Open selected report image
 selected-report-remove = Remove selected report
 selected-report-close = Close report image
+
+cx-id-edit = Edit CX ID
+cx-id-object = Object CX ID
+cx-id-session-error = Your session has expired. Sign in again to edit the CX ID.
+cx-id-optional = CX ID (optional)
+cx-id-save = Save
+cx-id-clear = Clear
+cx-id-close = Close
+cx-id-saved = CX ID saved.
+cx-id-working = Please wait…
+cx-id-access-error = You do not have access to the CX ID for this item.
+cx-id-invalid = The CX ID contains an unsupported character.
+cx-id-request-error = Could not load or save the CX ID. Try again.

@@ -1,47 +1,19 @@
 use crate::components::chat_context::ChatContext;
 use crate::components::chat_data::{DescriptionData, extract_name_pair};
+use crate::components::report_downloads::ReportDownloads;
 use crate::components::report_preview::ReportPreview;
+use crate::report_export::{
+    ExportResult, ExportSources, PowerOutletResult, ReportExport, ReportRequest,
+};
 use leptos::prelude::*;
-use leptos::*;
 use leptos_fluent::{I18n, move_tr};
-
-/// Triggers a browser download of `content` as a text file with the given `filename`
-pub fn download_text_file(filename: &str, content: &str) {
-    use wasm_bindgen::JsCast;
-    let window = web_sys::window().expect("no window");
-    let document = window.document().expect("no document");
-
-    // Build a Blob containing the Markdown text
-    let blob_parts = js_sys::Array::new();
-    blob_parts.push(&wasm_bindgen::JsValue::from_str(content));
-    let blob_options = web_sys::BlobPropertyBag::new();
-    blob_options.set_type("text/markdown");
-    let blob = web_sys::Blob::new_with_str_sequence_and_options(&blob_parts, &blob_options)
-        .expect("failed to create blob");
-
-    // Create a temporary object URL and click a hidden <a> element to trigger download
-    let url =
-        web_sys::Url::create_object_url_with_blob(&blob).expect("failed to create object URL");
-
-    let a: web_sys::HtmlAnchorElement = document
-        .create_element("a")
-        .expect("failed to create <a>")
-        .dyn_into()
-        .expect("not an anchor");
-
-    a.set_href(&url);
-    a.set_download(filename);
-    document.body().expect("no body").append_child(&a).ok();
-    a.click();
-    document.body().expect("no body").remove_child(&a).ok();
-    web_sys::Url::revoke_object_url(&url).ok();
-}
 
 /// Component to render multiple descriptions
 #[component]
 pub fn DescriptionListRenderer(
     /// List of description data to display
     data: Vec<DescriptionData>,
+    request: Option<ReportRequest>,
 ) -> impl IntoView {
     view! {
         <div class="description-list">
@@ -49,7 +21,7 @@ pub fn DescriptionListRenderer(
                 each=move || data.clone()
                 key=|item| format!("{}-{}", item.object, item.date_id)
                 children=move |item| {
-                    view! { <DescriptionRendererCompact data=item /> }
+                    view! { <DescriptionRendererCompact data=item request=request.clone() /> }
                 }
             />
         </div>
@@ -70,17 +42,33 @@ fn DetailItem(#[prop(into)] label_key: String, value: String) -> impl IntoView {
 }
 
 #[component]
-pub fn DescriptionRendererCompact(data: DescriptionData) -> impl IntoView {
+pub fn DescriptionRendererCompact(
+    data: DescriptionData,
+    request: Option<ReportRequest>,
+) -> impl IntoView {
     let ctx = expect_context::<ChatContext>();
+    let i18n = expect_context::<I18n>();
     let (object_name, report_name) = extract_name_pair(data.object.as_str());
     let report = ctx.report_by_id(&data.date_id);
 
-    // Prepare download payload before the view consumes `data`
-    let markdown = data.to_markdown();
-    let filename = data.filename();
-
-    let on_download = move |_| {
-        download_text_file(&filename, &markdown);
+    let downloads = view! {
+        <ReportDownloads
+            export=request.and_then(|request| Some(ReportExport {
+                request,
+                sources: ExportSources::Description { report_id: data.date_id.parse().ok()? },
+                result: ExportResult {
+                    description: data.description.clone(),
+                    windows: data.windows.clone(),
+                    doors: data.doors.clone(),
+                    radiators: data.radiators.clone(),
+                    openings: data.openings.clone(),
+                    power_outlets: data.power_outlets.map(PowerOutletResult::Photo),
+                    model_name: Some(data.model_name.clone()),
+                },
+            }))
+            markdown=data.to_markdown()
+            filename=data.filename()
+        />
     };
 
     view! {
@@ -103,18 +91,15 @@ pub fn DescriptionRendererCompact(data: DescriptionData) -> impl IntoView {
                 {data.doors.map(|v| view! { <DetailItem label_key="detail-label-doors" value=v /> })}
                 {data.radiators.map(|v| view! { <DetailItem label_key="detail-label-radiators" value=v /> })}
                 {data.openings.map(|v| view! { <DetailItem label_key="detail-label-openings" value=v /> })}
+                {data.power_outlets.map(|count| view! {
+                    <div class="detail-item">
+                        <strong>{move_tr!("detail-label-power-outlets")}" "</strong>
+                        {move || count.display(&i18n.tr("detail-outlet-uncertain"))}
+                    </div>
+                })}
             </div>
 
-            // Download button anchored to the bottom-right of the card
-            <div class="compact-download-row">
-                <button
-                    class="compact-download-btn"
-                    title=move_tr!("download-as-markdown")
-                    on:click=on_download
-                >
-                    <i class="fas fa-arrow-down"></i>
-                </button>
-            </div>
+            {downloads}
         </div>
     }
 }

@@ -1,9 +1,12 @@
 use crate::components::chat_context::ChatContext;
 use crate::components::chat_data::ComparisonData;
+use crate::components::report_downloads::ReportDownloads;
 use crate::components::report_preview::ReportPreview;
-use crate::components::show_description::download_text_file;
+use crate::report_export::{
+    ExportResult, ExportSources, PowerOutletResult, ReportExport, ReportRequest,
+};
+use leptos::prelude::ElementChild;
 use leptos::prelude::{ClassAttribute, expect_context};
-use leptos::prelude::{ElementChild, GlobalAttributes, OnAttribute};
 use leptos::*;
 use leptos_fluent::{I18n, move_tr};
 
@@ -21,16 +24,32 @@ fn ComparisonDetailItem(#[prop(into)] label_key: String, value: String) -> impl 
 }
 
 #[component]
-pub fn ComparisonRenderer(data: ComparisonData) -> impl IntoView {
+pub fn ComparisonRenderer(data: ComparisonData, request: Option<ReportRequest>) -> impl IntoView {
     let ctx = expect_context::<ChatContext>();
+    let i18n = expect_context::<I18n>();
     let previous_report = ctx.report_by_id(&data.prev_id);
     let current_report = ctx.report_by_id(&data.next_id);
-    // Clone what we need for the download closure
-    let markdown = data.to_markdown();
-    let filename = data.filename();
-
-    let on_download = move |_| {
-        download_text_file(&filename, &markdown);
+    let downloads = view! {
+        <ReportDownloads
+            export=request.and_then(|request| Some(ReportExport {
+                request,
+                sources: ExportSources::Comparison {
+                    previous_id: data.prev_id.parse().ok()?,
+                    current_id: data.next_id.parse().ok()?,
+                },
+                result: ExportResult {
+                    description: data.description.clone(),
+                    windows: data.windows.clone(),
+                    doors: data.doors.clone(),
+                    radiators: data.radiators.clone(),
+                    openings: data.openings.clone(),
+                    power_outlets: data.power_outlets.map(PowerOutletResult::Comparison),
+                    model_name: None,
+                },
+            }))
+            markdown=data.to_markdown()
+            filename=data.filename()
+        />
     };
 
     view! {
@@ -60,18 +79,15 @@ pub fn ComparisonRenderer(data: ComparisonData) -> impl IntoView {
                     <ComparisonDetailItem label_key="detail-label-radiators" value=v />})}
                 {data.openings.map(|v| view! {
                     <ComparisonDetailItem label_key="detail-label-openings" value=v />})}
+                {data.power_outlets.map(|counts| view! {
+                    <div class="detail-item">
+                        <strong>{move_tr!("detail-label-power-outlets-comparison")}" "</strong>
+                        {move || counts.display(&i18n.tr("detail-outlet-uncertain"), &i18n.tr("detail-outlet-unavailable"))}
+                    </div>
+                })}
             </div>
 
-            // Download button anchored to the bottom-right of the card
-            <div class="compact-download-row">
-                <button
-                    class="compact-download-btn"
-                    title=move_tr!("download-as-markdown")
-                    on:click=on_download
-                >
-                    <i class="fas fa-arrow-down"></i>
-                </button>
-            </div>
+            {downloads}
         </div>
     }
 }

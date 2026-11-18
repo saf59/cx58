@@ -4,6 +4,7 @@ use crate::components::chat_context::ChatContext;
 use crate::components::chat_data::{ComparisonData, ContextRequest, DescriptionData};
 use crate::components::chat_types::{Message, MessageContent, MessageRole};
 use crate::components::tree::{NodeInfo, NodeType, NodeWithLeaf};
+use crate::report_export::ReportRequest;
 use leptos::leptos_dom::log;
 use leptos::logging;
 use leptos::prelude::{GetUntracked, Set, Update, WriteSignal};
@@ -115,6 +116,10 @@ pub async fn handle_stream(
         set_chat_state,
         context,
         i18n,
+        ReportRequest {
+            text: prompt,
+            language,
+        },
     )
     .await
 }
@@ -125,9 +130,10 @@ async fn process_stream(
     set_chat_state: WriteSignal<String>,
     context: ChatContext,
     i18n: I18n,
+    report_request: ReportRequest,
 ) -> Result<(), String> {
     let mut current_event: Option<String> = None;
-    let mut buffer = String::new();
+    let mut buffer = Vec::new();
 
     loop {
         let chunk = JsFuture::from(reader.read()).await.map_err(|e| {
@@ -150,14 +156,13 @@ async fn process_stream(
             .map_err(|_| i18n.tr("chat-error-no-chunk-value"))?;
 
         let array = js_sys::Uint8Array::from(value);
-        let bytes = array.to_vec();
-        let text = String::from_utf8_lossy(&bytes);
+        buffer.extend(array.to_vec());
 
-        buffer.push_str(&text);
-
-        // Process lines
-        while let Some(newline_pos) = buffer.find('\n') {
-            let line = buffer[..newline_pos].trim().to_string();
+        // Decode complete SSE lines so a split UTF-8 character survives into the card.
+        while let Some(newline_pos) = buffer.iter().position(|&byte| byte == b'\n') {
+            let line = String::from_utf8_lossy(&buffer[..newline_pos])
+                .trim()
+                .to_owned();
             buffer.drain(..=newline_pos);
 
             if line.is_empty() {
@@ -178,6 +183,7 @@ async fn process_stream(
                     set_chat_state,
                     context,
                     i18n,
+                    &report_request,
                 );
                 current_event = None;
             }
@@ -197,6 +203,7 @@ fn process_sse_event(
     set_chat_state: WriteSignal<String>,
     context: ChatContext,
     i18n: I18n,
+    report_request: &ReportRequest,
 ) {
     use crate::components::tree::{TreeNode, build_tree};
 
@@ -262,9 +269,9 @@ fn process_sse_event(
                     context.remember_report_media(node);
                 }
                 set_history.update(|h| {
-                    h.push(Message::new(
-                        MessageRole::Llm,
+                    h.push(Message::from_report(
                         MessageContent::Description(Box::new(json_data)),
+                        report_request.clone(),
                     ));
                 });
             }
@@ -277,9 +284,9 @@ fn process_sse_event(
         Some("comparison") => match serde_json::from_str::<ComparisonData>(data) {
             Ok(json_data) => {
                 set_history.update(|h| {
-                    h.push(Message::new(
-                        MessageRole::Llm,
+                    h.push(Message::from_report(
                         MessageContent::Comparison(json_data),
+                        report_request.clone(),
                     ));
                 });
             }

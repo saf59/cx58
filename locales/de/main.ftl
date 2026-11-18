@@ -95,10 +95,23 @@ detail-label-windows = Fenster:
 detail-label-doors = Türen:
 detail-label-radiators = Heizkörper:
 detail-label-openings = Öffnungen:
+detail-label-power-outlets = Vollständig montierte Wandsteckdosen:
+detail-label-power-outlets-comparison = Vollständig montierte Wandsteckdosen (früher → später):
+detail-outlet-uncertain = unklare Fälle nicht mitgezählt
+detail-outlet-unavailable = nicht beurteilt
 
 # --- Shared download button tooltip ---
 # Used in: show_comparison and show_description.rs
 download-as-markdown = Als Markdown herunterladen
+download-as-pdf = Als PDF herunterladen
+download-as-json = Als JSON herunterladen
+report-export-working = Bericht wird vorbereitet…
+report-export-session-error = Ihre Sitzung ist abgelaufen oder nicht verfügbar. Melden Sie sich erneut an, um den Bericht herunterzuladen.
+report-export-access-error = Dieser Bericht ist nicht verfügbar. Prüfen Sie Ihren Berichtszugriff.
+report-export-size-error = Der Bericht ist zu groß für den Export.
+report-export-busy = Der Export ist ausgelastet. Versuchen Sie es gleich noch einmal.
+report-export-photo-error = Der Bericht oder seine Fotos sind vorübergehend nicht verfügbar. Versuchen Sie es erneut.
+report-export-error = Der Download ist fehlgeschlagen. Versuchen Sie es erneut.
 
 # --- Tree component (show_tree.rs) ---
 # Fallback label for nodes where name is None
@@ -122,3 +135,16 @@ selected-context-remove = Ausgewähltes Objekt entfernen
 selected-report-open = Bild des ausgewählten Berichts öffnen
 selected-report-remove = Ausgewählten Bericht entfernen
 selected-report-close = Berichtsbild schließen
+
+cx-id-edit = CX-ID bearbeiten
+cx-id-object = CX-ID des Objekts
+cx-id-session-error = Ihre Sitzung ist abgelaufen. Melden Sie sich erneut an, um die CX-ID zu bearbeiten.
+cx-id-optional = CX-ID (optional)
+cx-id-save = Speichern
+cx-id-clear = Leeren
+cx-id-close = Schließen
+cx-id-saved = CX-ID gespeichert.
+cx-id-working = Bitte warten…
+cx-id-access-error = Sie haben keinen Zugriff auf die CX-ID dieses Eintrags.
+cx-id-invalid = Die CX-ID enthält ein nicht unterstütztes Zeichen.
+cx-id-request-error = Die CX-ID konnte nicht geladen oder gespeichert werden. Bitte erneut versuchen.

@@ -23,6 +23,7 @@ use tracing::{debug, error, info, warn};
 enum FinishReason {
     Complete,
     StreamEndedEarly,
+    AgentError,
     Stopped,
     Timeout,
     MaxTokens,
@@ -36,7 +37,7 @@ fn terminal_sse_event(reason: &FinishReason) -> Option<(&'static str, &'static s
         FinishReason::Stopped => Some(("on_stop", "by_user")),
         FinishReason::Timeout => Some(("on_stop", "timeout")),
         FinishReason::MaxTokens => Some(("on_stop", "max_tokens")),
-        FinishReason::TransportError => None,
+        FinishReason::AgentError | FinishReason::TransportError => None,
     }
 }
 
@@ -49,6 +50,19 @@ pub struct PromptRequest {
     pub object_id: Option<String>,
     pub prev_leaf: Option<String>,
     pub next_leaf: Option<String>,
+}
+
+fn sse_block_end(bytes: &[u8]) -> Option<(usize, usize)> {
+    bytes.iter().enumerate().find_map(|(index, byte)| {
+        if *byte != b'\n' {
+            return None;
+        }
+        match &bytes[index + 1..] {
+            [b'\n', ..] => Some((index, 2)),
+            [b'\r', b'\n', ..] => Some((index, 3)),
+            _ => None,
+        }
+    })
 }
 
 pub async fn chat_stream_handler(
@@ -158,7 +172,7 @@ pub async fn chat_stream_handler(
 
         let mut assembler = ChunkAssembler::new();
 
-        let mut buffer = String::new();
+        let mut buffer = Vec::new();
         let finish_reason = 'outer: loop {
             tokio::select! {
                 _ = tokio::time::sleep_until((start_at + max_duration).into()) => {
@@ -179,13 +193,12 @@ pub async fn chat_stream_handler(
                         }
                     };
 
-                    let text = String::from_utf8_lossy(&bytes_chunk);
-                    buffer.push_str(&text.replace("\r\n", "\n"));
+                    buffer.extend_from_slice(&bytes_chunk);
 
-                    // Parse SSE lines
-                    while let Some(line_end) = buffer.find("\n\n") {
-                        let sse_block = buffer[..line_end].to_string();
-                        buffer = buffer[line_end + 2..].to_string();
+                    // Decode only complete SSE blocks to preserve split UTF-8 and CRLF.
+                    while let Some((end, delimiter_len)) = sse_block_end(&buffer) {
+                        let sse_block = String::from_utf8_lossy(&buffer[..end]).into_owned();
+                        buffer.drain(..end + delimiter_len);
 
                         // Extract data: from SSE
                         for line in sse_block.lines() {
@@ -251,7 +264,9 @@ pub async fn chat_stream_handler(
                                             }
                                             StreamEvent::Error { error, .. } => {
                                                 tracing::error!("Agent error: {}", error);
-                                                yield Ok(Event::default().event("error").data(error));
+                                                let message = error.lines().collect::<Vec<_>>().join(" ");
+                                                yield Ok(Event::default().event("error").data(message));
+                                                break 'outer FinishReason::AgentError;
                                             }
                                             StreamEvent::Cancelled { reason, .. } => {
                                                 warn!("Stream cancelled: {}", reason);
@@ -308,6 +323,7 @@ pub async fn chat_stream_handler(
         }
 
         match finish_reason {
+            FinishReason::AgentError => break,
             FinishReason::TransportError => {
                 retries += 1;
                 if retries <= max_retries {
@@ -336,7 +352,29 @@ pub async fn chat_stream_handler(
 
 #[cfg(test)]
 mod finish_reason_tests {
-    use super::{FinishReason, terminal_sse_event};
+    use super::{FinishReason, sse_block_end, terminal_sse_event};
+
+    #[test]
+    fn terminal_agent_error_has_no_second_stop_event() {
+        assert_eq!(terminal_sse_event(&FinishReason::AgentError), None);
+    }
+
+    #[test]
+    fn waits_for_the_complete_utf8_sse_block_and_line_ending() {
+        for ending in ["\n\n", "\r\n\r\n"] {
+            let event = format!("data: Küche – Схід{ending}");
+            let bytes = event.as_bytes();
+            for split in 0..bytes.len() {
+                assert!(sse_block_end(&bytes[..split]).is_none());
+            }
+            let (end, delimiter) = sse_block_end(bytes).unwrap();
+            assert_eq!(end + delimiter, bytes.len());
+            assert_eq!(
+                std::str::from_utf8(&bytes[..end]).unwrap().trim_end(),
+                "data: Küche – Схід"
+            );
+        }
+    }
 
     #[test]
     fn early_eof_is_not_reported_as_success() {

@@ -1,3 +1,4 @@
+use crate::report_export::{PowerOutletComparison, PowerOutletCount};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -28,6 +29,8 @@ pub struct DescriptionData {
     pub radiators: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub openings: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub power_outlets: Option<PowerOutletCount>,
     pub model_name: String,
     pub confidence: Option<f32>,
     pub created_at: String,
@@ -52,6 +55,12 @@ impl DescriptionData {
         }
         if let Some(v) = &self.openings {
             md.push_str(&format!("\n**Openings:** {}\n", v));
+        }
+        if let Some(count) = self.power_outlets {
+            md.push_str(&format!(
+                "\n**Fully installed wall outlets:** {}\n",
+                count.display("unclear candidates excluded")
+            ));
         }
         md
     }
@@ -85,6 +94,8 @@ pub struct ComparisonData {
     pub radiators: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub openings: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub power_outlets: Option<PowerOutletComparison>,
 }
 
 impl ComparisonData {
@@ -105,6 +116,12 @@ impl ComparisonData {
         }
         if let Some(v) = &self.openings {
             md.push_str(&format!("\n**Openings:** {}\n", v));
+        }
+        if let Some(counts) = self.power_outlets {
+            md.push_str(&format!(
+                "\n**Fully installed wall outlets (earlier → later):** {}\n",
+                counts.display("unclear candidates excluded", "not assessed")
+            ));
         }
         md
     }

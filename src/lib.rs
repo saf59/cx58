@@ -6,6 +6,7 @@ pub mod auth_ssr;
 #[cfg(feature = "ssr")]
 pub mod chunk_assembler;
 pub mod components;
+pub mod cx_id;
 pub mod config;
 #[cfg(feature = "ssr")]
 pub mod llm_stream;
@@ -14,6 +15,7 @@ pub mod proxy_reports;
 #[cfg(feature = "ssr")]
 pub mod proxy_tree;
 pub mod server_fn;
+pub mod report_export;
 #[cfg(feature = "ssr")]
 pub mod ssr;
 #[cfg(feature = "ssr")]

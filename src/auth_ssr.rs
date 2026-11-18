@@ -3,7 +3,7 @@ use crate::state::AppState;
 use axum::{
     Error,
     extract::FromRequestParts,
-    http::request::Parts,
+    http::{StatusCode, request::Parts},
     response::{IntoResponse, Redirect, Response},
 };
 use axum_extra::extract::CookieJar;
@@ -33,10 +33,28 @@ pub struct SessionData {
     pub name: Option<String>,
     pub roles: HashSet<Role>,
     pub id_token_expires_at: Option<Instant>,
-    pub is_refreshing: Arc<Mutex<bool>>,
+    pub refresh_lock: Arc<Mutex<()>>,
     pub email: Option<String>,
 }
 const REFRESH_THRESHOLD: Duration = Duration::from_secs(5 * 60);
+
+pub(crate) async fn authenticated_operator(
+    state: &AppState,
+    cookies: &CookieJar,
+) -> Result<String, StatusCode> {
+    let cookie = cookies.get(SESSION_ID).ok_or(StatusCode::UNAUTHORIZED)?;
+    let session = get_and_refresh_session(state, cookie.value())
+        .await
+        .filter(|session| session.id_token.is_some() && session.subject.is_some())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+    if !session.roles.contains(&Role::User) && !session.roles.contains(&Role::Admin) {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    session
+        .email
+        .filter(|email| !email.is_empty())
+        .ok_or(StatusCode::FORBIDDEN)
+}
 
 pub struct SessionDataWithRefresh(pub SessionData);
 
@@ -90,107 +108,75 @@ fn id_token_expiry_instant(claims: &CoreIdTokenClaims) -> Instant {
     )
 }
 
-pub async fn get_and_refresh_session(state: &AppState, session_id: &str) -> Option<SessionData> {
-    let session_data = {
-        let sessions = state.sessions.lock().await;
-        let Some(data) = sessions.get(session_id).cloned() else {
-            debug!(session_id = %session_id, "session refresh: session not found");
-            return None;
-        };
-        data
-    };
-
-    let now = Instant::now();
-
-    if session_data
+fn session_expired(session: &SessionData) -> bool {
+    session
         .id_token_expires_at
-        .is_some_and(|exp_at| now >= exp_at)
+        .is_some_and(|expiry| Instant::now() >= expiry)
+}
+
+pub async fn get_and_refresh_session(state: &AppState, session_id: &str) -> Option<SessionData> {
+    let session = state.sessions.lock().await.get(session_id).cloned()?;
+    if session_expired(&session) {
+        session.refresh_token.as_ref()?;
+        let _guard = session.refresh_lock.lock().await;
+        return refresh_session(state, session_id, true).await;
+    }
+
+    let near_expiry = session.id_token_expires_at.is_some_and(|expiry| {
+        expiry.saturating_duration_since(Instant::now()) <= REFRESH_THRESHOLD
+    });
+    if near_expiry
+        && session.refresh_token.is_some()
+        && let Ok(guard) = session.refresh_lock.clone().try_lock_owned()
     {
-        debug!(session_id = %session_id, "session refresh: id_token expired");
+        let state = state.clone();
+        let session_id = session_id.to_owned();
+        tokio::spawn(async move {
+            let _guard = guard;
+            refresh_session(&state, &session_id, false).await;
+        });
+    }
+    Some(session)
+}
+
+// The caller holds the session's refresh lock. Read again in case another
+// request refreshed the token while this request was waiting.
+async fn refresh_session(
+    state: &AppState,
+    session_id: &str,
+    expired_only: bool,
+) -> Option<SessionData> {
+    let session = state.sessions.lock().await.get(session_id).cloned()?;
+    if expired_only && !session_expired(&session) {
+        return Some(session);
+    }
+    let token = session.refresh_token?;
+    let refreshed = match perform_token_refresh(
+        token.clone(),
+        &state.http_client,
+        &state.sso_http_client,
+    )
+    .await
+    {
+        Ok(tokens) => tokens,
+        Err(_) => {
+            debug!("session refresh: provider rejected refresh");
+            return None;
+        }
+    };
+    if session.subject.as_deref() != Some(refreshed.subject.as_str())
+        || refreshed.expires_at <= Instant::now()
+    {
+        debug!("session refresh: invalid subject or expiry");
         return None;
     }
-
-    let needs_refresh = session_data.id_token_expires_at.is_some_and(|exp_at| {
-        exp_at
-            .checked_sub(REFRESH_THRESHOLD)
-            .is_some_and(|future_time| {
-                //trace_time("Refresh time at",&Some(future_time));
-                future_time <= now
-            })
-    });
-
-    if needs_refresh && session_data.refresh_token.is_some() {
-        debug!(session_id = %session_id, "session refresh: refresh needed");
-        let mut is_refreshing_lock = session_data.is_refreshing.lock().await;
-
-        if !*is_refreshing_lock {
-            *is_refreshing_lock = true;
-            drop(is_refreshing_lock);
-            let refresh_token = session_data.refresh_token.clone().unwrap();
-            let refresh_token_fallback = refresh_token.clone();
-            let session_id_clone = session_id.to_owned();
-            let session_store_clone = state.sessions.clone();
-            let oidc_client_clone = state.http_client.clone();
-            let http_client_clone = state.sso_http_client.clone();
-
-            tokio::spawn(async move {
-                tracing::info!(
-                    "Background refresh started for session: {}",
-                    session_id_clone
-                );
-
-                match perform_token_refresh(refresh_token, &oidc_client_clone, &http_client_clone)
-                    .await
-                {
-                    Ok((new_id_token, new_refresh_token, new_expires_at)) => {
-                        debug!(
-                            session_id = %session_id_clone,
-                            has_refresh_token = new_refresh_token.is_some(),
-                            "session refresh: token refresh ok"
-                        );
-                        let refresh_flag = {
-                            let mut guard = session_store_clone.lock().await;
-                            if let Some(current_data) = guard.get_mut(&session_id_clone) {
-                                current_data.id_token = Some(new_id_token);
-                                let current_refresh_token = current_data
-                                    .refresh_token
-                                    .clone()
-                                    .unwrap_or(refresh_token_fallback);
-                                current_data.refresh_token = Some(refresh_token_after_rotation(
-                                    current_refresh_token,
-                                    new_refresh_token,
-                                ));
-                                current_data.id_token_expires_at = Some(new_expires_at);
-                                Some(current_data.is_refreshing.clone())
-                            } else {
-                                None
-                            }
-                        };
-
-                        if let Some(refresh_flag) = refresh_flag {
-                            *refresh_flag.lock().await = false;
-                        }
-                    }
-                    Err(e) => {
-                        debug!(
-                            session_id = %session_id_clone,
-                            error = ?e,
-                            "session refresh: token refresh failed"
-                        );
-                        let refresh_flag = session_store_clone
-                            .lock()
-                            .await
-                            .get(&session_id_clone)
-                            .map(|current_data| current_data.is_refreshing.clone());
-                        if let Some(refresh_flag) = refresh_flag {
-                            *refresh_flag.lock().await = false;
-                        }
-                    }
-                }
-            });
-        }
-    }
-    Some(session_data)
+    let mut sessions = state.sessions.lock().await;
+    let current = sessions.get_mut(session_id)?;
+    current.id_token = Some(refreshed.id_token);
+    current.refresh_token = Some(refresh_token_after_rotation(token, refreshed.refresh_token));
+    current.id_token_expires_at = Some(refreshed.expires_at);
+    current.roles = refreshed.roles;
+    Some(current.clone())
 }
 
 pub fn trace_time(text: &str, id_token_expires_at: &Option<Instant>) {
@@ -323,14 +309,19 @@ impl TryFrom<&SessionData> for Auth {
     }
 }
 
-type RefreshResult =
-    Result<(String, Option<String>, Instant), Box<dyn std::error::Error + Send + Sync>>;
+struct RefreshedSession {
+    id_token: String,
+    refresh_token: Option<String>,
+    expires_at: Instant,
+    subject: String,
+    roles: HashSet<Role>,
+}
 
-pub async fn perform_token_refresh(
+async fn perform_token_refresh(
     current_refresh_token: String,
     oidc_client: &crate::ssr::ISPOidcClient,
     http_client: &reqwest::Client,
-) -> RefreshResult {
+) -> Result<RefreshedSession, Box<dyn std::error::Error + Send + Sync>> {
     let refresh_token = RefreshToken::new(current_refresh_token);
 
     let token_response = oidc_client
@@ -350,28 +341,25 @@ pub async fn perform_token_refresh(
         )
         .map_err(|e| format!("ID Token validation failed after refresh: {:?}", e))?;
 
-    let expires_at_system_time: SystemTime = claims.expiration().into();
-    let system_now = SystemTime::now();
-    let instant_now = Instant::now();
-    let time_until_expiry = expires_at_system_time
-        .duration_since(system_now)
-        .unwrap_or(Duration::ZERO);
-
-    let duration_to_wait = time_until_expiry.saturating_sub(REFRESH_THRESHOLD);
-    if duration_to_wait.is_zero() {
-        tracing::info!("Refresh window reached, refreshing immediately...");
-    } else {
-        tracing::info!("Waiting {:?} before refreshing...", duration_to_wait);
+    let mut roles = serde_json::to_value(claims)
+        .ok()
+        .map(|claims| extract_roles_from_claims(&claims))
+        .unwrap_or_default();
+    if roles.is_empty()
+        && let Some(claims) =
+            crate::ssr::extract_claims_from_access_token(token_response.access_token())
+    {
+        roles = extract_roles_from_claims(&claims);
     }
-    let new_expires_at = expiry_instant_from(expires_at_system_time, system_now, instant_now);
-
-    Ok((
-        id_token.to_string(),
-        token_response
+    Ok(RefreshedSession {
+        id_token: id_token.to_string(),
+        refresh_token: token_response
             .refresh_token()
             .map(|t| t.secret().to_string()),
-        new_expires_at,
-    ))
+        expires_at: id_token_expiry_instant(claims),
+        subject: claims.subject().to_string(),
+        roles,
+    })
 }
 pub fn extract_roles_from_claims(claims: &serde_json::Value) -> HashSet<Role> {
     let mut roles = HashSet::new();

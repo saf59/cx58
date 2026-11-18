@@ -1,9 +1,11 @@
 pub(crate) mod chat_context;
+pub(crate) mod cx_id_editor;
 pub(crate) mod home_page;
 pub(crate) mod lang;
 pub(crate) mod media_proxy_script;
 pub(crate) mod model_settings_panel;
 pub(crate) mod node_info_display;
+mod report_downloads;
 pub(crate) mod report_preview;
 pub(crate) mod reports_panel;
 pub(crate) mod show_carusel;

@@ -4,6 +4,7 @@
 
 use crate::components::chat_data::{ComparisonData, ContextRequest, DescriptionData};
 use crate::components::tree::{NodeWithLeaf, Tree};
+use crate::report_export::ReportRequest;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -40,6 +41,7 @@ pub struct Message {
     pub id: String,
     pub role: MessageRole,
     pub content: MessageContent,
+    pub report_request: Option<ReportRequest>,
 }
 
 impl Message {
@@ -48,10 +50,18 @@ impl Message {
             id: uuid::Uuid::now_v7().to_string(),
             role,
             content,
+            report_request: None,
         }
     }
 
     pub fn new_text(role: MessageRole, text: String) -> Self {
         Self::new(role, MessageContent::Text(text))
+    }
+
+    #[cfg(not(feature = "ssr"))]
+    pub fn from_report(content: MessageContent, request: ReportRequest) -> Self {
+        let mut message = Self::new(MessageRole::Llm, content);
+        message.report_request = Some(request);
+        message
     }
 }

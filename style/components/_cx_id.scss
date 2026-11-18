@@ -1,0 +1,63 @@
+.cx-id-trigger,
+.cx-id-actions button {
+    padding: 3px 8px;
+    border: 1px solid var(--6-color);
+    border-radius: 4px;
+    background: var(--f0-color);
+    color: var(--text-color);
+    cursor: pointer;
+}
+
+.reports-cx-id {
+    grid-column: 1 / -1;
+    min-width: 0;
+    text-align: left;
+
+    .cx-id-trigger {
+        display: block;
+        max-width: 100%;
+        overflow: hidden;
+        text-align: left;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+.cx-id-popover {
+    box-sizing: border-box;
+    width: min(24rem, calc(100% - 2rem));
+    padding: 1rem;
+    border: 1px solid var(--6-color);
+    border-radius: 8px;
+    background: var(--f0-color);
+    color: var(--text-color);
+    white-space: normal;
+    user-select: text;
+
+    form,
+    label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    textarea {
+        box-sizing: border-box;
+        width: 100%;
+        min-height: 4rem;
+        resize: vertical;
+        padding: 0.35rem;
+        font: inherit;
+    }
+
+    .cx-id-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    button:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
+}

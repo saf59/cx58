@@ -1,4 +1,5 @@
 use crate::components::tree::{NodeInfo, NodeType};
+use crate::cx_id::{name_with_cx_id, use_cx_ids};
 use leptos::prelude::*;
 use leptos_fluent::move_tr;
 
@@ -7,11 +8,13 @@ pub fn NodeInfoDisplay(
     node_signal: RwSignal<Option<NodeInfo>>,
     #[prop(into)] on_node_click: Callback<NodeInfo>,
 ) -> impl IntoView {
+    let cx_ids = use_cx_ids(move || node_signal.get().map(|node| node.id).into_iter().collect());
     view! {
         {move || {
             node_signal
                 .get()
                 .map(|node| {
+                    let id = node.id;
                     let node_clone = node.clone();
                     let icon_class = match node.node_type {
                         NodeType::Root => "fas fa-building",
@@ -33,6 +36,8 @@ pub fn NodeInfoDisplay(
                         let open_label = move_tr!("selected-report-open").get();
                         let remove_label = move_tr!("selected-report-remove").get();
                         let open_accessible_label = format!("{}: {}", open_label, display_name);
+                        let open_label = move || name_with_cx_id(&open_accessible_label, cx_ids.run(id).as_deref());
+                        let open_title = open_label.clone();
 
                         view! {
                             <div class="node-info-item selected-report-item">
@@ -40,8 +45,8 @@ pub fn NodeInfoDisplay(
                                     type="button"
                                     class="selected-report-open"
                                     popovertarget=popup_target
-                                    title=open_accessible_label.clone()
-                                    aria-label=open_accessible_label
+                                    title=open_title
+                                    aria-label=open_label
                                     disabled=full_url.is_none()
                                 >
                                     {thumbnail_url
@@ -53,7 +58,13 @@ pub fn NodeInfoDisplay(
                                                 loading="lazy"
                                             />
                                         })}
-                                    <span class="selected-report-name">{display_name.clone()}</span>
+                                    <span class="selected-report-label">
+                                        <span class="selected-report-name">{display_name.clone()}</span>
+                                        {move || cx_ids.run(id).map(|cx_id| {
+                                            let title = cx_id.clone();
+                                            view! { <span class="selected-report-name" title=title>{cx_id}</span> }
+                                        })}
+                                    </span>
                                 </button>
                                 <button
                                     type="button"
@@ -101,7 +112,9 @@ pub fn NodeInfoDisplay(
                                 <i class="fas fa-times"></i>
                             </button>
                             <i class=icon_class></i>
-                            <span class="node-name">{display_name}</span>
+                            <span class="node-name">
+                                {move || name_with_cx_id(&display_name, cx_ids.run(id).as_deref())}
+                            </span>
                         </div>
                         }.into_any()
                     }

@@ -20,6 +20,9 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
     let location = use_location();
     let navigate = use_navigate();
     let current_panel = Memo::new(move |_| location.query.with(|query| query.get("panel")));
+    // The tree panels fetch data in the browser. Mount them after the sidebar hydrates.
+    let tree_panels_ready = RwSignal::new(false);
+    Effect::new(move |_| tree_panels_ready.set(true));
     let nav_new_chat = navigate.clone();
     let nav_faq = navigate.clone();
     let nav_objects = navigate.clone();
@@ -75,8 +78,8 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
             <span>{move || move_tr!("objects")}</span>
         </a>
 
-        <Show when=move || current_panel.get().as_deref() != Some("objects") fallback=|| view! { <Objects /> }>
-            {().into_view()}
+        <Show when=move || tree_panels_ready.get() && current_panel.get().as_deref() == Some("objects")>
+            <Objects />
         </Show>
 
         <a href="/?panel=models" on:click=move |ev| {
@@ -95,8 +98,8 @@ pub fn SideBody(is_admin: bool) -> impl IntoView {
             <span>{move || move_tr!("reports")}</span>
         </a>
 
-        <Show when=move || location.pathname.get() != "/reports" fallback=|| view! { <Reports /> }>
-            {().into_view()}
+        <Show when=move || tree_panels_ready.get() && location.pathname.get() == "/reports">
+            <Reports />
         </Show>
 
         <hr />
