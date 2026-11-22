@@ -10,6 +10,34 @@ pub fn build_hmac(secret: &str, payload: &[u8]) -> Result<(i64, String)> {
     Ok((timestamp, signature))
 }
 
+pub(crate) fn build_operator_hmac(
+    secret: &str,
+    method: &str,
+    target: &str,
+    operator: &str,
+    content_type: &[u8],
+    body: &[u8],
+) -> Result<(i64, String)> {
+    if secret.trim().is_empty() {
+        bail!("HMAC secret must not be empty");
+    }
+    let timestamp = chrono::Utc::now().timestamp();
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes())?;
+    mac.update(b"cx58-operator-v1\0");
+    mac.update(&timestamp.to_be_bytes());
+    for field in [
+        method.as_bytes(),
+        target.as_bytes(),
+        operator.as_bytes(),
+        content_type,
+    ] {
+        mac.update(&(field.len() as u64).to_be_bytes());
+        mac.update(field);
+    }
+    mac.update(body);
+    Ok((timestamp, hex::encode(mac.finalize().into_bytes())))
+}
+
 fn build_hmac_at(secret: &str, payload: &[u8], timestamp: i64) -> Result<String> {
     if secret.trim().is_empty() {
         bail!("HMAC secret must not be empty");

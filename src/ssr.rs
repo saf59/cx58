@@ -1075,6 +1075,17 @@ pub async fn security_headers(
     next: Next,
 ) -> impl IntoResponse {
     let uri = req.uri().path().to_string();
+    if uri.starts_with("/api/")
+        && !req.method().is_safe()
+        && matches!(
+            req.headers()
+                .get("sec-fetch-site")
+                .and_then(|value| value.to_str().ok()),
+            Some("cross-site" | "same-site")
+        )
+    {
+        return StatusCode::FORBIDDEN.into_response();
+    }
     // ❌ We do not add CSP for static or API
     if is_static_asset(&uri) {
         let mut res = next.run(req).await;

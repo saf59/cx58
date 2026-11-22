@@ -57,6 +57,7 @@ pub struct UpdateModelsResponse {
 #[cfg(feature = "ssr")]
 mod ssr {
     use super::UpdateModelsRequest;
+    use crate::auth_ssr::authenticated_operator;
     use crate::{hmac::build_hmac, state::AppState};
     use axum::{
         Json,
@@ -64,6 +65,7 @@ mod ssr {
         http::StatusCode,
         response::IntoResponse,
     };
+    use axum_extra::extract::CookieJar;
     use serde_json::Value;
 
     pub async fn get_models_handler(
@@ -110,10 +112,26 @@ mod ssr {
     pub async fn update_models_handler(
         State(state): State<AppState>,
         Path(user_id): Path<String>,
+        cookies: CookieJar,
         Json(req): Json<UpdateModelsRequest>,
     ) -> impl IntoResponse {
+        let operator = match authenticated_operator(&state, &cookies).await {
+            Ok(operator) if operator == user_id => operator,
+            Ok(_) => return StatusCode::FORBIDDEN.into_response(),
+            Err(status) => return status.into_response(),
+        };
         let chat_config = &state.http_client.config.chat_config;
-        let agent_url = format!("{}/agent/models/{}", chat_config.agent_api_url, user_id);
+        let Ok(mut agent_url) = reqwest::Url::parse(&format!(
+            "{}/agent/models/",
+            chat_config.agent_api_url.trim_end_matches('/')
+        )) else {
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        };
+        let Ok(mut segments) = agent_url.path_segments_mut() else {
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        };
+        segments.pop_if_empty().push(&operator);
+        drop(segments);
         let agent_secret = chat_config.agent_api_key.clone().unwrap_or_default();
 
         let body = match serde_json::to_vec(&req) {
@@ -144,7 +162,7 @@ mod ssr {
 
         match state
             .async_http_client
-            .put(&agent_url)
+            .put(agent_url)
             .header("X-Timestamp", timestamp.to_string())
             .header("X-Signature", signature)
             .header("Content-Type", "application/json")

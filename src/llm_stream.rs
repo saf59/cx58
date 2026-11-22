@@ -68,8 +68,11 @@ fn sse_block_end(bytes: &[u8]) -> Option<(usize, usize)> {
 pub async fn chat_stream_handler(
     State(state): State<AppState>,
     jar: CookieJar,
-    axum::Json(req): axum::Json<PromptRequest>,
+    axum::Json(mut req): axum::Json<PromptRequest>,
 ) -> Result<impl IntoResponse, Response> {
+    req.user_id = crate::auth_ssr::authenticated_operator(&state, &jar)
+        .await
+        .map_err(IntoResponse::into_response)?;
     debug!("Received streaming request for prompt: {}", &req.message);
     let session_id = match jar.get(SESSION_ID) {
         Some(cookie) => cookie.value().to_string(),
@@ -119,7 +122,6 @@ pub async fn chat_stream_handler(
 
             let llm_req = match build_hmac(&agent_secret,&req_bytes) {
                 Ok ((timestamp,signature)) => {
-                    debug!("Sending request with timestamp: {} and signature: {}", &timestamp, &signature);
                     client.post(&agent_url)
                         .header("X-Timestamp", timestamp.to_string())
                         .header("X-Signature", signature)

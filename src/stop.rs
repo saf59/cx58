@@ -7,6 +7,9 @@ use std::time::Duration;
 
 // Stop handler - extracts session_id from cookie
 pub async fn stop_handler(State(state): State<AppState>, jar: CookieJar) -> impl IntoResponse {
+    if let Err(status) = crate::auth_ssr::authenticated_operator(&state, &jar).await {
+        return (status, "Operator session required");
+    }
     // Extract session_id from cookie
     let session_id = match jar.get(SESSION_ID) {
         Some(cookie) => cookie.value().to_string(),
@@ -15,8 +18,6 @@ pub async fn stop_handler(State(state): State<AppState>, jar: CookieJar) -> impl
             return (StatusCode::UNAUTHORIZED, "No session to exit");
         }
     };
-
-    tracing::info!("Stop request for session: {}", session_id);
 
     let mut sessions = state.chat_sessions.lock().await;
 
@@ -37,7 +38,6 @@ pub async fn stop_handler(State(state): State<AppState>, jar: CookieJar) -> impl
 
         (StatusCode::OK, "stopped")
     } else {
-        tracing::warn!("Session {} not found", session_id);
         (StatusCode::NOT_FOUND, "session not found")
     }
 }
